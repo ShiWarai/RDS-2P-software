@@ -1,0 +1,146 @@
+# Конфигурация двигателей квадропеда RDS-2P
+motor_types:
+  SCS40:
+    # Максимальные значения для units
+    min_position_units: 0         # Положение от 0 до 1023
+    max_position_units: 1023      # Положение от 0 до 1023
+    min_velocity_units: 0         # Скорость от 0 до 1023
+    max_velocity_units: 1023      # Скорость от 0 до 1023  
+    min_acceleration_units: 0     # Ускорение от 0 до 255
+    max_acceleration_units: 255   # Ускорение от 0 до 255
+    
+    # Коэффициенты конвертации
+    motor_units_per_radian: 195.56959      # 1023 units / 1.67 rad ≈ 614.4
+    motor_units_per_rad_per_sec: 195.56959 # 1023 units / 1.0 rad/s
+    motor_units_per_rad_per_sec_sq: 195.56959 # 255 units / 2.55 rad/s²
+    
+    # Коэффициент напряжения (реальный вольтаж = units * voltage_scale)
+    voltage_scale: 0.1
+    
+    # Коэффициент тока (реальный ток = units * current_scale)
+    current_scale: 0.0065
+    
+    # Коэффициент усилия (реальное усилие = current_units * effort_scale)
+    effort_scale: 0.01
+    
+    # Максимальные физические значения
+    max_velocity: 8.7       # рад/с
+    max_acceleration: 20.0  # рад/с²
+    
+    # PID коэффициенты для симуляции
+    pid_kp: 6.4            # Пропорциональный коэффициент
+    pid_ki: 0.0             # Интегральный коэффициент
+    pid_kd: 6.0             # Дифференциальный коэффициент
+
+motors:
+  # Передняя левая нога
+  leg_block_fl:
+    type: "SCS40"
+    id: 1
+    joint_name: "leg_block_fl_joint"
+    zero_offset_units: 500  # Центр отсчета в units (initial_position)
+    min_position_units: 157  # Минимальная позиция в units
+    max_position_units: 692  # Максимальная позиция в units
+    reversed: false
+  
+  hip_fl:
+    type: "SCS40"
+    id: 2
+    joint_name: "hip_fl_joint"
+    zero_offset_units: 400 # Центр отсчета в units (initial_position)
+    min_position_units: 163  # Минимальная позиция в units
+    max_position_units: 769  # Максимальная позиция в units
+    reversed: false
+  
+  shin_fl:
+    type: "SCS40"
+    id: 3
+    joint_name: "shin_fl_joint"
+    zero_offset_units: 440  # Центр отсчета в units (initial_position)
+    min_position_units: 297  # Минимальная позиция в units
+    max_position_units: 730  # Максимальная позиция в units
+    reversed: false
+  
+  # Передняя правая нога
+  leg_block_fr:
+    type: "SCS40"
+    id: 4
+    joint_name: "leg_block_fr_joint"
+    zero_offset_units: 505  # Центр отсчета в units (initial_position)
+    min_position_units: 376  # Минимальная позиция в units
+    max_position_units: 849  # Максимальная позиция в units
+    reversed: true
+  
+  hip_fr:
+    type: "SCS40"
+    id: 5
+    joint_name: "hip_fr_joint"
+    zero_offset_units: 615  # Центр отсчета в units (initial_position)
+    min_position_units: 274  # Минимальная позиция в units
+    max_position_units: 854  # Максимальная позиция в units
+    reversed: true
+  
+  shin_fr:
+    type: "SCS40"
+    id: 6
+    joint_name: "shin_fr_joint"
+    zero_offset_units: 630  # Центр отсчета в units (initial_position)
+    min_position_units: 359  # Минимальная позиция в units
+    max_position_units: 748  # Максимальная позиция в units
+    reversed: true
+  
+  # Задняя левая нога
+  leg_block_bl:
+    type: "SCS40"
+    id: 7
+    joint_name: "leg_block_bl_joint"
+    zero_offset_units: 495  # Центр отсчета в units (initial_position)
+    min_position_units: 396  # Минимальная позиция в units
+    max_position_units: 850  # Максимальная позиция в units
+    reversed: true
+  
+  hip_bl:
+    type: "SCS40"
+    id: 8
+    joint_name: "hip_bl_joint"
+    zero_offset_units: 415  # Центр отсчета в units (initial_position)
+    min_position_units: 183  # Минимальная позиция в units
+    max_position_units: 772  # Максимальная позиция в units
+    reversed: false
+  
+  shin_bl:
+    type: "SCS40"
+    id: 9
+    joint_name: "shin_bl_joint"
+    zero_offset_units: 363  # Центр отсчета в units (initial_position)
+    min_position_units: 191  # Минимальная позиция в units
+    max_position_units: 660  # Максимальная позиция в units
+    reversed: false
+  
+  # Задняя правая нога
+  leg_block_br:
+    type: "SCS40"
+    id: 10
+    joint_name: "leg_block_br_joint"
+    zero_offset_units: 515  # Центр отсчета в units (initial_position)
+    min_position_units: 178  # Минимальная позиция в units
+    max_position_units: 638  # Максимальная позиция в units
+    reversed: false
+  
+  hip_br:
+    type: "SCS40"
+    id: 11
+    joint_name: "hip_br_joint"
+    zero_offset_units: 644  # Центр отсчета в units (initial_position)
+    min_position_units: 309  # Минимальная позиция в units
+    max_position_units: 900  # Максимальная позиция в units
+    reversed: true
+  
+  shin_br:
+    type: "SCS40"
+    id: 12
+    joint_name: "shin_br_joint"
+    zero_offset_units: 613  # Центр отсчета в units (initial_position)
+    min_position_units: 361  # Минимальная позиция в units
+    max_position_units: 786  # Максимальная позиция в units
+    reversed: true

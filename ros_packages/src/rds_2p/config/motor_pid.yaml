@@ -1,0 +1,83 @@
+# Параметры контроллера моторов квадропеда RDS-2P
+# Лимиты суставов, усилия и скорости загружаются автоматически из URDF
+motor_controller:
+  ros__parameters:
+    # Общие параметры
+    update_rate: 100.0  # Hz
+    
+    # PID параметры для каждого типа сустава
+    pid_parameters:
+      leg_block:
+        p: 64.0
+        i: 0.0
+        d: 60.0
+        i_max: 50.0
+        i_min: -50.0
+        output_max: 100.0
+        output_min: -100.0
+      
+      hip:
+        p: 64.0
+        i: 0.0
+        d: 60.0
+        i_max: 40.0
+        i_min: -40.0
+        output_max: 80.0
+        output_min: -80.0
+      
+      shin:
+        p: 64.0
+        i: 0.0
+        d: 60.0
+        i_max: 30.0
+        i_min: -30.0
+        output_max: 60.0
+        output_min: -60.0
+    
+    # Параметры безопасности (дополнительные к URDF)
+    safety:
+      # Максимальная скорость изменения позиции (рад/с)
+      max_position_velocity: 5.0
+      
+      # Максимальное ускорение (рад/с²)
+      max_acceleration: 20.0
+      
+      # Таймаут связи с моторами (сек)
+      motor_timeout: 0.1
+      
+      # Автоматическая остановка при ошибке
+      auto_stop_on_error: true
+      
+      # Плавное ограничение (true) или жесткое (false)
+      soft_limits: true
+      
+      # Включить защиту по лимитам из URDF
+      enable_urdf_limits: true
+    
+    # Параметры кинематики
+    kinematics:
+      # Использовать сложную кинематику
+      use_complex_kinematics: false
+      
+      # Коэффициент для расчета shin угла
+      shin_angle_coefficient: 0.5
+    
+    # Параметры логирования
+    logging:
+      # Уровень логирования
+      level: "INFO"
+      
+      # Логировать состояния моторов
+      log_motor_states: false
+      
+      # Логировать кинематические преобразования
+      log_kinematics: false
+      
+      # Логировать команды
+      log_commands: false
+      
+      # Логировать нарушения безопасности
+      log_safety_violations: true
+      
+      # Логировать загрузку параметров из URDF
+      log_urdf_loading: true 

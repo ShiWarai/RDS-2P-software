@@ -1,0 +1,2 @@
+# This is a standalone CMake project, not a ROS package
+# It should be built separately using its own build.sh script

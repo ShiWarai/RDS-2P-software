@@ -1,0 +1,10 @@
+# Goal - текст для вывода
+string text
+---
+# Result - результат выполнения
+bool success
+string message
+---
+# Feedback - прогресс (опционально, можно использовать для длинных операций)
+string status
+

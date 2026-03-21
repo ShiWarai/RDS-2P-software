@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>rds_2p_telegram_bot</name>
+  <version>0.0.0</version>
+  <description>ROS2 пакет для Telegram бота - прослойка между Telegram и ROS2 топиками</description>
+  <maintainer email="zhuravlev.p.r@edu.mirea.ru">ubuntu</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclpy</depend>
+  <depend>std_msgs</depend>
+  <depend>audio_common_msgs</depend>
+  <depend>ament_index_python</depend>
+  
+  <depend>libsndfile1-dev</depend>
+
+  <exec_depend>python3-aiogram</exec_depend>
+  <exec_depend>python3-soundfile</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-scipy</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

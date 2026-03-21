@@ -1,0 +1,69 @@
+# Конфигурация осей для joints квадропеда RDS-2P
+# Эти настройки применяются к позициям моторов для получения правильных joint_states
+# 
+# Поля:
+# - axis_rotate: поворот оси (рад), ранее называлось position_offset (устарело)
+# - reversed_axis: инвертировать знак оси (true/false)
+
+joint_offsets:
+  # Передняя левая нога
+  leg_block_fl_joint:
+    axis_rotate: 0.0
+    reversed_axis: true
+  
+  hip_fl_joint:
+    axis_rotate: 0.7854
+    reversed_axis: true
+  
+  shin_fl_joint:
+    axis_rotate: 1.5707
+    reversed_axis: true
+
+  # Передняя правая нога
+  leg_block_fr_joint:
+    axis_rotate: 0.0
+    reversed_axis: false
+  
+  hip_fr_joint:
+    axis_rotate: 0.7854
+    reversed_axis: true
+  
+  shin_fr_joint:
+    axis_rotate: 1.5707
+    reversed_axis: true
+  
+  # Задняя левая нога
+  leg_block_bl_joint:
+    axis_rotate: 0.0
+    reversed_axis: true
+  
+  hip_bl_joint:
+    axis_rotate: 0.7854
+    reversed_axis: true
+  
+  shin_bl_joint:
+    axis_rotate: 1.5707
+    reversed_axis: true
+  
+  # Задняя правая нога
+  leg_block_br_joint:
+    axis_rotate: 0.0
+    reversed_axis: false
+  
+  hip_br_joint:
+    axis_rotate: 0.7854
+    reversed_axis: true
+  
+  shin_br_joint:
+    axis_rotate: 1.5707
+    reversed_axis: true
+
+# Коэффициенты кинематики для суставов голени
+kinematics_coefficients:
+  shin_velocity_multiplier: 1.4    # Коэффициент для скорости (joint изменяется быстрее мотора)
+  shin_effort_multiplier: 1.4   # Коэффициент для усилия (усилие мотора больше чем joint)
+
+# Описание:
+# - axis_rotate заменяет старое поле position_offset
+# - reversed_axis даёт возможность отразить направление без ручного "180 - угол"
+# - kinematics_coefficients применяются для суставов голени (shin_*_joint)

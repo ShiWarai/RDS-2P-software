@@ -1,0 +1,17 @@
+# Метаданные актуаторов для конвертации URDF в MJCF
+
+actuator_type: "scs40"
+sysid: "SCS40"
+max_torque: 4.16
+max_velocity: 8.7
+max_acceleration: 20.0
+armature: 0.001
+frictionloss: 0.1
+damping: 1.0
+kp: 4.16
+kv: 0.29
+vin: null
+kt: null
+R: null
+max_pwm: null
+error_gain: null

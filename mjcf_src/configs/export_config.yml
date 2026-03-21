@@ -1,0 +1,10 @@
+# Конфигурация путей для экспорта URDF в MJCF
+# Этот файл содержит настройки путей к исходным и выходным файлам
+
+# Пути к файлам и директориям
+paths:
+  urdf_source: "../urdf_src/export/rds-2p"  # Путь к исходному URDF файлу
+  original_meshes: "../urdf_src/export/rds-2p/meshes"  # Путь к исходным мешам
+  output_mjcf: "export/rds-2p/rds-2p.mjcf"  # Путь к выходному MJCF файлу
+  output_meshes: "export/rds-2p/meshes"  # Путь к выходным мешам
+  output_mjcf_feet_only: "export/rds-2p/rds-2p_feetonly.mjcf"  # Выходной MJCF файл только со стопами

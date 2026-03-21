@@ -1,0 +1,16 @@
+build
+install
+log
+Log
+
+
+.requirements_cache
+
+*.log
+
+# Other packages
+src/audio_common
+src/OrbbecSDK_ROS2
+
+# Other my repositories
+src/vosk_ros2

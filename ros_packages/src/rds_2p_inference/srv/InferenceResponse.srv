@@ -1,0 +1,6 @@
+# Request (empty - no input needed, all data comes from topics)
+---
+# Response
+float64 timestamp        # Timestamp when inference completed
+float64[12] joint_commands # Inference results (12 joint commands) - фиксированный размер для оптимизации DDS
+

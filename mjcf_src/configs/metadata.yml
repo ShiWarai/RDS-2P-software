@@ -1,0 +1,36 @@
+# Метаданные для конвертации URDF в MJCF
+
+# Глобальные настройки конвертации
+freejoint: true
+floating_base: true
+angle: "radian"
+floor_name: "floor"
+add_floor: false
+remove_redundancies: true
+height_offset: 0.16
+
+# IMU сенсоры
+imus:
+  - body_name: "base_link"
+    pos: [0.0, 0.0, 0.0]
+    quat: [1.0, 0.0, 0.0, 0.0]
+    acc_noise: 0.001
+    gyro_noise: 0.001
+
+# Камеры
+cameras:
+  - name: "track"
+    mode: "trackcom"
+    rpy: [45, 0, 0]
+    pos: [0, -1.0, 1.1]
+
+# Параметры столкновений
+collision_params:
+  condim: 1
+  contype: 1
+  conaffinity: 1
+  group: 4
+  priority: 1
+  friction: [0.6, 0.6, 0.6]
+  solref: [0.005, 1]
+  solimp: [0.99, 0.999, 0.00001]

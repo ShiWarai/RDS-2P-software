@@ -1,0 +1,38 @@
+# Конфигурация команд для Command Parser Node
+#
+# Этот файл связывает текстовые команды (из Telegram/голоса) с Action серверами.
+# Когда вы добавляете новое действие в unified_action_server.py, добавьте его сюда тоже!
+#
+# ВАЖНО: Настройки CVC теперь передаются через параметры launch файла, а не здесь!
+
+# Классы команд для управления параллельным выполнением
+# Команды одного класса НЕ могут выполняться параллельно
+# Команды разных классов МОГУТ выполняться параллельно
+
+commands:
+  # Команда "dance" - проигрывание танца
+  dance:
+    keywords: ["dance", "play", "танцуй", "танец"]  # Ключевые слова для fallback парсинга
+    cvc_command: "dance"  # Команда в CVC классификаторе (если используется)
+    action_type: "rds_2p_dance/action/PlayDance"  # Тип Action
+    action_name: "/dance/play"  # Имя Action сервера (должно совпадать с unified_action_server.py)
+    parser: "extract_number"  # Парсер параметров: "extract_number" извлекает число из текста
+    class: "motors"  # Класс команды - команды управления моторами не могут выполняться параллельно
+  
+  # Команда "say" - пример кастомного действия (вывод текста)
+  say:
+    keywords: ["say", "скажи", "сказать", "произнести"]
+    cvc_command: "say"
+    action_type: "rds_2p_commands/action/Say"
+    action_name: "/say"
+    parser: "extract_text"  # Извлекает текст после команды
+    class: "audio_output"  # Класс для аудио вывода
+  
+  # Пример: добавление новой команды
+  # your_command:
+  #   keywords: ["move", "двигайся", "иди"]
+  #   cvc_command: "move"
+  #   action_type: "your_package/action/YourAction"
+  #   action_name: "/your/action"
+  #   parser: "extract_number"
+  #   class: "motors"  # Не может выполняться параллельно с другими командами класса "motors"

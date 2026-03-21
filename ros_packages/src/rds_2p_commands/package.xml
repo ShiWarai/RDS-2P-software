@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>rds_2p_commands</name>
+  <version>0.0.0</version>
+  <description>ROS2 пакет для обработки команд из Telegram и голосовых расшифровок с поддержкой CVC классификатора и универсального Action сервера</description>
+  <maintainer email="zhuravlev.p.r@edu.mirea.ru">ubuntu</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
+  <buildtool_depend>rosidl_default_generators</buildtool_depend>
+
+  <depend>rclpy</depend>
+  <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>action_msgs</depend>
+  <depend>rosidl_default_runtime</depend>
+  <depend>unique_identifier_msgs</depend>
+  <depend>builtin_interfaces</depend>
+
+  <member_of_group>rosidl_interface_packages</member_of_group>
+  <depend>vosk_ros2</depend>
+  <depend>rds_2p_dance</depend>
+  <depend>ament_index_python</depend>
+  <depend>audio_common_msgs</depend>
+
+  <exec_depend>python3-requests</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
+

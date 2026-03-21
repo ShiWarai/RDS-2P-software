@@ -1,0 +1,122 @@
+# Метаданные суставов для конвертации URDF в MJCF
+
+joint_name_to_metadata:
+  leg_block_bl_joint:
+    actuator_type: "scs40"
+    nn_id: -1
+    id: -1
+    kp: -1
+    kd: -1
+    soft_torque_limit: -1
+    min_angle_deg: -1
+    max_angle_deg: -1
+
+  hip_bl_joint:
+    actuator_type: "scs40"
+    nn_id: -1
+    id: -1
+    kp: -1
+    kd: -1
+    soft_torque_limit: -1
+    min_angle_deg: -1
+    max_angle_deg: -1
+
+  shin_bl_joint:
+    actuator_type: "scs40"
+    nn_id: -1
+    id: -1
+    kp: -1
+    kd: -1
+    soft_torque_limit: -1
+    min_angle_deg: -1
+    max_angle_deg: -1
+
+  leg_block_br_joint:
+    actuator_type: "scs40"
+    nn_id: -1
+    id: -1
+    kp: -1
+    kd: -1
+    soft_torque_limit: -1
+    min_angle_deg: -1
+    max_angle_deg: -1
+
+  hip_br_joint:
+    actuator_type: "scs40"
+    nn_id: -1
+    id: -1
+    kp: -1
+    kd: -1
+    soft_torque_limit: -1
+    min_angle_deg: -1
+    max_angle_deg: -1
+
+  shin_br_joint:
+    actuator_type: "scs40"
+    nn_id: -1
+    id: -1
+    kp: -1
+    kd: -1
+    soft_torque_limit: -1
+    min_angle_deg: -1
+    max_angle_deg: -1
+
+  leg_block_fl_joint:
+    actuator_type: "scs40"
+    nn_id: -1
+    id: -1
+    kp: -1
+    kd: -1
+    soft_torque_limit: -1
+    min_angle_deg: -1
+    max_angle_deg: -1
+
+  hip_fl_joint:
+    actuator_type: "scs40"
+    nn_id: -1
+    id: -1
+    kp: -1
+    kd: -1
+    soft_torque_limit: -1
+    min_angle_deg: -1
+    max_angle_deg: -1
+
+  shin_fl_joint:
+    actuator_type: "scs40"
+    nn_id: -1
+    id: -1
+    kp: -1
+    kd: -1
+    soft_torque_limit: -1
+    min_angle_deg: -1
+    max_angle_deg: -1
+
+  leg_block_fr_joint:
+    actuator_type: "scs40"
+    nn_id: -1
+    id: -1
+    kp: -1
+    kd: -1
+    soft_torque_limit: -1
+    min_angle_deg: -1
+    max_angle_deg: -1
+
+  hip_fr_joint:
+    actuator_type: "scs40"
+    nn_id: -1
+    id: -1
+    kp: -1
+    kd: -1
+    soft_torque_limit: -1
+    min_angle_deg: -1
+    max_angle_deg: -1
+
+  shin_fr_joint:
+    actuator_type: "scs40"
+    nn_id: -1
+    id: -1
+    kp: -1
+    kd: -1
+    soft_torque_limit: -1
+    min_angle_deg: -1
+    max_angle_deg: -1

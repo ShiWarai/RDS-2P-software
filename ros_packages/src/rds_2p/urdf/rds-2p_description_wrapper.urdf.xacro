@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="rds-2p_description">
+    <xacro:include filename="rds-2p_ros.urdf"/>
+</robot>

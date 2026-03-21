@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>rds_2p</name>
+  <version>0.0.1</version>
+  <description>RDS-2P quadruped robot package</description>
+  <maintainer email="zhuravliov.pav@yandex.ru">Zhuravliov Pavel</maintainer>
+  <license>MIT License</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>ftservo_ros</depend>
+  <depend>rviz_imu_plugin</depend>
+  <depend>geometry_msgs</depend>
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
+  <depend>teleop_twist_keyboard</depend>
+  <depend>compressed_image_transport</depend>
+  <depend>compressed_depth_image_transport</depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

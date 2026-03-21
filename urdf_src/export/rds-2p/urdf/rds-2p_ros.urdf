@@ -1,0 +1,432 @@
+<robot name="rds-2p" version="1.0">
+  <joint name="leg_block_bl_joint" type="revolute">
+    <limit lower="-0.959931" upper="1.745329" effort="4.160000" velocity="8.700000"/>
+    <origin rpy="1.570796 0.000000 1.570796" xyz="-0.135944 0.061964 0.002448"/>
+    <parent link="base_link"/>
+    <child link="leg_block_bl_link"/>
+    <axis xyz="0.000000 0.000000 1.000000"/>
+  </joint>
+  <joint name="hip_bl_joint" type="revolute">
+    <limit lower="-1.047200" upper="1.047200" effort="4.160000" velocity="8.700000"/>
+    <origin rpy="1.570796 0.785398 -1.570796" xyz="0.031501 -0.000292 -0.008541"/>
+    <parent link="leg_block_bl_link"/>
+    <child link="hip_bl_link"/>
+    <axis xyz="0.000000 0.000000 -1.000000"/>
+  </joint>
+  <joint name="shin_fl_joint" type="revolute">
+    <limit lower="-1.134464" upper="0.523599" effort="4.160000" velocity="8.700000"/>
+    <origin rpy="-0.000000 -0.000000 2.356194" xyz="-0.099981 0.000046 0.005059"/>
+    <parent link="hip_fl_link"/>
+    <child link="shin_fl_link"/>
+    <axis xyz="0.000000 0.000000 1.000000"/>
+  </joint>
+  <joint name="foot_fl_joint" type="fixed">
+    <origin rpy="-0.000000 -0.000000 -0.000000" xyz="0.072618 -0.072439 0.002894"/>
+    <parent link="shin_fl_link"/>
+    <child link="foot_fl_link"/>
+  </joint>
+  <joint name="leg_block_fr_joint" type="revolute">
+    <limit lower="-1.745329" upper="0.959931" effort="4.160000" velocity="8.700000"/>
+    <origin rpy="1.570796 0.000000 1.570796" xyz="0.098667 -0.062261 0.002451"/>
+    <parent link="base_link"/>
+    <child link="leg_block_fr_link"/>
+    <axis xyz="0.000000 0.000000 1.000000"/>
+  </joint>
+  <joint name="hip_fr_joint" type="revolute">
+    <limit lower="-1.047198" upper="1.047200" effort="4.160000" velocity="8.700000"/>
+    <origin rpy="-1.570796 -0.000000 1.570796" xyz="-0.031718 0.000131 -0.009643"/>
+    <parent link="leg_block_fr_link"/>
+    <child link="hip_fr_link"/>
+    <axis xyz="0.000000 0.000000 -1.000000"/>
+  </joint>
+  <joint name="shin_fr_joint" type="revolute">
+    <limit lower="-1.134464" upper="0.523599" effort="4.160000" velocity="8.700000"/>
+    <origin rpy="0.000000 0.000000 -2.356195" xyz="-0.070737 0.070711 0.004477"/>
+    <parent link="hip_fr_link"/>
+    <child link="shin_fr_link"/>
+    <axis xyz="0.000000 0.000000 -1.000000"/>
+  </joint>
+  <joint name="foot_fr_joint" type="fixed">
+    <origin rpy="-0.000000 0.000000 -0.785397" xyz="0.102834 -0.000040 0.000002"/>
+    <parent link="shin_fr_link"/>
+    <child link="foot_fr_link"/>
+  </joint>
+  <joint name="panda_visual_joint" type="fixed">
+    <origin rpy="-0.000000 0.000000 1.570796" xyz="0.069342 -0.000054 0.020418"/>
+    <parent link="base_link"/>
+    <child link="panda_visual_link"/>
+  </joint>
+  <joint name="shin_bl_joint" type="revolute">
+    <limit lower="-1.134464" upper="0.523599" effort="4.160000" velocity="8.700000"/>
+    <origin rpy="3.141592 0.000000 -3.141592" xyz="0.100012 0.000035 0.004572"/>
+    <parent link="hip_bl_link"/>
+    <child link="shin_bl_link"/>
+    <axis xyz="0.000000 0.000000 1.000000"/>
+  </joint>
+  <joint name="foot_bl_joint" type="fixed">
+    <origin rpy="-0.000000 -0.000000 2.356195" xyz="0.000156 0.102417 0.008527"/>
+    <parent link="shin_bl_link"/>
+    <child link="foot_bl_link"/>
+  </joint>
+  <joint name="leg_block_br_joint" type="revolute">
+    <limit lower="-1.745329" upper="0.959931" effort="4.160000" velocity="8.700000"/>
+    <origin rpy="1.570796 0.000000 1.570796" xyz="-0.133924 -0.062262 0.002451"/>
+    <parent link="base_link"/>
+    <child link="leg_block_br_link"/>
+    <axis xyz="0.000000 0.000000 1.000000"/>
+  </joint>
+  <joint name="hip_br_joint" type="revolute">
+    <limit lower="-1.047200" upper="1.047200" effort="4.160000" velocity="8.700000"/>
+    <origin rpy="-1.570796 -0.785398 1.570796" xyz="-0.031717 -0.000295 -0.010561"/>
+    <parent link="leg_block_br_link"/>
+    <child link="hip_br_link"/>
+    <axis xyz="0.000000 0.000000 -1.000000"/>
+  </joint>
+  <joint name="shin_br_joint" type="revolute">
+    <limit lower="-1.134464" upper="0.523599" effort="4.160000" velocity="8.700000"/>
+    <origin rpy="0.000000 -0.000000 -1.570797" xyz="-0.100133 0.000005 0.004477"/>
+    <parent link="hip_br_link"/>
+    <child link="shin_br_link"/>
+    <axis xyz="0.000000 0.000000 -1.000000"/>
+  </joint>
+  <joint name="foot_br_joint" type="fixed">
+    <origin rpy="-0.000000 0.000000 -0.785398" xyz="0.102457 0.000276 0.000002"/>
+    <parent link="shin_br_link"/>
+    <child link="foot_br_link"/>
+  </joint>
+  <joint name="leg_block_fl_joint" type="revolute">
+    <limit lower="-0.959931" upper="1.745329" effort="4.160000" velocity="8.700000"/>
+    <origin rpy="-0.000000 -1.570796 0.000000" xyz="0.098579 0.061964 0.002449"/>
+    <parent link="base_link"/>
+    <child link="leg_block_fl_link"/>
+    <axis xyz="0.000000 0.000000 -1.000000"/>
+  </joint>
+  <joint name="hip_fl_joint" type="revolute">
+    <limit lower="-1.047200" upper="1.047200" effort="4.160000" velocity="8.700000"/>
+    <origin rpy="-1.570796 0.785398 0.000000" xyz="0.000001 0.030541 0.009353"/>
+    <parent link="leg_block_fl_link"/>
+    <child link="hip_fl_link"/>
+    <axis xyz="0.000000 0.000000 1.000000"/>
+  </joint>
+  <link name="base_link">
+    <sensor name="camera" type="camera">
+      <origin rpy="1.570796 0.000000 1.570796" xyz="0.152412 0.002539 0.004207"/>
+      <parent link="base_link"/>
+      <camera>
+        <image>
+          <width>640</width>
+          <height>480</height>
+          <hfov>1.570796</hfov>
+        </image>
+      </camera>
+    </sensor>
+    <collision name="base_collision">
+      <origin rpy="-0.000000 0.000000 -1.570796" xyz="-0.017626 -0.000162 -0.007849"/>
+      <geometry>
+        <mesh filename="package://meshes/dae/base.dae" scale="1 1 1"/>
+      </geometry>
+    </collision>
+    <sensor name="imu" type="imu">
+      <parent link="base_link"/>
+    </sensor>
+    <inertial>
+      <inertia ixx="0.002168" ixy="0.000055" ixz="0.000034" iyy="0.014482" iyz="0.000006" izz="0.015817"/>
+      <origin rpy="0.000000 0.000000 0.000000" xyz="-0.007317 -0.000191 -0.004098"/>
+      <mass value="1.522000"/>
+    </inertial>
+    <visual name="base">
+      <material name="App0.003"/>
+      <origin rpy="-0.000000 -0.000000 -1.570797" xyz="-0.017626 -0.000162 -0.007849"/>
+      <geometry>
+        <mesh filename="package://meshes/dae/base.dae" scale="1 1 1"/>
+      </geometry>
+    </visual>
+  </link>
+  <link name="leg_block_bl_link">
+    <collision name="leg_block_bl_collision">
+      <origin rpy="1.570796 -0.000000 0.000000" xyz="0.001694 -0.010052 0.002505"/>
+      <geometry>
+        <mesh filename="package://meshes/dae/leg_block_bl.dae" scale="1 1 1"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="0.000062" ixy="-0.000002" ixz="-0.000002" iyy="0.000070" iyz="-0.000001" izz="0.000095"/>
+      <origin rpy="0.000000 0.000000 0.000000" xyz="0.003043 -0.010057 0.002359"/>
+      <mass value="0.193000"/>
+    </inertial>
+    <visual name="leg_block_bl">
+      <material name="App0.010"/>
+      <origin rpy="1.570796 0.000000 0.000000" xyz="0.001694 -0.010052 0.002505"/>
+      <geometry>
+        <mesh filename="package://meshes/dae/leg_block_bl.dae" scale="1 1 1"/>
+      </geometry>
+    </visual>
+  </link>
+  <link name="hip_fl_link">
+    <collision name="hip_fl_collision">
+      <origin rpy="0.000000 -0.000000 -0.000000" xyz="-0.000000 -0.000000 -0.000000"/>
+      <geometry>
+        <mesh filename="package://meshes/dae/hip_fl.dae" scale="1 1 1"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="0.000035" ixy="-0.000001" ixz="0.000001" iyy="0.000018" iyz="0.000017" izz="0.000018"/>
+      <origin rpy="0.000000 0.000000 0.000000" xyz="-0.042963 -0.000022 0.004941"/>
+      <mass value="0.023000"/>
+    </inertial>
+    <visual name="hip_fl">
+      <material name="App0.010"/>
+      <origin rpy="-0.000000 -0.000000 0.000000" xyz="0.000000 -0.000000 -0.000000"/>
+      <geometry>
+        <mesh filename="package://meshes/dae/hip_fl.dae" scale="1 1 1"/>
+      </geometry>
+    </visual>
+  </link>
+  <link name="shin_fl_link">
+    <collision name="shin_fl_collision">
+      <origin rpy="3.141593 0.000000 2.356194" xyz="-0.000000 0.000000 -0.000000"/>
+      <geometry>
+        <mesh filename="package://meshes/dae/shin_fl.dae" scale="1 1 1"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="0.000092" ixy="0.000003" ixz="0.000004" iyy="0.000054" iyz="-0.000044" izz="0.000045"/>
+      <origin rpy="0.000000 0.000000 0.000000" xyz="0.032975 -0.034987 -0.000398"/>
+      <mass value="0.049000"/>
+    </inertial>
+    <visual name="shin_fl">
+      <material name="App0.010"/>
+      <origin rpy="-3.141593 0.000000 2.356194" xyz="-0.000000 0.000000 0.000000"/>
+      <geometry>
+        <mesh filename="package://meshes/dae/shin_fl.dae" scale="1 1 1"/>
+      </geometry>
+    </visual>
+  </link>
+  <link name="foot_fl_link">
+    <collision name="foot_fl_collusion">
+      <origin rpy="-0.000000 0.000000 -0.000000" xyz="0.000000 0.000000 -0.002895"/>
+      <geometry>
+        <cylinder radius="0.012816" length="0.019799"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="leg_block_fr_link">
+    <collision name="leg_block_fr_collision">
+      <origin rpy="-1.570796 0.000000 -3.141592" xyz="-0.001909 -0.009600 -0.000400"/>
+      <geometry>
+        <mesh filename="package://meshes/dae/leg_block_fr.dae" scale="1 1 1"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="0.000062" ixy="-0.000002" ixz="0.000002" iyy="0.000070" iyz="-0.000001" izz="0.000095"/>
+      <origin rpy="0.000000 0.000000 0.000000" xyz="-0.003258 -0.009610 -0.000275"/>
+      <mass value="0.193000"/>
+    </inertial>
+    <visual name="leg_block_fr">
+      <material name="App0.010"/>
+      <origin rpy="-1.570796 -0.000000 -3.141592" xyz="-0.001909 -0.009600 -0.000400"/>
+      <geometry>
+        <mesh filename="package://meshes/dae/leg_block_fr.dae" scale="1 1 1"/>
+      </geometry>
+    </visual>
+  </link>
+  <link name="hip_fr_link">
+    <collision name="hip_fr_collision">
+      <origin rpy="0.000000 -0.000000 -0.785398" xyz="-0.000000 0.000000 0.000000"/>
+      <geometry>
+        <mesh filename="package://meshes/dae/hip_fr.dae" scale="1 1 1"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="0.000035" ixy="0.000001" ixz="-0.000001" iyy="0.000018" iyz="0.000017" izz="0.000018"/>
+      <origin rpy="0.000000 0.000000 0.000000" xyz="-0.030395 0.030364 0.004941"/>
+      <mass value="0.023000"/>
+    </inertial>
+    <visual name="hip_fr">
+      <material name="App0.010"/>
+      <origin rpy="0.000000 -0.000000 -0.785398" xyz="-0.000000 0.000000 -0.000000"/>
+      <geometry>
+        <mesh filename="package://meshes/dae/hip_fr.dae" scale="1 1 1"/>
+      </geometry>
+    </visual>
+  </link>
+  <link name="shin_fr_link">
+    <collision name="shin_fr_collision">
+      <origin rpy="0.000000 0.000000 -3.141592" xyz="0.000000 -0.000000 -0.000000"/>
+      <geometry>
+        <mesh filename="package://meshes/dae/shin_fr.dae" scale="1 1 1"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="0.000092" ixy="0.000003" ixz="0.000004" iyy="0.000054" iyz="-0.000044" izz="0.000045"/>
+      <origin rpy="0.000000 0.000000 0.000000" xyz="0.048057 0.001422 0.000398"/>
+      <mass value="0.049000"/>
+    </inertial>
+    <visual name="shin_fr">
+      <material name="App0.010"/>
+      <origin rpy="0.000000 -0.000000 -3.141592" xyz="0.000000 0.000000 -0.000000"/>
+      <geometry>
+        <mesh filename="package://meshes/dae/shin_fr.dae" scale="1 1 1"/>
+      </geometry>
+    </visual>
+  </link>
+  <link name="foot_fr_link">
+    <collision name="foot_fr_collusion">
+      <origin rpy="-3.141592 -0.000000 -0.000000" xyz="-0.000000 0.000000 -0.000000"/>
+      <geometry>
+        <cylinder radius="0.012816" length="0.019799"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="panda_visual_link">
+    <visual name="panda_visual">
+      <material name="App0.010"/>
+      <origin rpy="0.000000 -0.000000 0.000000" xyz="-0.000000 0.000000 0.000000"/>
+      <geometry>
+        <mesh filename="package://meshes/dae/panda_visual.dae" scale="1 1 1"/>
+      </geometry>
+    </visual>
+  </link>
+  <link name="hip_bl_link">
+    <collision name="hip_bl_collision">
+      <origin rpy="3.141592 0.000001 3.141592" xyz="0.000000 -0.000000 0.000000"/>
+      <geometry>
+        <mesh filename="package://meshes/dae/hip_bl.dae" scale="1 1 1"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="0.000035" ixy="-0.000001" ixz="0.000001" iyy="0.000018" iyz="0.000017" izz="0.000018"/>
+      <origin rpy="0.000000 0.000000 0.000000" xyz="0.042963 -0.000022 -0.004941"/>
+      <mass value="0.023000"/>
+    </inertial>
+    <visual name="hip_bl">
+      <material name="App0.010"/>
+      <origin rpy="3.141593 -0.000000 3.141591" xyz="0.000000 0.000000 0.000000"/>
+      <geometry>
+        <mesh filename="package://meshes/dae/hip_bl.dae" scale="1 1 1"/>
+      </geometry>
+    </visual>
+  </link>
+  <link name="shin_bl_link">
+    <collision name="shin_bl_collision">
+      <origin rpy="3.130172 0.000000 -1.570793" xyz="0.000000 0.000000 0.008671"/>
+      <geometry>
+        <mesh filename="package://meshes/dae/shin_bl.dae" scale="1 1 1"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="0.000092" ixy="0.000003" ixz="0.000004" iyy="0.000054" iyz="-0.000044" izz="0.000045"/>
+      <origin rpy="0.000000 0.000000 0.000000" xyz="0.001418 0.048057 0.008256"/>
+      <mass value="0.049000"/>
+    </inertial>
+    <visual name="shin_bl">
+      <material name="App0.010"/>
+      <origin rpy="3.141593 0.000000 -1.570794" xyz="0.000000 0.000000 0.008671"/>
+      <geometry>
+        <mesh filename="package://meshes/dae/shin_bl.dae" scale="1 1 1"/>
+      </geometry>
+    </visual>
+  </link>
+  <link name="foot_bl_link">
+    <collision name="foot_bl_collusion">
+      <origin rpy="-0.000000 0.000000 -0.000000" xyz="-0.000000 0.000000 -0.000000"/>
+      <geometry>
+        <cylinder radius="0.012816" length="0.019799"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="leg_block_br_link">
+    <collision name="leg_block_br_collision">
+      <origin rpy="-1.570796 0.000000 -0.000000" xyz="-0.004218 -0.010309 -0.000000"/>
+      <geometry>
+        <mesh filename="package://meshes/dae/leg_block_br.dae" scale="1 1 1"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="0.000062" ixy="0.000002" ixz="0.000002" iyy="0.000070" iyz="-0.000001" izz="0.000095"/>
+      <origin rpy="0.000000 0.000000 0.000000" xyz="-0.003255 -0.010060 0.000339"/>
+      <mass value="0.193000"/>
+    </inertial>
+    <visual name="leg_block_br">
+      <material name="App0.010"/>
+      <origin rpy="-1.570796 0.000000 0.000000" xyz="-0.004218 -0.010309 -0.000000"/>
+      <geometry>
+        <mesh filename="package://meshes/dae/leg_block_br.dae" scale="1 1 1"/>
+      </geometry>
+    </visual>
+  </link>
+  <link name="hip_br_link">
+    <collision name="hip_br_collision">
+      <origin rpy="-0.000000 0.000000 -0.000000" xyz="0.000000 0.000000 0.000000"/>
+      <geometry>
+        <mesh filename="package://meshes/dae/hip_br.dae" scale="1 1 1"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="0.000035" ixy="0.000001" ixz="-0.000001" iyy="0.000018" iyz="0.000017" izz="0.000018"/>
+      <origin rpy="0.000000 0.000000 0.000000" xyz="-0.042963 -0.000022 0.004941"/>
+      <mass value="0.023000"/>
+    </inertial>
+    <visual name="hip_br">
+      <material name="App0.010"/>
+      <origin rpy="-0.000000 -0.000000 0.000000" xyz="-0.000000 0.000000 -0.000000"/>
+      <geometry>
+        <mesh filename="package://meshes/dae/hip_br.dae" scale="1 1 1"/>
+      </geometry>
+    </visual>
+  </link>
+  <link name="shin_br_link">
+    <collision name="shin_br_collision">
+      <origin rpy="0.000000 0.000000 -3.141592" xyz="0.000000 0.000000 -0.000000"/>
+      <geometry>
+        <mesh filename="package://meshes/dae/shin_br.dae" scale="1 1 1"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="0.000092" ixy="0.000003" ixz="0.000004" iyy="0.000054" iyz="-0.000044" izz="0.000045"/>
+      <origin rpy="0.000000 0.000000 0.000000" xyz="0.048057 0.001422 0.000398"/>
+      <mass value="0.049000"/>
+    </inertial>
+    <visual name="shin_br">
+      <material name="App0.010"/>
+      <origin rpy="0.000000 -0.000000 3.141592" xyz="-0.000000 -0.000000 -0.000000"/>
+      <geometry>
+        <mesh filename="package://meshes/dae/shin_br.dae" scale="1 1 1"/>
+      </geometry>
+    </visual>
+  </link>
+  <link name="foot_br_link">
+    <collision name="foot_br_collusion">
+      <origin rpy="-3.141592 -0.000000 -0.000000" xyz="0.000000 0.000000 0.000000"/>
+      <geometry>
+        <cylinder radius="0.012816" length="0.019799"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="leg_block_fl_link">
+    <collision name="leg_block_fl_collision">
+      <origin rpy="-1.570797 -0.000000 0.000000" xyz="-0.009632 0.001547 0.000477"/>
+      <geometry>
+        <mesh filename="package://meshes/dae/leg_block_fl.dae" scale="1 1 1"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="0.000062" ixy="0.000002" ixz="-0.000002" iyy="0.000070" iyz="-0.000001" izz="0.000094"/>
+      <origin rpy="0.000000 0.000000 0.000000" xyz="-0.009629 0.002871 0.000273"/>
+      <mass value="0.193000"/>
+    </inertial>
+    <visual name="leg_block_fl">
+      <material name="App0.010"/>
+      <origin rpy="-1.570796 0.000000 -0.000000" xyz="-0.009632 0.001547 0.000477"/>
+      <geometry>
+        <mesh filename="package://meshes/dae/leg_block_fl.dae" scale="1 1 1"/>
+      </geometry>
+    </visual>
+  </link>
+  <material name="App0.003">
+    <color rgba="0.800000 0.800000 0.800000 1.000000"/>
+  </material>
+  <material name="App0.010">
+    <color rgba="0.282353 0.282353 0.282353 1.000000"/>
+  </material>
+</robot>

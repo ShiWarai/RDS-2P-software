@@ -1,0 +1,14 @@
+# Goal - параметры проигрывания танца
+int32 dance_number
+bool interpolate          # Включить линейную интерполяцию между позами (если false, используется параметр узла)
+float32 speed_multiplier # Множитель скорости воспроизведения (если <= 0.0, используется параметр узла; если > 0.0, используется это значение)
+---
+# Result - результат выполнения
+bool success
+string message
+---
+# Feedback - прогресс воспроизведения
+int32 current_pose
+int32 total_poses
+float32 progress
+
