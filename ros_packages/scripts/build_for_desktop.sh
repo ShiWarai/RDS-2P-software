@@ -301,6 +301,46 @@ else
     echo "⏭️ Пропускаем обновление зависимостей ROS2 (--ros-deps-ignore)"
 fi
 
+# RNNoise для audio_filters: vendor в deps/ (autotools; до colcon)
+echo "📥 RNNoise (audio_filters) → deps/rnnoise_install..."
+RNN_SRC="$(pwd)/deps/rnnoise_src"
+RNN_INST="$(pwd)/deps/rnnoise_install"
+STUB="$(pwd)/src/audio_filters/third_party/rnnoise/rnnoise_os_support_stub.h"
+JOBS="$(nproc 2>/dev/null || echo 4)"
+if [[ ! -f "${RNN_INST}/lib/librnnoise.a" ]] || [[ ! -f "${RNN_INST}/include/rnnoise.h" ]]; then
+    mkdir -p "$(pwd)/deps"
+    touch "$(pwd)/deps/COLCON_IGNORE"
+    if [[ ! -f "${RNN_SRC}/src/denoise.c" ]]; then
+        echo "📥 Клонируем xiph/rnnoise (v0.2)..."
+        rm -rf "${RNN_SRC}"
+        git clone --depth 1 --branch v0.2 https://github.com/xiph/rnnoise.git "${RNN_SRC}"
+    fi
+    if [[ ! -f "${STUB}" ]]; then
+        echo "❌ Нет заглушки os_support: ${STUB}" >&2
+        exit 1
+    fi
+    cp -f "${STUB}" "${RNN_SRC}/src/os_support.h"
+    pushd "${RNN_SRC}" >/dev/null
+    ./autogen.sh
+    ./configure --prefix="${RNN_INST}" --disable-examples
+    make "-j${JOBS}"
+    make install
+    popd >/dev/null
+    echo "✅ RNNoise: ${RNN_INST}"
+else
+    echo "ℹ️ RNNoise уже в ${RNN_INST}"
+fi
+
+# SoXR для audio_filters/RNNoise (менее приоритетно, перед colcon)
+echo "🔊 [опционально] libsoxr-dev для audio_filters..."
+if ! dpkg -s libsoxr-dev >/dev/null 2>&1; then
+    echo "📦 Устанавливаем libsoxr-dev (sudo apt)..."
+    sudo apt-get install -y libsoxr-dev
+    echo "✅ libsoxr-dev установлен"
+else
+    echo "ℹ️ libsoxr-dev уже установлен"
+fi
+
 # Собираем все пакеты кроме...
 echo "🔨 Собираем пакеты (кроме тех, что запускаются только на роботе, и orbbec_camera - собираем только сообщения, mtf02p_ros - только на роботе)"
 

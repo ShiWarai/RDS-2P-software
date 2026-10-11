@@ -2,9 +2,9 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>rds_2p_telegram_bot</name>
-  <version>0.0.0</version>
+  <version>1.0.0</version>
   <description>ROS2 пакет для Telegram бота - прослойка между Telegram и ROS2 топиками</description>
-  <maintainer email="zhuravlev.p.r@edu.mirea.ru">ubuntu</maintainer>
+  <maintainer email="zhuravlev.p.r@edu.mirea.ru">ShiWarai</maintainer>
   <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>

@@ -2,9 +2,9 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>rds_2p_commands</name>
-  <version>0.0.0</version>
-  <description>ROS2 пакет для обработки команд из Telegram и голосовых расшифровок с поддержкой CVC классификатора и универсального Action сервера</description>
-  <maintainer email="zhuravlev.p.r@edu.mirea.ru">ubuntu</maintainer>
+  <version>1.0.0</version>
+  <description>ROS2 пакет: парсер команд из Telegram/транскрипций, PandaCommand action-сервер, rkllm+Paroli.</description>
+  <maintainer email="zhuravlev.p.r@edu.mirea.ru">ShiWarai</maintainer>
   <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
@@ -21,12 +21,15 @@
 
   <member_of_group>rosidl_interface_packages</member_of_group>
   <depend>vosk_ros2</depend>
-  <depend>rds_2p_dance</depend>
   <depend>ament_index_python</depend>
   <depend>audio_common_msgs</depend>
+  <depend>rkllm_ros2</depend>
+  <depend>paroli_ros2</depend>
+  <depend>std_srvs</depend>
 
-  <exec_depend>python3-requests</exec_depend>
   <exec_depend>python3-yaml</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-pil</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

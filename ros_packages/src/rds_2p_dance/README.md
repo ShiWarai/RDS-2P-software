@@ -9,6 +9,7 @@
 ```bash
 # Активируйте окружение ROS2
 source /opt/ros/humble/setup.bash
+source ~/mujoco_playground/RDS-2P-simulator/ros_packages/install/setup.bash
 
 # Запустите Action сервер с параметрами по умолчанию
 ros2 launch rds_2p_dance dance_action_server.launch.py
@@ -31,6 +32,7 @@ ros2 launch rds_2p_dance dance_action_server.launch.py log_level:=debug
 ```bash
 # Активируйте окружение ROS2
 source /opt/ros/humble/setup.bash
+source ~/mujoco_playground/RDS-2P-simulator/ros_packages/install/setup.bash
 
 # Запустите Action сервер
 ros2 run rds_2p_dance dance_action_server
@@ -242,12 +244,14 @@ ros2 action send_goal --cancel /dance/play rds_2p_dance/action/PlayDance "{dance
 1. **Запустите Action сервер** (в первом терминале):
 ```bash
 source /opt/ros/humble/setup.bash
+source ~/mujoco_playground/RDS-2P-simulator/ros_packages/install/setup.bash
 ros2 run rds_2p_dance dance_action_server
 ```
 
 2. **Проверьте, что сервер запущен** (во втором терминале):
 ```bash
 source /opt/ros/humble/setup.bash
+source ~/mujoco_playground/RDS-2P-simulator/ros_packages/install/setup.bash
 
 # Проверка наличия action сервера
 ros2 action list
@@ -371,6 +375,7 @@ ls $(ros2 pkg prefix rds_2p_dance)/share/rds_2p_dance/animations/
 **Проблема:** Импорт не работает
 ```bash
 # Решение: Пересоберите пакет
+cd ~/mujoco_playground/RDS-2P-simulator/ros_packages
 colcon build --packages-select rds_2p_dance
 source install/setup.bash
 ```

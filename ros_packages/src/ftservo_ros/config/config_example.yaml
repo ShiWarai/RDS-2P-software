@@ -75,7 +75,7 @@ motors:
     type: "SCS40"
     id: 5
     joint_name: "hip_fr_joint"
-    zero_offset_units: 615  # Центр отсчета в units (initial_position)
+    zero_offset_units: 605  # Центр отсчета в units (initial_position)
     min_position_units: 274  # Минимальная позиция в units
     max_position_units: 854  # Максимальная позиция в units
     reversed: true
@@ -84,7 +84,7 @@ motors:
     type: "SCS40"
     id: 6
     joint_name: "shin_fr_joint"
-    zero_offset_units: 630  # Центр отсчета в units (initial_position)
+    zero_offset_units: 550  # Центр отсчета в units (initial_position)
     min_position_units: 359  # Минимальная позиция в units
     max_position_units: 748  # Максимальная позиция в units
     reversed: true
@@ -122,7 +122,7 @@ motors:
     type: "SCS40"
     id: 10
     joint_name: "leg_block_br_joint"
-    zero_offset_units: 515  # Центр отсчета в units (initial_position)
+    zero_offset_units: 530  # Центр отсчета в units (initial_position)
     min_position_units: 178  # Минимальная позиция в units
     max_position_units: 638  # Максимальная позиция в units
     reversed: false

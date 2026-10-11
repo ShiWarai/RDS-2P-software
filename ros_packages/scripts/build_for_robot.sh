@@ -113,6 +113,21 @@ else
     fi
 fi
 
+# Патч orbbec_camera: upstream не включает astra_mini.launch.py (RDS-2P)
+ORB_PATCH_LAUNCH="$SCRIPT_DIR/orbbec_camera_patches/astra_mini.launch.py"
+ORB_PATCH_TARGET="src/OrbbecSDK_ROS2/orbbec_camera/launch/astra_mini.launch.py"
+if [ -d "src/OrbbecSDK_ROS2/orbbec_camera" ]; then
+    if [ -f "$ORB_PATCH_LAUNCH" ]; then
+        mkdir -p "$(dirname "$ORB_PATCH_TARGET")"
+        cp -f "$ORB_PATCH_LAUNCH" "$ORB_PATCH_TARGET"
+        echo "✅ Применён патч Orbbec: astra_mini.launch.py → $ORB_PATCH_TARGET"
+    else
+        echo "⚠️ Файл патча не найден: $ORB_PATCH_LAUNCH"
+    fi
+else
+    echo "⚠️ orbbec_camera не найден — патч astra_mini.launch.py пропущен"
+fi
+
 # Клонируем audio_common если его нет
 AUDIO_COMMON_PATH="src/audio_common"
 if [ ! -d "$AUDIO_COMMON_PATH" ]; then
@@ -347,6 +362,46 @@ if [ "$ROS_DEPS_IGNORE" = false ]; then
     fi
 else
     echo "⏭️ Пропускаем обновление зависимостей ROS2 (--ros-deps-ignore)"
+fi
+
+# RNNoise для audio_filters: vendor в deps/ (autotools; до colcon)
+echo "📥 RNNoise (audio_filters) → deps/rnnoise_install..."
+RNN_SRC="$(pwd)/deps/rnnoise_src"
+RNN_INST="$(pwd)/deps/rnnoise_install"
+STUB="$(pwd)/src/audio_filters/third_party/rnnoise/rnnoise_os_support_stub.h"
+JOBS="$(nproc 2>/dev/null || echo 4)"
+if [[ ! -f "${RNN_INST}/lib/librnnoise.a" ]] || [[ ! -f "${RNN_INST}/include/rnnoise.h" ]]; then
+    mkdir -p "$(pwd)/deps"
+    touch "$(pwd)/deps/COLCON_IGNORE"
+    if [[ ! -f "${RNN_SRC}/src/denoise.c" ]]; then
+        echo "📥 Клонируем xiph/rnnoise (v0.2)..."
+        rm -rf "${RNN_SRC}"
+        git clone --depth 1 --branch v0.2 https://github.com/xiph/rnnoise.git "${RNN_SRC}"
+    fi
+    if [[ ! -f "${STUB}" ]]; then
+        echo "❌ Нет заглушки os_support: ${STUB}" >&2
+        exit 1
+    fi
+    cp -f "${STUB}" "${RNN_SRC}/src/os_support.h"
+    pushd "${RNN_SRC}" >/dev/null
+    ./autogen.sh
+    ./configure --prefix="${RNN_INST}" --disable-examples
+    make "-j${JOBS}"
+    make install
+    popd >/dev/null
+    echo "✅ RNNoise: ${RNN_INST}"
+else
+    echo "ℹ️ RNNoise уже в ${RNN_INST}"
+fi
+
+# SoXR для audio_filters/RNNoise (вторично относительно основного робота-сборки)
+echo "🔊 [опционально] libsoxr-dev для audio_filters..."
+if ! dpkg -s libsoxr-dev >/dev/null 2>&1; then
+    echo "📦 Устанавливаем libsoxr-dev (sudo apt)..."
+    sudo apt-get install -y libsoxr-dev
+    echo "✅ libsoxr-dev установлен"
+else
+    echo "ℹ️ libsoxr-dev уже установлен"
 fi
 
 # Собираем все пакеты

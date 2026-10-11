@@ -1,176 +1,112 @@
 # rds_2p_audio
 
-Пакет с launch файлами для работы с аудио в RDS-2P.
+Пакет воспроизведения на роботе: нода **`audio_player`** принимает `audio_common_msgs/AudioStamped` на шине воспроизведения (**по умолчанию `/audio/output`**), разделяет поток по **`header.frame_id`**, **суммирует** источники и отдаёт **один** PortAudio-поток (драйвер через `sounddevice`).
 
-## Launch файлы
+Отдельно на запуск добавляется `audio_common/audio_capturer_node` через единственный файл **`launch/audio.launch.py`**.
 
-### audio_nodes.launch.py
-Запускает узлы захвата и воспроизведения аудио (`audio_capturer_node` и `audio_player_node`).
+---
 
-**Использование:**
+## Контракт `AudioStamped` на воспроизведение
+
+| Поле | Правило |
+|------|---------|
+| `header.frame_id` | **Обязательно** непустая строка, рекомендуемый вид `домен.ид`: `routine.lie_down`, `test_speaker`, `tts.paroli` (paroli_ros2) и т.д. Одна строка однозначно относится к «источнику» для микшера. Пустое значение — сообщение отбрасывается. |
+| `audio.info.rate` | Должно быть **строго равно** параметру узла **`output_sample_rate`** (launch `output_sample_rate`, для Orange Pi RK/ES8323 обычно **44100**). Иначе чанк отбрасывается. |
+
+Ресемплинг под целевую Fs делают **издатели** (наш `RobotRoutineHandler`, `test_speaker.py` и т.д.).
+
+Известные источники в дереве RDS-2P:
+
+- `routine.<routine_id>` — сценарии панды из `RobotRoutineHandler`.
+- `test_speaker` (или свой `--source-id`) — утилита `scripts/test_speaker.py`.
+
+---
+
+## Запуск робота (`audio.launch.py`)
+
 ```bash
-ros2 launch rds_2p_audio audio_nodes.launch.py
-```
-
-**Параметры:**
-- `capturer_device` - индекс устройства для захвата (по умолчанию: 7 для робота, для desktop/WSL2 используйте 0)
-- `capturer_rate` - частота дискретизации (по умолчанию: 48000, для desktop можно использовать 44100)
-- `capturer_channels` - количество каналов (по умолчанию: 1, **для WSL2 рекомендуется 2**)
-- `capturer_format` - формат аудио (по умолчанию: 8 = paInt16)
-- `capturer_chunk` - размер буфера (по умолчанию: 512, **для WSL2 рекомендуется 4096**)
-- `capturer_topic` - топик для публикации аудио (по умолчанию: `/audio/input`)
-- `player_device` - индекс устройства для воспроизведения (по умолчанию: 2)
-- `player_topic` - топик для подписки на аудио (по умолчанию: `/audio/output`)
-
-**Пример для desktop/WSL2:**
-```bash
-ros2 launch rds_2p_audio audio_nodes.launch.py \
-    capturer_device:=0 \
-    capturer_rate:=44100 \
-    capturer_channels:=2 \
-    capturer_chunk:=4096
-```
-
-## Работа в WSL2
-
-### ⚠️ Важно: Патчинг пакета audio_common
-
-Пакет `audio_common` требует патчинга для корректной работы в WSL2. Без этих изменений микрофон не будет захватывать звук.
-
-#### Необходимые изменения в `audio_common`
-
-Файл: `ros_packages/src/audio_common/audio_common/src/audio_common/audio_capturer_node.cpp`
-
-**1. Изменить задержку (строка ~24):**
-```cpp
-// Было:
-inputParameters.suggestedLatency = Pa_GetDeviceInfo(inputParameters.device)->defaultLowInputLatency;
-
-// Должно быть:
-inputParameters.suggestedLatency = 0.1; // Стабильная задержка для WSL2
-```
-
-**2. Принудительно использовать paFloat32 (строка ~23):**
-```cpp
-// Было:
-inputParameters.sampleFormat = this->format_;
-
-// Должно быть:
-inputParameters.sampleFormat = paFloat32; // Принудительно для WSL2
-```
-
-**3. Увеличить размер чанка по умолчанию (строка ~9):**
-```cpp
-// Было:
-this->declare_parameter<int>("chunk", 512);
-
-// Должно быть:
-this->declare_parameter<int>("chunk", 4096); // Для WSL2
-```
-
-**4. Обновить callback для использования paFloat32 (строки ~46-63):**
-
-В функции `paCallback` заменить switch-case на принудительное использование `float32_data`:
-
-```cpp
-int AudioCapturerNode::paCallback(const void *inputBuffer, void *outputBuffer,
-                                  unsigned long framesPerBuffer,
-                                  const PaStreamCallbackTimeInfo *timeInfo,
-                                  PaStreamCallbackFlags statusFlags, void *userData) {
-  AudioCapturerNode *node = static_cast<AudioCapturerNode *>(userData);
-  (void)outputBuffer; (void)timeInfo; (void)statusFlags;
-
-  audio_common_msgs::msg::AudioStamped msg;
-  msg.header.stamp = node->now();
-  msg.audio.audio_data.float32_data.assign((const float*)inputBuffer, (const float*)inputBuffer + framesPerBuffer * node->get_channels());
-  msg.audio.info.format = 1; // paFloat32
-  msg.audio.info.channels = node->get_channels();
-  msg.audio.info.chunk = framesPerBuffer;
-  msg.audio.info.rate = node->get_rate();
-
-  node->publish_audio(msg);
-  return paContinue;
-}
-```
-
-**5. Добавить геттеры в заголовочный файл:**
-
-Файл: `ros_packages/src/audio_common/audio_common/include/audio_common/audio_capturer_node.hpp`
-
-Добавить в публичную секцию класса:
-```cpp
-int get_channels() const { return channels_; }
-int get_format() const { return format_; }
-```
-
-#### После внесения изменений
-
-Пересоберите пакет:
-```bash
-cd ros_packages
-colcon build --packages-select audio_common
 source install/setup.bash
+
+ros2 launch rds_2p_audio audio.launch.py \
+  output_device:=-1 \
+  pulse_sink:=alsa_output.platform-es8388-sound.stereo-fallback \
+  output_channels:=1 \
+  output_sample_rate:=44100 \
+  capturer_device:=-1 \
+  capturer_rate:=44100 \
+  capturer_channels:=1 \
+  capturer_chunk:=1024
 ```
 
-#### Использование после патчинга
+Дефолт захвата в launch сделан максимально безопасным для большинства устройств: `capturer_device:=-1` (default input PortAudio) и `capturer_channels:=1` (mono). Если у вашего входа stereo, явно задайте `capturer_channels:=2`.
 
-1. Установите PulseAudio в WSL2 и Windows (инструкции внутри `scripts/test_microphone_desktop.py`).
-2. Используйте устройство `1` (стандартное для PulseAudio в WSL2).
-3. Используйте формат `1` (`paFloat32`).
-
-Пример запуска:
-```bash
-ros2 launch rds_2p_audio audio_nodes.launch.py \
-    capturer_device:=1 \
-    capturer_rate:=44100 \
-    capturer_format:=1 \
-    capturer_chunk:=4096
-```
-
-#### Почему нужны эти изменения?
-
-- **Задержка 0.1с**: В WSL2 через PulseAudio требуется большая задержка для стабильного наполнения буфера. При чанке 4096 и частоте 44100 Гц один пакет собирается ~92мс, поэтому 100мс — минимальное стабильное значение.
-- **paFloat32**: PulseAudio в WSL2 лучше работает с форматом float32, чем с int16.
-- **Чанк 4096**: Увеличенный размер буфера снижает риск переполнения при работе через сетевой мост PulseAudio.
-
-## Использование с vosk_ros2
-
-Для распознавания речи запустите vosk_ros2 отдельно после запуска audio_nodes:
+Только динамик (без микрофона):
 
 ```bash
-# Терминал 1: Запуск захвата аудио
-ros2 launch rds_2p_audio audio_nodes.launch.py capturer_device:=0 capturer_rate:=44100
-
-# Терминал 2: Запуск распознавания речи
-ros2 launch vosk_ros2 vosk.launch.py
-
-# Терминал 3: Просмотр результатов
-ros2 topic echo /audio/transcription
+ros2 launch rds_2p_audio audio.launch.py enable_capturer:=false
 ```
+### Параметры launch (минимально нужные аргументы)
+
+**Воспроизведение:** `output_topic`, `output_device` (−1 = default ALSA), **`pulse_sink`** (имя sink Pulse для `PULSE_SINK` у `audio_player`; пустая строка — не менять окружение), `output_channels`, `output_sample_rate`, плюс внутренние микшера `mix_period_ms`, `source_evict_sec`, `qos_depth`.
+
+**Захват:** при `enable_capturer:=true` — `capturer_device`, `capturer_rate`, `capturer_channels`, `capturer_chunk`, необязательно `capturer_format` (чаще **8** = int16 как в `audio_common`), `capturer_topic`, `capturer_respawn`.
+
+---
+
+## Параметры ноды `audio_player`
+
+| Parameter | По умолчанию | Описание |
+|-----------|---------------|----------|
+| `topic` | `/audio/output` | Подписка на шину |
+| `device` | `−1` | Индекс PortAudio для выхода |
+| `pulse_sink` | `""` | Если непустая строка — перед открытием потока выставить `PULSE_SINK` (маршрутизация default через Pulse); в `audio.launch.py` по умолчанию задан sink ES8388 для Orange Pi RDS |
+| `channels` | `1` | Каналы динамика |
+| `output_sample_rate` | `44100` | Договорная Fs |
+| `mix_period_ms` | `20.0` | Длительность блока смешения (мс) |
+| `source_evict_sec` | `5.0` | Эвикт источника без новых сообщений (с) |
+| `qos_depth` | `50` | HISTORY depth BEST_EFFORT |
+
+---
+
+## Проверка
+
+Микрофон (нужны запущенные `ros2 launch rds_2p_audio audio.launch.py` и `source install/setup.bash` из воркспейса):
+
+```bash
+python3 ~/RDS-2P-simulator/ros_packages/scripts/test_microphone.py --output record_mic.wav --duration 5
+```
+
+Утилита плеера (`audio_player` и `test_speaker` на `/audio/output` по умолчанию **BEST_EFFORT**):
+
+```bash
+python3 ~/RDS-2P-simulator/ros_packages/scripts/test_speaker.py --file ~/path/to/sample.wav \
+  --sample-rate 44100 --source-id test_speaker
+```
+
+---
 
 ## Топики
 
-### Входные топики
-- `/audio/input` (`audio_common_msgs/msg/AudioStamped`) - аудио данные от микрофона
+- **`/audio/output`** — вход воспроизведения для `audio_player` (много издателей с разными `frame_id`).
+- **`/audio/input`** — захват из `audio_capturer_node` при запуске с `enable_capturer:=true`.
+- Очистка шума (**RNNoise**) в отдельном пакете [`audio_filters`](../audio_filters/README.md): топик **`/audio/input/clean`** (запуск `ros2 launch audio_filters rnnoise_filter.launch.py`; для Vosk: `audio_topic:=/audio/input/clean`).
 
-### Выходные топики
-- `/audio/output` (`audio_common_msgs/msg/AudioStamped`) - аудио данные для воспроизведения
+---
 
-## Настройка для WSL2
+## WSL2 / патчинг `audio_common`
 
-Для работы микрофона в WSL2 необходимо настроить аудио. Подробные инструкции см. в комментариях в файле `test_microphone_desktop.py`.
-
-Кратко:
-1. Установите PulseAudio в WSL2: `sudo apt-get install pulseaudio pulseaudio-utils`
-2. Настройте конфигурацию PulseAudio
-3. Установите PulseAudio в Windows или используйте WSL Audio
-4. Перезапустите WSL2
-
-## Проверка устройств
-
-Для проверки доступных аудио устройств используйте:
+Для некоторых окружений (WSL2 + PulseAudio) может понадобиться патч описанный у вас в истории README (задержка, float32 и т.д.). После патча пересборка:
 
 ```bash
-python3 ros_packages/scripts/test_microphone_desktop.py --list-devices
+colcon build --packages-select audio_common
 ```
 
+Подставьте в `audio.launch.py` свои аргументы (`capturer_device`, `capturer_format`, больший `capturer_chunk`).
+
+---
+
+## Список устройств PortAudio
+
+```bash
+python3 -m sounddevice
+```

@@ -1,0 +1,18 @@
+# Goal — один user-turn: текст + опционально изображение (как chat completions)
+string user_message
+sensor_msgs/Image image
+# Если у rkllm_node persist_session_kv=true — для rkllm_infer игнорируется (KV всегда копится); сброс только через ~/clear_kv_cache.
+bool keep_history
+int32 max_new_tokens
+---
+# Result
+bool success
+string message
+string text
+float32 prefill_time_ms
+float32 generate_time_ms
+int32 generate_tokens
+---
+# Feedback
+string token
+string text

@@ -30,6 +30,10 @@ share/python-wheels/
 *.egg
 MANIFEST
 
+# ROS workspace build artifacts
+ros_packages/deps/rnnoise_src/
+ros_packages/deps/rnnoise_install/
+
 # Env
 .venv
 .vscode
