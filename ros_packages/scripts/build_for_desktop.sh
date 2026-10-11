@@ -344,7 +344,7 @@ fi
 # Собираем все пакеты кроме...
 echo "🔨 Собираем пакеты (кроме тех, что запускаются только на роботе, и orbbec_camera - собираем только сообщения, mtf02p_ros - только на роботе)"
 
-colcon build --parallel-workers 4 --symlink-install --packages-skip mpu6500_ros rds_2p_joystick rds_2p_face orbbec_camera mtf02p_ros
+colcon build --parallel-workers 4 --symlink-install --packages-skip mpu6500_ros rds_2p_joystick orbbec_camera mtf02p_ros
 
 echo "✅ Готово! Загрузите переменные: source install/setup.bash"
 
