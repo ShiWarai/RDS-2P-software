@@ -114,18 +114,15 @@ else
 fi
 echo "   Управление: PLATFORM=rk3588 (NPU) | PLATFORM=generic (без NPU) | PLATFORM=auto (авто)."
 
-if [ ! -f "$ROSPKG/src/rds_2p_inference/external_lib/onnxruntime-linux-aarch64-1.19.2.tgz" ]; then
-  mkdir -p "$ROSPKG/src/rds_2p_inference/external_lib"
-  echo "📥 Скачиваем OnnxRuntime aarch64 1.19.2..."
-  curl -L -o "$ROSPKG/src/rds_2p_inference/external_lib/onnxruntime-linux-aarch64-1.19.2.tgz" \
-    https://github.com/microsoft/onnxruntime/releases/download/v1.19.2/onnxruntime-linux-aarch64-1.19.2.tgz
-fi
-
 clone_if_missing "$ROSPKG/src/ftservo_ros/library/FTServoLibrary" "https://github.com/ShiWarai/FTServoLibrary.git"
 clone_if_missing "$ROSPKG/src/mpu6500_ros/library/mpu6500" "https://github.com/libdriver/mpu6500.git"
 clone_if_missing "$ROSPKG/src/OrbbecSDK_ROS2" "https://github.com/orbbec/OrbbecSDK_ROS2.git" "main"
 clone_if_missing "$ROSPKG/src/audio_common" "https://github.com/mgonzs13/audio_common.git"
 clone_if_missing "$ROSPKG/src/vosk_ros2" "https://github.com/ShiWarai/vosk_ros2.git"
+
+# OnnxRuntime SDK в контекст (единая логика с нативной сборкой: fetch_onnxruntime.sh,
+# там же её используют build_for_robot.sh / build_for_desktop.sh).
+bash "$ROSPKG/scripts/fetch_onnxruntime.sh" "$ROSPKG"
 
 VOSK_MODEL="$ROSPKG/src/vosk_ros2/models/vosk-model-small-ru-0.22"
 if [ ! -d "$VOSK_MODEL" ]; then

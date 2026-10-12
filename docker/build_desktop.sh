@@ -53,6 +53,9 @@ clone_if_missing "$ROSPKG/src/ftservo_ros/library/FTServoLibrary" "https://githu
 # как в ros_packages/scripts/build_for_desktop.sh
 clone_if_missing "$ROSPKG/src/OrbbecSDK_ROS2" "https://github.com/orbbec/OrbbecSDK_ROS2.git" "main"
 
+# OnnxRuntime SDK в контекст (единая логика с нативной сборкой: fetch_onnxruntime.sh).
+bash "$ROSPKG/scripts/fetch_onnxruntime.sh" "$ROSPKG"
+
 VOSK_MODEL="$ROSPKG/src/vosk_ros2/models/vosk-model-small-ru-0.22"
 if [ ! -d "$VOSK_MODEL" ]; then
   echo "📥 Скачиваем модель Vosk..."

@@ -60,23 +60,8 @@ else
     echo "✅ Desktop-зависимости уже установлены"
 fi
 
-# Проверяем и подгружаем OnnxRuntime (если отсутствует)
-ONNX_DIR="src/rds_2p_inference/external_lib/onnxruntime-linux-x64-1.19.2"
-if [ ! -d "$ONNX_DIR" ]; then
-    echo "📥 Скачиваем OnnxRuntime 1.19.2..."
-    mkdir -p "src/rds_2p_inference/external_lib"
-    pushd "src/rds_2p_inference/external_lib" >/dev/null
-    ONNX_TGZ="onnxruntime-linux-x64-1.19.2.tgz"
-    if [ ! -f "$ONNX_TGZ" ]; then
-        curl -L -o "$ONNX_TGZ" https://github.com/microsoft/onnxruntime/releases/download/v1.19.2/onnxruntime-linux-x64-1.19.2.tgz
-    fi
-    tar -xzf "$ONNX_TGZ"
-    rm -f "$ONNX_TGZ"
-    echo "✅ OnnxRuntime установлен в $ONNX_DIR"
-    popd >/dev/null
-else
-    echo "ℹ️ OnnxRuntime уже установлен: $ONNX_DIR"
-fi
+# Проверяем и подгружаем OnnxRuntime (единая логика — fetch_onnxruntime.sh)
+bash "$SCRIPT_DIR/fetch_onnxruntime.sh"
 
 # Скачиваем FTServoLibrary если его нет или папка пустая
 FTSERVO_LIB_PATH="src/ftservo_ros/library/FTServoLibrary"

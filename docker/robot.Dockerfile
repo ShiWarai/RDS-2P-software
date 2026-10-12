@@ -20,8 +20,17 @@ RUN rm -rf /var/lib/apt/lists/*
 
 COPY ros_packages /opt/rds2p/ros-ws
 
-RUN cd /opt/rds2p/ros-ws/src/rds_2p_inference/external_lib \
-    && tar -xf onnxruntime-linux-aarch64-1.19.2.tgz
+# onnxruntime SDK кладёт в контекст prepare (docker/build_robot.sh ->
+# ros_packages/scripts/fetch_onnxruntime.sh; можно положить и $ORT.tgz руками —
+# офлайн на роботе). Здесь только распаковка tgz/проверка наличия.
+RUN set -eux; \
+    mkdir -p /opt/rds2p/ros-ws/src/rds_2p_inference/external_lib; \
+    cd /opt/rds2p/ros-ws/src/rds_2p_inference/external_lib; \
+    ORT=onnxruntime-linux-aarch64-1.19.2; \
+    if [ ! -d "$ORT" ]; then \
+      if [ -f "$ORT.tgz" ]; then tar -xf "$ORT.tgz"; rm -f "$ORT.tgz"; \
+      else echo "ERROR: $ORT нет в контексте — собирай через docker/build_robot.sh (он вызывает ros_packages/scripts/fetch_onnxruntime.sh)"; exit 1; fi; \
+    fi
 
 RUN if [ -d /opt/rds2p/ros-ws/src/OrbbecSDK_ROS2/orbbec_camera ]; then \
       cp -f /opt/rds2p/ros-ws/scripts/orbbec_camera_patches/astra_mini.launch.py \
