@@ -10,8 +10,8 @@
 | [`ros_packages/scripts/`](ros_packages/scripts/) | Скрипты быстрой сборки (`build_for_desktop.sh`, `build_for_robot.sh`) и вспомогательные утилиты |
 | `urdf_src/` | Исходники/черновики URDF |
 | `mjcf_src/` | Скрипты и конфигурации для MJCF |
-| `inverse_kinematic/` | Наброски по обратной кинематике |
-| [`wasm_demo/`](wasm_demo/README.md) | Браузерная симуляция (MuJoCo + three.js) |
+| `experiments/inverse_kinematic/` | Наброски по обратной кинематике |
+| [`experiments/wasm_demo/`](experiments/wasm_demo/README.md) | Браузерная симуляция (MuJoCo + three.js) |
 
 Подробная установка и запуск ROS 2 — в [ros_packages/README.md](ros_packages/README.md).
 
