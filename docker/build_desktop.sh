@@ -27,18 +27,16 @@ cd "$ROOT_DIR"
 
 echo "🛠️ Готовим контекст desktop-сборки..."
 
+# mujoco_playground (locomotion/rds2p) — вендорный subset прямо в репозитории
+# (ros_packages/deps/mujoco_playground). Внешних клонов при сборке нет; если
+# каталога нет — desktop собирается без twin (warn в desktop.Dockerfile).
 if [ ! -d "$ROSPKG/deps/mujoco_playground/_src" ]; then
-  echo "📥 Клонируем mujoco_playground (RDS-2P-simulator, dev-walk, sparse)..."
-  rm -rf "$ROSPKG/deps/mujoco_playground"
-  mkdir -p "$ROSPKG/deps"
-  touch "$ROSPKG/deps/COLCON_IGNORE"
-  SIM_TMP="$(mktemp -d)"
-  git clone --depth 1 --filter=blob:none --sparse -b dev-walk \
-    https://github.com/ShiWarai/RDS-2P-simulator.git "$SIM_TMP/sim"
-  git -C "$SIM_TMP/sim" sparse-checkout set learning/mujoco_playground
-  cp -a "$SIM_TMP/sim/learning/mujoco_playground" "$ROSPKG/deps/"
-  rm -rf "$SIM_TMP"
+  echo "⚠️  ros_packages/deps/mujoco_playground отсутствует — desktop будет собран без twin"
+else
+  echo "ℹ️ mujoco_playground на месте (vendored)"
 fi
+mkdir -p "$ROSPKG/deps"
+touch "$ROSPKG/deps/COLCON_IGNORE"
 
 clone_if_missing "$ROSPKG/src/audio_common" "https://github.com/mgonzs13/audio_common.git"
 clone_if_missing "$ROSPKG/src/vosk_ros2" "https://github.com/ShiWarai/vosk_ros2.git" "dev"

@@ -73,13 +73,13 @@ ros2 launch rds_2p_audio audio.launch.py enable_capturer:=false
 Микрофон (нужны запущенные `ros2 launch rds_2p_audio audio.launch.py` и `source install/setup.bash` из воркспейса):
 
 ```bash
-python3 ~/RDS-2P-simulator/ros_packages/scripts/test_microphone.py --output record_mic.wav --duration 5
+python3 ~/RDS-2P-software/ros_packages/scripts/test_microphone.py --output record_mic.wav --duration 5
 ```
 
 Утилита плеера (`audio_player` и `test_speaker` на `/audio/output` по умолчанию **BEST_EFFORT**):
 
 ```bash
-python3 ~/RDS-2P-simulator/ros_packages/scripts/test_speaker.py --file ~/path/to/sample.wav \
+python3 ~/RDS-2P-software/ros_packages/scripts/test_speaker.py --file ~/path/to/sample.wav \
   --sample-rate 44100 --source-id test_speaker
 ```
 

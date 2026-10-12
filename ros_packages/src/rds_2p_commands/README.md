@@ -14,7 +14,7 @@ ROS 2 пакет для текстовых/голосовых команд из 
 ### 1. Сборка
 
 ```bash
-cd ~/RDS-2P-simulator/ros_packages
+cd ~/RDS-2P-software/ros_packages
 source install/setup.bash
 
 colcon build --packages-select rds_2p_commands

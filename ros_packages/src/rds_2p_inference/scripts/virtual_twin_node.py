@@ -30,8 +30,8 @@ except ImportError:
             break
     else:
         raise ImportError(
-            "mujoco_playground не найден. Выполните ros_packages/scripts/build_for_desktop.sh "
-            "(клонирует его в ros_packages/deps) и source install/setup.bash."
+            "mujoco_playground не найден в ros_packages/deps (вендорный subset). "
+            "Проверь, что deps/mujoco_playground закоммичен, и source install/setup.bash."
         )
 
 # Add parent directory to path for imports

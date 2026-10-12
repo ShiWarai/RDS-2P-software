@@ -173,18 +173,12 @@ fi
 # Клонируем mujoco_playground во внешние зависимости воркспейса: ros_packages/deps/
 # (как rnnoise). twin находит его через PYTHONPATH (ament env-hook пакета rds_2p_inference).
 # Берём только learning/mujoco_playground (sparse, ~40МБ); venv не нужен —
-# python-зависимости twin ставит requirements.txt
+# mujoco_playground (locomotion/rds2p) — вендорный subset в deps/, внешних клонов нет
 SIM_DEPS_DIR="deps"
 if [ ! -d "$SIM_DEPS_DIR/mujoco_playground" ]; then
-    echo "📥 Клонируем mujoco_playground (RDS-2P-simulator, dev-walk) в deps/..."
+    echo "⚠️  deps/mujoco_playground отсутствует — twin не будет работать (проверь, что subset закоммичен)" >&2
     mkdir -p "$SIM_DEPS_DIR"
     touch "$SIM_DEPS_DIR/COLCON_IGNORE"
-    SIM_TMP=$(mktemp -d)
-    git clone --depth 1 --filter=blob:none --sparse -b dev-walk https://github.com/ShiWarai/RDS-2P-simulator.git "$SIM_TMP/sim"
-    git -C "$SIM_TMP/sim" sparse-checkout set learning/mujoco_playground
-    cp -a "$SIM_TMP/sim/learning/mujoco_playground" "$SIM_DEPS_DIR/"
-    rm -rf "$SIM_TMP"
-    echo "✅ mujoco_playground установлен в $SIM_DEPS_DIR/"
 else
     echo "ℹ️ $SIM_DEPS_DIR/mujoco_playground уже существует"
 fi

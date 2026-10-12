@@ -39,7 +39,7 @@ sudo apt install ds4drv
 ## Сборка
 
 ```bash
-cd ~/RDS-2P-simulator/ros_packages
+cd ~/RDS-2P-software/ros_packages
 colcon build --packages-select rds_2p_joystick
 source install/setup.bash
 ```

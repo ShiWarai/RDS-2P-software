@@ -14,7 +14,7 @@ ROS 2 (Humble): **RKNN vision encoder** + **RKLLM**, один унифициро
 1. Сборка и окружение (один раз за сессию):
 
    ```bash
-   cd ~/RDS-2P-simulator/ros_packages
+   cd ~/RDS-2P-software/ros_packages
    source /opt/ros/humble/setup.bash
    source install/setup.bash
    ```
@@ -82,7 +82,7 @@ ros2 topic echo /rkllm_ros2/text --once
 ## Сборка
 
 ```bash
-cd ~/RDS-2P-simulator/ros_packages
+cd ~/RDS-2P-software/ros_packages
 source /opt/ros/humble/setup.bash
 colcon build --packages-select rkllm_ros2
 source install/setup.bash

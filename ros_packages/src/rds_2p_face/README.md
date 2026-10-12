@@ -143,7 +143,7 @@ ros2 launch rds_2p_face lip_sync_face.launch.py
 ## Установка и сборка
 
 ```bash
-cd ~/RDS-2P-simulator/ros_packages
+cd ~/RDS-2P-software/ros_packages
 colcon build --packages-select rds_2p_face
 source install/setup.bash
 ```
@@ -211,7 +211,7 @@ ros2 run rds_2p_face image_processor --ros-args -p output_width:=320 -p output_h
 Самый простой способ - использовать скрипт-обёртку:
 
 ```bash
-cd ~/RDS-2P-simulator/ros_packages
+cd ~/RDS-2P-software/ros_packages
 source install/setup.bash
 ./install/rds_2p_face/lib/rds_2p_face/display_face_sudo.sh
 ```
@@ -219,7 +219,7 @@ source install/setup.bash
 С указанием уровня логирования:
 
 ```bash
-cd ~/RDS-2P-simulator/ros_packages
+cd ~/RDS-2P-software/ros_packages
 source install/setup.bash
 ./install/rds_2p_face/lib/rds_2p_face/display_face_sudo.sh log_level:=debug
 ```
@@ -227,7 +227,7 @@ source install/setup.bash
 Или напрямую из исходников:
 
 ```bash
-cd ~/RDS-2P-simulator/ros_packages/src/rds_2p_face/scripts
+cd ~/RDS-2P-software/ros_packages/src/rds_2p_face/scripts
 ./display_face_sudo.sh
 ```
 
@@ -367,7 +367,7 @@ rviz2
 ros2 run ваш_пакет publisher_node
 
 # Терминал 2: Отображение на дисплее (требует sudo)
-cd ~/RDS-2P-simulator/ros_packages
+cd ~/RDS-2P-software/ros_packages
 source install/setup.bash
 ./install/rds_2p_face/lib/rds_2p_face/display_face_sudo.sh
 ```
@@ -398,7 +398,7 @@ ros2 launch rds_2p_face touchpad_drawer.launch.py
 ros2 launch rds_2p_face image_processor.launch.py
 
 # Терминал 4: Отображение на физическом дисплее (требует sudo)
-cd ~/RDS-2P-simulator/ros_packages
+cd ~/RDS-2P-software/ros_packages
 source install/setup.bash
 ./install/rds_2p_face/lib/rds_2p_face/display_face_sudo.sh
 ```
@@ -417,7 +417,7 @@ ros2 run rds_2p_face publish_image.py /home/orangepi/face/image/smile3.png
 Или напрямую из исходников:
 
 ```bash
-cd ~/RDS-2P-simulator/ros_packages/src/rds_2p_face
+cd ~/RDS-2P-software/ros_packages/src/rds_2p_face
 python3 scripts/publish_image.py /home/orangepi/face/image/smile3.png
 ```
 
