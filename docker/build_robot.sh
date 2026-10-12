@@ -174,12 +174,12 @@ else
   echo "ℹ️ Модель RNNoise уже на месте: $RNN_MODEL_TGZ"
 fi
 
-# меши rds_2p: в git не лежат (rds_2p/.gitignore), берутся из urdf_src/export —
-# как это делает urdf_src/update_rds2p.sh. Нужны для install(DIRECTORY meshes) в colcon.
-if [ ! -d "$ROSPKG/src/rds_2p/meshes/dae" ] && [ -d "$ROOT_DIR/urdf_src/export/rds-2p/meshes/dae" ]; then
-  echo "📥 Копируем меши rds_2p из urdf_src/export..."
-  mkdir -p "$ROSPKG/src/rds_2p/meshes"
-  cp -a "$ROOT_DIR/urdf_src/export/rds-2p/meshes/dae" "$ROSPKG/src/rds_2p/meshes/"
+# robot-образ максимально тонкий: визуальные меши (48MB dae) в него не кладём —
+# rviz/симуляция живут на desktop. Убираем и локальную копию из контекста,
+# иначе COPY ros_packages затащит их в каждый robot-образ.
+if [ -d "$ROSPKG/src/rds_2p/meshes" ]; then
+  echo "🧹 robot-контекст: удаляю rds_2p/meshes (тонкий образ; вернутся: urdf_src/update_rds2p.sh)"
+  rm -rf "$ROSPKG/src/rds_2p/meshes"
 fi
 
 cp -f "$SCRIPT_DIR/.dockerignore" "$ROOT_DIR/.dockerignore"

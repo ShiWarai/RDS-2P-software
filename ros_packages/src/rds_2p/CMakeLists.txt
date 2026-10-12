@@ -151,7 +151,18 @@ install(DIRECTORY include/
 )
 
 # Установка ресурсов
-install(DIRECTORY launch meshes rviz urdf worlds config
+install(DIRECTORY launch rviz urdf worlds config
   DESTINATION share/${PROJECT_NAME}
 )
+
+# Меши (dae) — визуальные ассеты для rviz/симуляции. Не лежат в git (см. meshes/*
+# в этом пакете): единственный источник — urdf_src/export/rds-2p/meshes/dae,
+# копируется сюда при prepare desktop-сборки (docker/build_desktop.sh) или
+# urdf_src/update_rds2p.sh. robot-образ намеренно тонкий: без dae,
+# robot_state_publisher/управление меши не читают.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/meshes/dae")
+  install(DIRECTORY meshes
+    DESTINATION share/${PROJECT_NAME}
+  )
+endif()
 ament_package()
