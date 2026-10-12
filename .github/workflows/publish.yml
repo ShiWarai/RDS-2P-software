@@ -3,6 +3,9 @@ name: Publish Docker images
 on:
   push:
     branches: [main]
+    tags: ["v*"]
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       image:
@@ -57,6 +60,8 @@ jobs:
           ./docker/build_desktop.sh
 
       - name: Tag and push (${{ matrix.arch }})
+        env:
+          PRERELEASE: ${{ github.event.release.prerelease }}
         run: |
           set -euo pipefail
           OWNER_LC=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
@@ -66,6 +71,12 @@ jobs:
           docker tag rds2p/desktop:ci "${IMG}:${{ matrix.arch }}-${GITHUB_SHA}"
           docker push "${IMG}:${{ matrix.arch }}-${TAG}"
           docker push "${IMG}:${{ matrix.arch }}-${GITHUB_SHA}"
+          # канал-алиасы только для GitHub Release: stable -> latest, prerelease -> prerelease
+          if [ "$GITHUB_EVENT_NAME" = "release" ]; then
+            if [ "$PRERELEASE" = "true" ]; then CH=prerelease; else CH=latest; fi
+            docker tag rds2p/desktop:ci "${IMG}:${{ matrix.arch }}-${CH}"
+            docker push "${IMG}:${{ matrix.arch }}-${CH}"
+          fi
 
   desktop-manifest:
     if: (github.event_name != 'workflow_dispatch' || github.event.inputs.image == 'all' || github.event.inputs.image == 'desktop')
@@ -82,14 +93,22 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Merge per-arch tags into multiarch tag
+        env:
+          PRERELEASE: ${{ github.event.release.prerelease }}
         run: |
           set -euo pipefail
           OWNER_LC=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
           IMG="ghcr.io/${OWNER_LC}/rds-2p-software-desktop"
           TAG=$(echo "$GITHUB_REF_NAME" | tr '/' '-')
+          CHANNELS=()
+          if [ "$GITHUB_EVENT_NAME" = "release" ]; then
+            if [ "$PRERELEASE" = "true" ]; then CH=prerelease; else CH=latest; fi
+            CHANNELS=(-t "${IMG}:${CH}")
+          fi
           docker buildx imagetools create \
             -t "${IMG}:${TAG}" \
             -t "${IMG}:${GITHUB_SHA}" \
+            ${CHANNELS[@]+"${CHANNELS[@]}"} \
             "${IMG}:amd64-${TAG}" "${IMG}:arm64-${TAG}"
 
   robot:
@@ -119,6 +138,8 @@ jobs:
           ./docker/build_robot.sh
 
       - name: Tag and push
+        env:
+          PRERELEASE: ${{ github.event.release.prerelease }}
         run: |
           set -euo pipefail
           OWNER_LC=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
@@ -128,3 +149,8 @@ jobs:
           docker tag rds2p/robot:ci "${IMG}:${GITHUB_SHA}"
           docker push "${IMG}:${TAG}"
           docker push "${IMG}:${GITHUB_SHA}"
+          if [ "$GITHUB_EVENT_NAME" = "release" ]; then
+            if [ "$PRERELEASE" = "true" ]; then CH=prerelease; else CH=latest; fi
+            docker tag rds2p/robot:ci "${IMG}:${CH}"
+            docker push "${IMG}:${CH}"
+          fi
