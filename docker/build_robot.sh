@@ -176,6 +176,11 @@ fi
 
 cp -f "$SCRIPT_DIR/.dockerignore" "$ROOT_DIR/.dockerignore"
 
+if [ "${PREPARE_ONLY:-0}" = "1" ]; then
+  echo "✅ Контекст robot-сборки подготовлен (PREPARE_ONLY=1) — docker build пропущен"
+  exit 0
+fi
+
 # Колонки colcon по MemTotal: на 2GB SBC (Pi4) четыре компилятора параллельно ловят OOM.
 # Ручной override: BUILD_WORKERS=8 ./docker/build_robot.sh
 MEM_GB="$(awk '/MemTotal/{print int($2/1048576)}' /proc/meminfo 2>/dev/null || echo 0)"

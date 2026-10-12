@@ -62,6 +62,11 @@ fi
 
 cp -f "$SCRIPT_DIR/.dockerignore" "$ROOT_DIR/.dockerignore"
 
+if [ "${PREPARE_ONLY:-0}" = "1" ]; then
+  echo "✅ Контекст desktop-сборки подготовлен (PREPARE_ONLY=1) — docker build пропущен"
+  exit 0
+fi
+
 echo "🐳 docker build -f docker/desktop.Dockerfile -t $IMAGE"
 docker build -f "$SCRIPT_DIR/desktop.Dockerfile" -t "$IMAGE" "$ROOT_DIR"
 
