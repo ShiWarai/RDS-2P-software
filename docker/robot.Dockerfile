@@ -122,7 +122,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       alsa-utils \
       python3-opencv python3-numpy python3-pil python3-yaml python3-scipy \
       ros-humble-robot-state-publisher ros-humble-xacro \
-      ros-humble-joint-state-publisher ros-humble-joint-state-publisher-gui \
+      ros-humble-joint-state-publisher \
       ros-humble-cv-bridge ros-humble-image-transport \
       ros-humble-compressed-image-transport ros-humble-compressed-depth-image-transport \
       ros-humble-tf2-ros ros-humble-teleop-twist-keyboard \

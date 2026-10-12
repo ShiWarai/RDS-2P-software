@@ -170,10 +170,8 @@ else
     echo "ℹ️ Модель Vosk уже установлена: $VOSK_MODEL_PATH"
 fi
 
-# Клонируем mujoco_playground во внешние зависимости воркспейса: ros_packages/deps/
-# (как rnnoise). twin находит его через PYTHONPATH (ament env-hook пакета rds_2p_inference).
-# Берём только learning/mujoco_playground (sparse, ~40МБ); venv не нужен —
-# mujoco_playground (locomotion/rds2p) — вендорный subset в deps/, внешних клонов нет
+# mujoco_playground (locomotion/rds2p) — вендорный subset в deps/, внешних клонов нет.
+# twin находит его через PYTHONPATH (ament env-hook пакета rds_2p_inference).
 SIM_DEPS_DIR="deps"
 if [ ! -d "$SIM_DEPS_DIR/mujoco_playground" ]; then
     echo "⚠️  deps/mujoco_playground отсутствует — twin не будет работать (проверь, что subset закоммичен)" >&2
@@ -181,6 +179,15 @@ if [ ! -d "$SIM_DEPS_DIR/mujoco_playground" ]; then
     touch "$SIM_DEPS_DIR/COLCON_IGNORE"
 else
     echo "ℹ️ $SIM_DEPS_DIR/mujoco_playground уже существует"
+fi
+
+# obj-меши для twin: canonical-источник — urdf_src/export/.../meshes/obj (GIT, по
+# аналогии с dae для URDF), в subset-е в git не лежат — кладутся сюда при prepare.
+MP_MESHES="$SIM_DEPS_DIR/mujoco_playground/_src/locomotion/rds2p/xmls/meshes"
+URDF_OBJ_DIR="$(dirname "$ROSPKG_DIR")/urdf_src/export/rds-2p/meshes/obj"
+if [ -d "$SIM_DEPS_DIR/mujoco_playground/_src" ] && [ -d "$URDF_OBJ_DIR" ]; then
+    mkdir -p "$MP_MESHES"
+    cp -a "$URDF_OBJ_DIR/." "$MP_MESHES/"
 fi
 
 # Устанавливаем Python-зависимости из всех requirements.txt (после скачивания всех пакетов)
@@ -394,7 +401,7 @@ if [[ ! -f "${RNN_INST}/lib/librnnoise.a" ]]; then
     COLCON_SKIP_EXTRA="audio_filters"
     echo "⚠️  audio_filters в сборку не входит (нет собранного RNNoise)."
 fi
-colcon build --parallel-workers 4 --symlink-install --packages-skip mpu6500_ros rds_2p_joystick orbbec_camera mtf02p_ros rkllm_ros2 ${COLCON_SKIP_EXTRA} --packages-ignore rds_2p_face
+colcon build --parallel-workers "${JOBS}" --symlink-install --packages-skip mpu6500_ros rds_2p_joystick orbbec_camera mtf02p_ros rkllm_ros2 ${COLCON_SKIP_EXTRA} --packages-ignore rds_2p_face
 
 echo "✅ Готово! Загрузите переменные: source install/setup.bash"
 

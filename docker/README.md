@@ -32,7 +32,7 @@ sudo systemctl daemon-reload && sudo systemctl restart docker
 
 ### Сборка и запуск
 ```bash
-docker/build_desktop.sh    # чинит контекст (sparse-clone mujoco_playground, vosk-модель) + docker build
+docker/build_desktop.sh    # чинит контекст (vendored subset + obj-меши из urdf_src, vosk-модель) + docker build
 docker/run_desktop.sh      # окно MuJoCo через WSLg (DISPLAY/Wayland монтируются)
 ```
 Переменные: `IMAGE=...` (тег), `LAUNCH_OVERRIDE="ros2 launch ..."` (любая команда вместо CMD).

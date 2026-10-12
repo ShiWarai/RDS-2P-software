@@ -438,7 +438,16 @@ if [[ ! -f "${RNN_INST}/lib/librnnoise.a" ]]; then
     COLCON_SKIP="--packages-skip audio_filters"
     echo "⚠️  audio_filters в сборку не входит (нет собранного RNNoise)."
 fi
-colcon build --parallel-workers 4 --symlink-install ${COLCON_SKIP}
+# Колонки colcon по MemTotal (как в docker/build_robot.sh): на 2GB SBC 4 компилятора
+# параллельно ловят OOM, на длинных сборкахworkers=2; на RAM>=4 — все ядра.
+MEM_GB="$(awk '/MemTotal/{print int($2/1048576)}' /proc/meminfo 2>/dev/null || echo 0)"
+if [ "${MEM_GB:-0}" -lt 4 ]; then
+    COLCON_WORKERS=$(( JOBS < 2 ? JOBS : 2 ))
+else
+    COLCON_WORKERS="$JOBS"
+fi
+echo "⚙️  colcon workers: $COLCON_WORKERS (RAM=${MEM_GB}GB, cores=$JOBS)"
+colcon build --parallel-workers "${COLCON_WORKERS}" --symlink-install ${COLCON_SKIP}
 
 echo "✅ Готово! Загрузите переменные: source install/setup.bash"
 

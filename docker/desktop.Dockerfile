@@ -49,9 +49,11 @@ RUN set -eux; \
       make install; \
     fi
 
+# Runtime-pip только из нужного: twin = mujoco+etils+glfw+numba (без jax/flax/brax —
+# они нужны только тренировочному окружению, из requirements.txt в образ не берём)
 RUN cd /opt/rds2p/ros-ws \
     && python3 -m pip install --no-cache-dir \
-         -r src/rds_2p_inference/requirements.txt \
+         etils "mujoco==3.3.5" glfw numba \
          -r src/vosk_ros2/requirements.txt \
          -r src/rds_2p_telegram_bot/requirements.txt \
          "numpy<2" sounddevice
@@ -83,7 +85,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libwayland-client0 libglib2.0-0 \
       python3-opencv python3-numpy python3-pil python3-yaml python3-scipy \
       ros-humble-robot-state-publisher ros-humble-xacro \
-      ros-humble-joint-state-publisher ros-humble-joint-state-publisher-gui \
+      ros-humble-joint-state-publisher \
       ros-humble-cv-bridge ros-humble-image-transport \
       ros-humble-tf2-ros ros-humble-teleop-twist-keyboard \
     && rm -rf /var/lib/apt/lists/*

@@ -34,6 +34,9 @@ MANIFEST
 ros_packages/deps/rnnoise_src/
 ros_packages/deps/rnnoise_install/
 # NOTE: deps/mujoco_playground — вендорный subset (locomotion/rds2p), КОММИТИТСЯ в репозиторий
+# obj-меши twin не дублирует в git: canonical-источник urdf_src/export/rds-2p/meshes/obj,
+# билд-скрипты (docker/build_desktop.sh, build_for_desktop.sh) кладут их в subset при prepare.
+ros_packages/deps/mujoco_playground/_src/locomotion/rds2p/xmls/meshes/
 # предзагруженная rnnoise-модель (22MB бинарь; build_robot.sh качает с NetBSD CDN,
 # Dockerfile подхватывает из контекста). Артефакт сборки — в git не идёт.
 ros_packages/deps/rnnoise_data-*.tar.gz
