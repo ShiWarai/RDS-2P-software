@@ -53,7 +53,7 @@ ros2 topic echo /rkllm_ros2/text --once
 
 ### Что вызывается под капотом
 
-- Action-сервер: **`/rkllm_ros2/complete`**, тип **`rkllm_ros2/action/ChatCompletion`**.
+- Action-сервер: **`/rkllm_ros2/complete`**, тип **`rkllm_ros2_msgs/action/ChatCompletion`**.
 - В goal всегда нужен **`user_message`**; поле **`image`** можно не заполнять (только текст) или заполнить для VLM.
 
 Дальше — таблица интерфейсов и **примеры `ros2 run`** для `scripts/`.
@@ -62,7 +62,7 @@ ros2 topic echo /rkllm_ros2/text --once
 
 | Интерфейс | Тип | Описание |
 |-----------|-----|----------|
-| `~/complete` | `rkllm_ros2/action/ChatCompletion` | **Goal:** `user_message` (перед infer санитизируется: trim и снятие ведущих префиксов `user:` / `robot:`); **`image`** опционально (multimodal: к промпту добавляется `<image>`). **`keep_history`**: при **`persist_session_kv:=true`** на ноде поле **не управляет** накоплением KV в RKLLM (infer всегда с «памятью»); сброс только **`~/clear_kv_cache`**. При **`persist_session_kv:=false`** — прежняя семантика: очистка KV и флаг infer берутся из goal. `max_new_tokens` в goal не подменяет лимит init-time. Фидбек/result — поток и итоговый текст + метрики. |
+| `~/complete` | `rkllm_ros2_msgs/action/ChatCompletion` | **Goal:** `user_message` (перед infer санитизируется: trim и снятие ведущих префиксов `user:` / `robot:`); **`image`** опционально (multimodal: к промпту добавляется `<image>`). **`keep_history`**: при **`persist_session_kv:=true`** на ноде поле **не управляет** накоплением KV в RKLLM (infer всегда с «памятью»); сброс только **`~/clear_kv_cache`**. При **`persist_session_kv:=false`** — прежняя семантика: очистка KV и флаг infer берутся из goal. `max_new_tokens` в goal не подменяет лимит init-time. Фидбек/result — поток и итоговый текст + метрики. |
 | `~/clear_kv_cache` | `std_srvs/Trigger` | Сброс KV на стороне RKLLM (простой диалог без наследия контекста прошлого клиента). Отказ, если нода занята goal. |
 | `~/text_chunks` | `std_msgs/String` | Чанки генерации |
 | `~/text` | `std_msgs/String` | Полный ответ после успешного goal |
@@ -122,7 +122,7 @@ ros2 launch rkllm_ros2 rkllm.launch.py \
 ## Просмотр интерфейса
 
 ```bash
-ros2 interface show rkllm_ros2/action/ChatCompletion
+ros2 interface show rkllm_ros2_msgs/action/ChatCompletion
 ```
 
 ## Примеры вызова

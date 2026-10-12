@@ -22,34 +22,15 @@ from launch_ros.substitutions import FindPackageShare
 from launch_ros.actions import Node
 
 
-def get_workspace_root():
-    """Получить корень workspace (нужно для поиска venv)."""
-    colcon_prefix = os.environ.get('COLCON_PREFIX_PATH', '')
-    if colcon_prefix:
-        install_dir = colcon_prefix.split(':')[0]
-        return os.path.abspath(os.path.join(install_dir, '..', '..'))
-
-    current_file = os.path.abspath(__file__)
-    if 'install' in current_file:
-        parts = current_file.split(os.sep)
-        install_idx = next((i for i, p in enumerate(parts) if p == 'install'), None)
-        if install_idx is not None:
-            ros_packages_path = os.sep.join(parts[:install_idx])
-            return os.path.abspath(os.path.join(ros_packages_path, '..'))
-    return os.path.abspath(os.path.join(os.path.dirname(current_file), '..', '..', '..', '..'))
-
-
 def generate_launch_description():
     # Пути пакетов
     ftservo_ros_pkg = FindPackageShare('ftservo_ros')
     rds_2p_pkg = FindPackageShare('rds_2p')
     rds_2p_dance_pkg = FindPackageShare('rds_2p_dance')
 
-    # Поиск venv для MuJoCo twin (fallback на системный python3)
-    workspace_root = get_workspace_root()
-    venv_python = os.path.join(workspace_root, 'learning', 'export_inference', '.venv', 'bin', 'python3')
-    if not os.path.exists(venv_python):
-        venv_python = 'python3'
+    # Python для twin: системный (mujoco и т.п. ставятся build_for_desktop.sh из requirements.txt);
+    # при наличии внешнего venv можно переопределить через переменную окружения
+    venv_python = os.environ.get('RDS2P_TWIN_PYTHON', 'python3')
 
     # Конфиги по умолчанию
     ftservo_config_file = PathJoinSubstitution([

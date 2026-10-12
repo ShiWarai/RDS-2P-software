@@ -22,21 +22,14 @@ if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vendor/include/rknn_api.h")
 endif()
 
 find_package(ament_cmake REQUIRED)
-find_package(rosidl_default_generators REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
+find_package(rkllm_ros2_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(OpenCV REQUIRED)
-
-rosidl_generate_interfaces(${PROJECT_NAME}
-  "action/ChatCompletion.action"
-  DEPENDENCIES sensor_msgs
-)
-
-ament_export_dependencies(rosidl_default_runtime)
 
 add_executable(rkllm_node
   src/rkllm_node.cpp
@@ -68,7 +61,7 @@ ament_target_dependencies(rkllm_node
   cv_bridge
 )
 
-rosidl_get_typesupport_target(cpp_typesupport_target "${PROJECT_NAME}" "rosidl_typesupport_cpp")
+rosidl_get_typesupport_target(cpp_typesupport_target "rkllm_ros2_msgs" "rosidl_typesupport_cpp")
 target_link_libraries(rkllm_node "${cpp_typesupport_target}")
 
 # Исполняемый файл: lib/<pkg>/rkllm_node, .so: lib/<pkg>/vendor/lib → $ORIGIN/vendor/lib

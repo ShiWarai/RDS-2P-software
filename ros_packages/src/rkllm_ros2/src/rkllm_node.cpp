@@ -21,7 +21,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "rkllm.h"
-#include "rkllm_ros2/action/chat_completion.hpp"
+#include "rkllm_ros2_msgs/action/chat_completion.hpp"
 #include "sensor_msgs/image_encodings.hpp"
 #include "sensor_msgs/msg/image.hpp"
 #include "std_msgs/msg/string.hpp"
@@ -211,7 +211,7 @@ static std::string SanitizeUserMessage(std::string input)
 
 class RkllmNode : public rclcpp::Node {
 public:
-  using ChatCompletion = rkllm_ros2::action::ChatCompletion;
+  using ChatCompletion = rkllm_ros2_msgs::action::ChatCompletion;
   using GoalHandleChatCompletion = rclcpp_action::ServerGoalHandle<ChatCompletion>;
 
   explicit RkllmNode()

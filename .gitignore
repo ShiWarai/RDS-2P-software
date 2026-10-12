@@ -33,6 +33,7 @@ MANIFEST
 # ROS workspace build artifacts
 ros_packages/deps/rnnoise_src/
 ros_packages/deps/rnnoise_install/
+ros_packages/deps/mujoco_playground/
 
 # Env
 .venv

@@ -25,7 +25,7 @@ import rclpy
 from rclpy.action import ActionClient
 from rclpy.node import Node
 
-from rkllm_ros2.action import ChatCompletion
+from rkllm_ros2_msgs.action import ChatCompletion
 
 
 def _try_clear_kv(node: Node, action_name: str) -> None:

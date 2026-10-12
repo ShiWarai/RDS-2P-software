@@ -170,6 +170,25 @@ else
     echo "ℹ️ Модель Vosk уже установлена: $VOSK_MODEL_PATH"
 fi
 
+# Клонируем mujoco_playground во внешние зависимости воркспейса: ros_packages/deps/
+# (как rnnoise). twin находит его через PYTHONPATH (ament env-hook пакета rds_2p_inference).
+# Берём только learning/mujoco_playground (sparse, ~40МБ); venv не нужен —
+# python-зависимости twin ставит requirements.txt
+SIM_DEPS_DIR="deps"
+if [ ! -d "$SIM_DEPS_DIR/mujoco_playground" ]; then
+    echo "📥 Клонируем mujoco_playground (RDS-2P-simulator, dev-walk) в deps/..."
+    mkdir -p "$SIM_DEPS_DIR"
+    touch "$SIM_DEPS_DIR/COLCON_IGNORE"
+    SIM_TMP=$(mktemp -d)
+    git clone --depth 1 --filter=blob:none --sparse -b dev-walk https://github.com/ShiWarai/RDS-2P-simulator.git "$SIM_TMP/sim"
+    git -C "$SIM_TMP/sim" sparse-checkout set learning/mujoco_playground
+    cp -a "$SIM_TMP/sim/learning/mujoco_playground" "$SIM_DEPS_DIR/"
+    rm -rf "$SIM_TMP"
+    echo "✅ mujoco_playground установлен в $SIM_DEPS_DIR/"
+else
+    echo "ℹ️ $SIM_DEPS_DIR/mujoco_playground уже существует"
+fi
+
 # Устанавливаем Python-зависимости из всех requirements.txt (после скачивания всех пакетов)
 echo "🐍 Ищем и устанавливаем Python-зависимости..."
 REQ_FILES=$(find "src" -maxdepth 2 -name "requirements.txt" -type f 2>/dev/null)
@@ -344,7 +363,12 @@ fi
 # Собираем все пакеты кроме...
 echo "🔨 Собираем пакеты (кроме тех, что запускаются только на роботе, и orbbec_camera - собираем только сообщения, mtf02p_ros - только на роботе)"
 
-colcon build --parallel-workers 4 --symlink-install --packages-skip mpu6500_ros rds_2p_joystick orbbec_camera mtf02p_ros
+# rkllm_ros2 — нода с vendor RK-рантаймом (aarch64), только для робота;
+# сообщения rkllm_ros2_msgs собираются (нужны rds_2p_commands)
+# rds_2p_face — морда (display_face/GPIO, touchpad-пайплайн), только для робота;
+# --packages-ignore (а не skip): rds_2p объявляет exec_depend на неё, skip бы оставил
+# её в графе зависимостей и colcon ждал бы её в install/
+colcon build --parallel-workers 4 --symlink-install --packages-skip mpu6500_ros rds_2p_joystick orbbec_camera mtf02p_ros rkllm_ros2 --packages-ignore rds_2p_face
 
 echo "✅ Готово! Загрузите переменные: source install/setup.bash"
 

@@ -24,7 +24,7 @@ from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image as RosImage
 
-from rkllm_ros2.action import ChatCompletion
+from rkllm_ros2_msgs.action import ChatCompletion
 
 
 def _try_clear_kv(node: Node, action_name: str) -> float | None:

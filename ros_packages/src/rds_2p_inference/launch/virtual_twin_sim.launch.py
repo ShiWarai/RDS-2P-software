@@ -23,29 +23,6 @@ from pathlib import Path
 import os
 
 
-def get_workspace_root():
-    """Get workspace root directory."""
-    # Try to get from environment variable first
-    colcon_prefix = os.environ.get('COLCON_PREFIX_PATH', '')
-    if colcon_prefix:
-        install_dir = colcon_prefix.split(':')[0]
-        workspace_root = os.path.abspath(os.path.join(install_dir, '..', '..'))
-    else:
-        # Fallback: compute from current file location
-        current_file = os.path.abspath(__file__)
-        if 'install' in current_file:
-            parts = current_file.split(os.sep)
-            install_idx = next((i for i, p in enumerate(parts) if p == 'install'), None)
-            if install_idx:
-                ros_packages_path = os.sep.join(parts[:install_idx])
-                workspace_root = os.path.abspath(os.path.join(ros_packages_path, '..'))
-            else:
-                workspace_root = os.path.abspath(os.path.join(os.path.dirname(current_file), '..', '..', '..', '..', '..'))
-        else:
-            workspace_root = os.path.abspath(os.path.join(os.path.dirname(current_file), '..', '..', '..', '..'))
-    return workspace_root
-
-
 def generate_launch_description():
     # Получаем пути к пакетам
     ftservo_ros_pkg = FindPackageShare('ftservo_ros')
@@ -54,13 +31,9 @@ def generate_launch_description():
     rds_2p_face_pkg = FindPackageShare('rds_2p_face')
     rds_2p_dance_pkg = FindPackageShare('rds_2p_dance')
     
-    # Получаем путь к виртуальному окружению
-    workspace_root = get_workspace_root()
-    venv_python = os.path.join(workspace_root, 'learning', 'export_inference', '.venv', 'bin', 'python3')
-    
-    # Проверяем существование виртуального окружения, если нет - используем системный python3
-    if not os.path.exists(venv_python):
-        venv_python = 'python3'
+    # Python для twin: системный (зависимости ставятся build-скриптом из requirements.txt);
+    # переопределяется переменным окружения RDS2P_TWIN_PYTHON
+    venv_python = os.environ.get('RDS2P_TWIN_PYTHON', 'python3')
     
     # Получаем абсолютные пути для конфигурационных файлов
     ftservo_config_file = PathJoinSubstitution([

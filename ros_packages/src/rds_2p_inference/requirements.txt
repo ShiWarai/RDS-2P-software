@@ -7,3 +7,4 @@ flax
 brax
 tqdm
 numba
+coverage>=7

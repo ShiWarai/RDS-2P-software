@@ -14,39 +14,25 @@ from etils import epath
 import numpy as np
 import mujoco
 
-# Get workspace root to find mujoco_playground
-# From install: install/rds_2p_inference/lib/rds_2p_inference/virtual_twin_node.py
-# From src: src/rds_2p_inference/scripts/virtual_twin_node.py
-def get_workspace_root():
-    """Get workspace root directory."""
-    current_file = os.path.abspath(__file__)
-    
-    # Check if running from install directory
-    if 'install' in current_file:
-        # Find install in path and go up to ros_packages, then to workspace root
-        parts = current_file.split(os.sep)
-        install_idx = next((i for i, p in enumerate(parts) if p == 'install'), None)
-        if install_idx:
-            ros_packages_path = os.sep.join(parts[:install_idx])
-            workspace_root = os.path.abspath(os.path.join(ros_packages_path, '..'))
-        else:
-            # Fallback: go up from lib/rds_2p_inference
-            workspace_root = os.path.abspath(os.path.join(os.path.dirname(current_file), '..', '..', '..', '..', '..'))
+# mujoco_playground — внешняя зависимость в ros_packages/deps (ставится build_for_desktop.sh).
+# Основной путь: PYTHONPATH уже содержит deps/ после source install/setup.bash (ament env-hook).
+# Резервные пути — для запуска без окружения.
+try:
+    import mujoco_playground  # noqa: F401
+except ImportError:
+    _this_dir = os.path.dirname(os.path.realpath(__file__))
+    for _parent in (
+        os.path.join(_this_dir, '..', '..', '..', '..', 'deps'),  # install/rds_2p_inference/lib/rds_2p_inference/..
+        os.path.join(_this_dir, '..', '..', '..', 'deps'),        # src/rds_2p_inference/scripts/..
+    ):
+        if os.path.isdir(os.path.join(_parent, 'mujoco_playground')):
+            sys.path.insert(0, os.path.abspath(_parent))
+            break
     else:
-        # Running from src directory
-        # src/rds_2p_inference/scripts -> src -> ros_packages -> workspace root
-        workspace_root = os.path.abspath(os.path.join(os.path.dirname(current_file), '..', '..', '..', '..'))
-    
-    return workspace_root
-
-# Add mujoco_playground to path
-workspace_root = get_workspace_root()
-mujoco_playground_path = os.path.join(workspace_root, 'learning', 'mujoco_playground')
-if os.path.exists(mujoco_playground_path):
-    sys.path.insert(0, os.path.join(workspace_root, 'learning'))
-else:
-    # Try alternative path (if mujoco_playground is in a different location)
-    print(f"Warning: mujoco_playground not found at {mujoco_playground_path}")
+        raise ImportError(
+            "mujoco_playground не найден. Выполните ros_packages/scripts/build_for_desktop.sh "
+            "(клонирует его в ros_packages/deps) и source install/setup.bash."
+        )
 
 # Add parent directory to path for imports
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
