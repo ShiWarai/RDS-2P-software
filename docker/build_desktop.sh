@@ -43,6 +43,9 @@ fi
 clone_if_missing "$ROSPKG/src/audio_common" "https://github.com/mgonzs13/audio_common.git"
 clone_if_missing "$ROSPKG/src/vosk_ros2" "https://github.com/ShiWarai/vosk_ros2.git" "dev"
 clone_if_missing "$ROSPKG/src/ftservo_ros/library/FTServoLibrary" "https://github.com/ShiWarai/FTServoLibrary.git"
+# desktop собирает orbbec_camera_msgs/orbbec_description (сам orbbec_camera скипается) —
+# как в ros_packages/scripts/build_for_desktop.sh
+clone_if_missing "$ROSPKG/src/OrbbecSDK_ROS2" "https://github.com/orbbec/OrbbecSDK_ROS2.git" "main"
 
 VOSK_MODEL="$ROSPKG/src/vosk_ros2/models/vosk-model-small-ru-0.22"
 if [ ! -d "$VOSK_MODEL" ]; then

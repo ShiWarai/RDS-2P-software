@@ -23,6 +23,49 @@ clone_if_missing() {
   fi
 }
 
+# Определение аппаратной платформы робота (NPU/SoC).
+# Возвращает: rk3588 | rk3576 | rk3568 | generic
+detect_rk_platform() {
+  local model=""
+  if [ -f /proc/device-tree/model ]; then
+    model="$(tr '\0' '\n' < /proc/device-tree/model 2>/dev/null | tr '[:upper:]' '[:lower:]' | tr -s ' _-')"
+  fi
+  # RK-процессоры определяем по модели и наличию NPU-устройств (/dev/rknn, /dev/rga, /dev/mpp_service).
+  if echo "$model" | grep -Eq "rk3588|rk3576|rk3568|orange pi ?5|orange_pi|rk3562|rk3588s"; then
+    if echo "$model" | grep -q rk3562; then echo rk3562
+    elif echo "$model" | grep -q rk3588s; then echo rk3588s
+    elif echo "$model" | grep -q rk3576; then echo rk3576
+    elif echo "$model" | grep -q rk3568; then echo rk3568
+    else echo rk3588
+    fi
+    return 0
+  fi
+  for d in rknn rga mpp_service; do
+    if [ -e "/dev/$d" ]; then echo rk3588; return 0; fi
+  done
+  echo generic
+}
+
+# Разрешить PLATFORM в конкретный результат с проверкой.
+# auto — автоопределение; rk3588|rk3576|rk3562|rk3568|rk3588s — с NPU; generic — без NPU.
+resolve_platform() {
+  local requested="${PLATFORM:-auto}"
+  case "$requested" in
+    auto) echo "$(detect_rk_platform)"; return 0 ;;
+    rk3588|rk3576|rk3562|rk3568|rk3588s) echo "$requested"; return 0 ;;
+    generic|cpu|no-npu) echo generic; return 0 ;;
+    *) echo "⚠️ Неизвестный PLATFORM='$requested' — используем автоопределение." >&2; echo "$(detect_rk_platform)"; return 0 ;;
+  esac
+}
+
+# NPU доступен только на RK-платформах И при наличии vendor RK-рантайма.
+rk_platform_has_npu() {
+  local plat="$1"
+  [ "$plat" != "generic" ] || return 1
+  [ "$VENDOR_OK" = true ] || return 1
+  return 0
+}
+
 ARCH="$(uname -m)"
 if [ "$ARCH" != "aarch64" ] && [ "${ALLOW_CROSS:-0}" != "1" ]; then
   echo "❌ Архитектура хоста: $ARCH. robot-образ собирается нативно на роботе (aarch64)."
@@ -46,15 +89,33 @@ for f in lib/librkllmrt.so lib/librknnrt.so include/rkllm.h include/rknn_api.h; 
     echo "❗ Нет ros_packages/src/rkllm_ros2/vendor/$f"
   fi
 done
-if [ "$VENDOR_OK" != true ]; then
-  echo "⚠️  RK-рантайм не полностью в vendor/ — образ соберётся БЕЗ rkllm_ros2."
+if [ "$VENDOR_OK" = true ]; then
+  echo "✅ vendor RK-рантайм (librkllmrt.so/librknnrt.so + заголовки) в vendor/ — rkllm_ros2 соберётся при наличии NPU."
+else
+  echo "⚠️  RK-рантайм не полностью в vendor/ — rkllm_ros2 НЕ соберётся (LLM-экшены отключатся)."
   echo "    Положите .so и заголовки по инструкции ros_packages/src/rkllm_ros2/vendor/README.md"
   echo "    и пересоберите, если нужны LLM-экшены."
-else
-  echo "✅ vendor rkllm на месте — rkllm_ros2 будет собран"
 fi
 
+# Платформа: supported = rk3588|rk3576|rk3562|rk3568|rk3588s|generic|auto
+PLATFORM="${PLATFORM:-auto}"
+RESOLVED_PLATFORM="$(resolve_platform)"
+NPU_ENABLED=0
+if rk_platform_has_npu "$RESOLVED_PLATFORM"; then
+  NPU_ENABLED=1
+  echo "🎯 Платформа: $RESOLVED_PLATFORM (NPU вкл — будет собран rkllm_ros2)."
+else
+  case "$RESOLVED_PLATFORM" in
+    generic)
+      echo "🎯 Платформа: generic (NPU выкл — rkllm_ros2 НЕ собран). Repka-Pi4 / Orange Pi без RK." ;;
+    *)
+      echo "🎯 Платформа: $RESOLVED_PLATFORM (NPU выкл — rkllm_ros2 НЕ собран: нет vendor RK-рантайма)." ;;
+  esac
+fi
+echo "   Управление: PLATFORM=rk3588 (NPU) | PLATFORM=generic (без NPU) | PLATFORM=auto (авто)."
+
 if [ ! -f "$ROSPKG/src/rds_2p_inference/external_lib/onnxruntime-linux-aarch64-1.19.2.tgz" ]; then
+  mkdir -p "$ROSPKG/src/rds_2p_inference/external_lib"
   echo "📥 Скачиваем OnnxRuntime aarch64 1.19.2..."
   curl -L -o "$ROSPKG/src/rds_2p_inference/external_lib/onnxruntime-linux-aarch64-1.19.2.tgz" \
     https://github.com/microsoft/onnxruntime/releases/download/v1.19.2/onnxruntime-linux-aarch64-1.19.2.tgz
@@ -68,21 +129,68 @@ clone_if_missing "$ROSPKG/src/vosk_ros2" "https://github.com/ShiWarai/vosk_ros2.
 
 VOSK_MODEL="$ROSPKG/src/vosk_ros2/models/vosk-model-small-ru-0.22"
 if [ ! -d "$VOSK_MODEL" ]; then
-  echo "📥 Скачиваем модель Vosk..."
   mkdir -p "$ROSPKG/src/vosk_ros2/models"
   pushd "$ROSPKG/src/vosk_ros2/models" >/dev/null
-  wget -q https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip
-  python3 -m zipfile -e vosk-model-small-ru-0.22.zip .
-  rm -f vosk-model-small-ru-0.22.zip
+  if timeout 180 wget -q -T 30 --tries=1 \
+        https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip 2>/dev/null \
+     && [ -f vosk-model-small-ru-0.22.zip ] && [ -s vosk-model-small-ru-0.22.zip ]; then
+    python3 -m zipfile -e vosk-model-small-ru-0.22.zip .
+    rm -f vosk-model-small-ru-0.22.zip
+    echo "✅ Модель Vosk скачана."
+  else
+    echo "⚠️  Модель Vosk не успела скааться (сеть/таймаут). Модель — runtime-актив (монтируется в /models), сборка продолжается без неё в образе."
+    rm -f vosk-model-small-ru-0.22.zip 2>/dev/null || true
+  fi
   popd >/dev/null
 else
   echo "ℹ️ Модель Vosk уже на месте"
 fi
 
+# Модель RNNoise (rnnoise_data-<ver>.tar.gz): предзагружаем в ros_packages/deps/,
+# чтобы docker build не зависел от media.xiph.org (в контейнере она часто недоступна).
+# Dockerfile сам подхватит файл из контекста; fallback — time-boxed-загрузка внутри образа.
+RNN_VER="$(cat "$ROSPKG/deps/rnnoise_src/model_version" 2>/dev/null || echo 0b50c45)"
+RNN_MODEL_TGZ="$ROSPKG/deps/rnnoise_data-$RNN_VER.tar.gz"
+if [ ! -s "$RNN_MODEL_TGZ" ]; then
+  mkdir -p "$ROSPKG/deps"
+  echo "📥 Скачиваем модель RNNoise (rnnoise_data-$RNN_VER.tar.gz)..."
+  RNN_DL_OK=false
+  for url in \
+    "https://cdn.netbsd.org/pub/pkgsrc/distfiles/rnnoise-0.2/rnnoise_data-$RNN_VER.tar.gz" \
+    "https://media.xiph.org/rnnoise/models/rnnoise_data-$RNN_VER.tar.gz"; do
+    if timeout 240 curl -fL --connect-timeout 15 --max-time 230 -o "$RNN_MODEL_TGZ" "$url" 2>/dev/null \
+       && [ -s "$RNN_MODEL_TGZ" ] && tar -tzf "$RNN_MODEL_TGZ" >/dev/null 2>&1; then
+      RNN_DL_OK=true
+      break
+    fi
+    rm -f "$RNN_MODEL_TGZ" 2>/dev/null || true
+  done
+  if [ "$RNN_DL_OK" = true ]; then
+    echo "✅ Модель RNNoise готова в ros_packages/deps/."
+  else
+    echo "⚠️  Модель RNNoise не скачалась — Dockerfile попробует time-boxed-загрузку в контейнере, иначе пропустит rnnoise/audio_filters."
+  fi
+else
+  echo "ℹ️ Модель RNNoise уже на месте: $RNN_MODEL_TGZ"
+fi
+
 cp -f "$SCRIPT_DIR/.dockerignore" "$ROOT_DIR/.dockerignore"
 
-echo "🐳 docker build -f docker/robot.Dockerfile -t $IMAGE (нативная сборка, это займёт время)"
-docker build -f "$SCRIPT_DIR/robot.Dockerfile" -t "$IMAGE" "$ROOT_DIR"
+# Колонки colcon по MemTotal: на 2GB SBC (Pi4) четыре компилятора параллельно ловят OOM.
+# Ручной override: BUILD_WORKERS=8 ./docker/build_robot.sh
+MEM_GB="$(awk '/MemTotal/{print int($2/1048576)}' /proc/meminfo 2>/dev/null || echo 0)"
+CORES="$(nproc)"
+if [ "${BUILD_WORKERS:-0}" -gt 0 ] 2>/dev/null; then
+  WORKERS="$BUILD_WORKERS"
+elif [ "${MEM_GB:-0}" -lt 4 ]; then
+  WORKERS=$(( CORES < 2 ? CORES : 2 ))
+else
+  WORKERS="$CORES"
+fi
+echo "⚙️  colcon workers: $WORKERS (RAM=${MEM_GB}GB, cores=$CORES)"
+
+echo "🐳 docker build --build-arg NPU=$NPU_ENABLED --build-arg BUILD_WORKERS=$WORKERS -f docker/robot.Dockerfile -t $IMAGE (нативная сборка, это займёт время)"
+docker build --build-arg "NPU=$NPU_ENABLED" --build-arg "BUILD_WORKERS=$WORKERS" -f "$SCRIPT_DIR/robot.Dockerfile" -t "$IMAGE" "$ROOT_DIR"
 
 rm -f "$ROOT_DIR/.dockerignore"
 echo "✅ Образ $IMAGE собран. Запуск: docker/run_robot.sh (MODELS_DIR=... RKLLM_MODEL=...)"

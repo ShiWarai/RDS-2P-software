@@ -34,6 +34,13 @@ MANIFEST
 ros_packages/deps/rnnoise_src/
 ros_packages/deps/rnnoise_install/
 ros_packages/deps/mujoco_playground/
+# предзагруженная rnnoise-модель (22MB бинарь; build_robot.sh качает с NetBSD CDN,
+# Dockerfile подхватывает из контекста). Артефакт сборки — в git не идёт.
+ros_packages/deps/rnnoise_data-*.tar.gz
+# временный корневой .dockerignore (копия docker/.dockerignore на время build_robot/build_desktop)
+/.dockerignore
+# gitignored клон-зависимости, подтягиваются билд-скриптами
+ros_packages/src/mpu6500_ros/library/mpu6500/
 
 # Env
 .venv

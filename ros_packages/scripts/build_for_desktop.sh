@@ -339,13 +339,40 @@ if [[ ! -f "${RNN_INST}/lib/librnnoise.a" ]] || [[ ! -f "${RNN_INST}/include/rnn
         exit 1
     fi
     cp -f "${STUB}" "${RNN_SRC}/src/os_support.h"
-    pushd "${RNN_SRC}" >/dev/null
-    ./autogen.sh
-    ./configure --prefix="${RNN_INST}" --disable-examples
-    make "-j${JOBS}"
-    make install
-    popd >/dev/null
-    echo "✅ RNNoise: ${RNN_INST}"
+    # Модель rnnoise: локальный tarball в deps/ (предзагружен), иначе time-boxed-загрузка
+    # с зеркал (media.xiph.org из роботов часто недоступна). Без модели — пропускаем rnnoise.
+    RNN_VER="$(cat "${RNN_SRC}/model_version" 2>/dev/null || echo 0b50c45)"
+    RNN_MODEL_TGZ="$(pwd)/deps/rnnoise_data-${RNN_VER}.tar.gz"
+    RNN_MODEL_LOCAL="${RNN_SRC}/rnnoise_data-${RNN_VER}.tar.gz"
+    if [[ ! -f "${RNN_MODEL_LOCAL}" ]] && [[ -s "${RNN_MODEL_TGZ}" ]]; then
+        cp -f "${RNN_MODEL_TGZ}" "${RNN_MODEL_LOCAL}"
+        echo "ℹ️ Модель RNNoise взята из deps/ (локальный tarball)."
+    fi
+    if [[ ! -f "${RNN_MODEL_LOCAL}" ]]; then
+        echo "📥 Скачиваем модель RNNoise (time-boxed, зеркала)..."
+        for url in \
+            "https://cdn.netbsd.org/pub/pkgsrc/distfiles/rnnoise-0.2/rnnoise_data-${RNN_VER}.tar.gz" \
+            "https://media.xiph.org/rnnoise/models/rnnoise_data-${RNN_VER}.tar.gz"; do
+            if timeout 240 curl -fL --connect-timeout 15 --max-time 230 -o "${RNN_MODEL_LOCAL}" "$url" 2>/dev/null \
+               && [[ -s "${RNN_MODEL_LOCAL}" ]] && tar -tzf "${RNN_MODEL_LOCAL}" >/dev/null 2>&1; then
+                cp -f "${RNN_MODEL_LOCAL}" "${RNN_MODEL_TGZ}"
+                break
+            fi
+            rm -f "${RNN_MODEL_LOCAL}" 2>/dev/null || true
+        done
+    fi
+    if [[ ! -f "${RNN_MODEL_LOCAL}" ]] || ! tar -tzf "${RNN_MODEL_LOCAL}" >/dev/null 2>&1; then
+        echo "⚠️  Модель RNNoise недоступна — пропускаю сборку rnnoise, audio_filters будет исключён из colcon." >&2
+        rm -f "${RNN_MODEL_LOCAL}" 2>/dev/null || true
+    else
+        pushd "${RNN_SRC}" >/dev/null
+        ./autogen.sh
+        ./configure --prefix="${RNN_INST}" --disable-examples
+        make "-j${JOBS}"
+        make install
+        popd >/dev/null
+        echo "✅ RNNoise: ${RNN_INST}"
+    fi
 else
     echo "ℹ️ RNNoise уже в ${RNN_INST}"
 fi
@@ -368,7 +395,12 @@ echo "🔨 Собираем пакеты (кроме тех, что запуск
 # rds_2p_face — морда (display_face/GPIO, touchpad-пайплайн), только для робота;
 # --packages-ignore (а не skip): rds_2p объявляет exec_depend на неё, skip бы оставил
 # её в графе зависимостей и colcon ждал бы её в install/
-colcon build --parallel-workers 4 --symlink-install --packages-skip mpu6500_ros rds_2p_joystick orbbec_camera mtf02p_ros rkllm_ros2 --packages-ignore rds_2p_face
+COLCON_SKIP_EXTRA=""
+if [[ ! -f "${RNN_INST}/lib/librnnoise.a" ]]; then
+    COLCON_SKIP_EXTRA="audio_filters"
+    echo "⚠️  audio_filters в сборку не входит (нет собранного RNNoise)."
+fi
+colcon build --parallel-workers 4 --symlink-install --packages-skip mpu6500_ros rds_2p_joystick orbbec_camera mtf02p_ros rkllm_ros2 ${COLCON_SKIP_EXTRA} --packages-ignore rds_2p_face
 
 echo "✅ Готово! Загрузите переменные: source install/setup.bash"
 

@@ -14,13 +14,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY ros_packages /opt/rds2p/ros-ws
 
+# onnxruntime по архитектуре: x64 или aarch64 (TARGETARCH от BuildKit;
+# на classic builder TARGETARCH пуст -> fallback по uname -m)
 RUN set -eux; \
     cd /opt/rds2p/ros-ws/src/rds_2p_inference/external_lib; \
-    if [ ! -d onnxruntime-linux-x64-1.19.2 ]; then \
-      curl -L -o onnxruntime-linux-x64-1.19.2.tgz \
-        https://github.com/microsoft/onnxruntime/releases/download/v1.19.2/onnxruntime-linux-x64-1.19.2.tgz; \
-      tar -xf onnxruntime-linux-x64-1.19.2.tgz; \
-      rm -f onnxruntime-linux-x64-1.19.2.tgz; \
+    A="${TARGETARCH:-$(uname -m)}"; \
+    case "$A" in \
+      amd64|x86_64) ORT=onnxruntime-linux-x64-1.19.2 ;; \
+      arm64|aarch64) ORT=onnxruntime-linux-aarch64-1.19.2 ;; \
+      *) echo "unsupported arch: $A" >&2; exit 1 ;; \
+    esac; \
+    if [ ! -d "$ORT" ]; then \
+      curl -L -o "$ORT.tgz" "https://github.com/microsoft/onnxruntime/releases/download/v1.19.2/$ORT.tgz"; \
+      tar -xf "$ORT.tgz"; \
+      rm -f "$ORT.tgz"; \
     fi
 
 RUN rosdep init || true \

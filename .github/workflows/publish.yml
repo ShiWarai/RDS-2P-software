@@ -1,0 +1,130 @@
+name: Publish Docker images
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image:
+        description: "Что публиковать"
+        required: false
+        default: all
+        type: choice
+        options:
+          - all
+          - desktop
+          - robot
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: docker-publish-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desktop:
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.image == 'all' || github.event.inputs.image == 'desktop'
+    name: desktop (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 240
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Подготовка контекста (clone deps, Vosk-модель, mujoco_playground) + docker build
+      - name: Build desktop image
+        env:
+          IMAGE: rds2p/desktop:ci
+        run: |
+          chmod +x docker/build_desktop.sh
+          ./docker/build_desktop.sh
+
+      - name: Tag and push (${{ matrix.arch }})
+        run: |
+          set -euo pipefail
+          OWNER_LC=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
+          IMG="ghcr.io/${OWNER_LC}/rds-2p-software-desktop"
+          TAG=$(echo "$GITHUB_REF_NAME" | tr '/' '-')
+          docker tag rds2p/desktop:ci "${IMG}:${{ matrix.arch }}-${TAG}"
+          docker tag rds2p/desktop:ci "${IMG}:${{ matrix.arch }}-${GITHUB_SHA}"
+          docker push "${IMG}:${{ matrix.arch }}-${TAG}"
+          docker push "${IMG}:${{ matrix.arch }}-${GITHUB_SHA}"
+
+  desktop-manifest:
+    if: (github.event_name != 'workflow_dispatch' || github.event.inputs.image == 'all' || github.event.inputs.image == 'desktop')
+    needs: [desktop]
+    name: desktop manifest (amd64 + arm64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Merge per-arch tags into multiarch tag
+        run: |
+          set -euo pipefail
+          OWNER_LC=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
+          IMG="ghcr.io/${OWNER_LC}/rds-2p-software-desktop"
+          TAG=$(echo "$GITHUB_REF_NAME" | tr '/' '-')
+          docker buildx imagetools create \
+            -t "${IMG}:${TAG}" \
+            -t "${IMG}:${GITHUB_SHA}" \
+            "${IMG}:amd64-${TAG}" "${IMG}:arm64-${TAG}"
+
+  robot:
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.image == 'all' || github.event.inputs.image == 'robot'
+    name: robot (arm64)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 360
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Подготовка контекста (vendor-проверка, onnxruntime aarch64, rnnoise-модель в deps/,
+      # clone deps, PLATFORM auto -> generic на runner без RK NPU) + docker build.
+      # Образ только arm64: нативный ARM-раннер, без QEMU.
+      - name: Build robot image
+        env:
+          IMAGE: rds2p/robot:ci
+        run: |
+          chmod +x docker/build_robot.sh
+          ./docker/build_robot.sh
+
+      - name: Tag and push
+        run: |
+          set -euo pipefail
+          OWNER_LC=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
+          IMG="ghcr.io/${OWNER_LC}/rds-2p-software-robot"
+          TAG=$(echo "$GITHUB_REF_NAME" | tr '/' '-')
+          docker tag rds2p/robot:ci "${IMG}:${TAG}"
+          docker tag rds2p/robot:ci "${IMG}:${GITHUB_SHA}"
+          docker push "${IMG}:${TAG}"
+          docker push "${IMG}:${GITHUB_SHA}"
