@@ -52,6 +52,15 @@ jobs:
           OWNER="${GITHUB_REPOSITORY_OWNER,,}"
           echo "IMG=ghcr.io/${OWNER}/rds-2p-software-${{ matrix.image }}" >> $GITHUB_ENV
 
+      - name: Auth private dep repos (RDS-2P-simulator)
+        if: matrix.image == 'desktop'
+        env:
+          DEPS_PAT: ${{ secrets.DEPS_PAT }}
+        run: |
+          if [ -n "${DEPS_PAT:-}" ]; then
+            git config --global url."https://x-access-token:${DEPS_PAT}@github.com/".insteadOf "https://github.com/"
+          fi
+
       - name: Prepare build context
         run: |
           if [ "${{ matrix.image }}" = "robot" ]; then
