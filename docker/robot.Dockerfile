@@ -72,8 +72,11 @@ RUN set -eux; \
       fi; \
     fi
 
+# Runtime-pip только из нужного: twin = mujoco+etils+glfw+numba (без jax/flax/brax —
+# они нужны только тренировочному окружению, из requirements.txt в образ не берём)
 RUN cd /opt/rds2p/ros-ws \
     && python3 -m pip install --no-cache-dir \
+         etils "mujoco==3.3.5" glfw numba \
          -r src/vosk_ros2/requirements.txt \
          -r src/rds_2p_telegram_bot/requirements.txt \
           "numpy<2" sounddevice ds4drv
@@ -129,6 +132,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
       libasound2 libgpiod2 libsoxr0 libudev1 libusb-1.0-0 libportaudio2 \
       alsa-utils \
+      libglfw3 libgl1 libegl1 libgles2 \
       python3-opencv python3-numpy python3-pil python3-yaml python3-scipy \
       ros-humble-robot-state-publisher ros-humble-xacro \
       ros-humble-joint-state-publisher \
@@ -143,6 +147,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/rds2p/install /opt/rds2p/install
+COPY --from=builder /opt/rds2p/ros-ws/deps/mujoco_playground /opt/rds2p/deps/mujoco_playground
 COPY --from=builder /usr/local/lib/python3.10/dist-packages /usr/local/lib/python3.10/dist-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY docker/entrypoint.sh /entrypoint.sh
