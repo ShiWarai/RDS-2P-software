@@ -31,6 +31,18 @@ def generate_launch_description():
         description='Enable automatic calibration on startup'
     )
     
+    i2c_device_arg = DeclareLaunchArgument(
+        'i2c_device',
+        default_value='/dev/i2c-1',
+        description='I2C device path (e.g. /dev/i2c-1)'
+    )
+    
+    spi_device_arg = DeclareLaunchArgument(
+        'spi_device',
+        default_value='/dev/spidev0.0',
+        description='SPI device path (e.g. /dev/spidev0.0)'
+    )
+    
     # MPU6500 IMU Node
     mpu6500_node = Node(
         package='mpu6500_ros',
@@ -42,6 +54,8 @@ def generate_launch_description():
             'publish_rate': LaunchConfiguration('publish_rate'),
             'frame_id': LaunchConfiguration('frame_id'),
             'enable_calibration': LaunchConfiguration('enable_calibration'),
+            'i2c_device': LaunchConfiguration('i2c_device'),
+            'spi_device': LaunchConfiguration('spi_device'),
         }],
         remappings=[
             ('/imu', '/imu'),
@@ -53,5 +67,7 @@ def generate_launch_description():
         publish_rate_arg,
         frame_id_arg,
         calibration_arg,
+        i2c_device_arg,
+        spi_device_arg,
         mpu6500_node,
     ])
