@@ -116,6 +116,17 @@ echo "   Управление: PLATFORM=rk3588 (NPU) | PLATFORM=generic (без 
 
 clone_if_missing "$ROSPKG/src/ftservo_ros/library/FTServoLibrary" "https://github.com/ShiWarai/FTServoLibrary.git"
 clone_if_missing "$ROSPKG/src/mpu6500_ros/library/mpu6500" "https://github.com/libdriver/mpu6500.git"
+# RDS-2P overlay: runtime-переназначение шины IMU (SPI/I2C девайсы берутся из ROS2-параметров).
+# Вендор libdriver/mpu6500 клонится свежим без этих сеттеров — накладка обязательна для сборки mpu6500_ros.
+MPU_PATCH="$ROSPKG/patches/mpu6500-runtime-bus-override.patch"
+MPU_LIB="$ROSPKG/src/mpu6500_ros/library/mpu6500"
+if [ -f "$MPU_PATCH" ]; then
+  if git -C "$MPU_LIB" apply --check "$MPU_PATCH" 2>/dev/null; then
+    git -C "$MPU_LIB" apply "$MPU_PATCH" && echo "🩹 RDS-2P mpu6500 overlay применён (runtime SPI/I2C)"
+  else
+    echo "ℹ️ RDS-2P mpu6500 overlay уже применён (или не подходит к HEAD) — пропускаю"
+  fi
+fi
 clone_if_missing "$ROSPKG/src/OrbbecSDK_ROS2" "https://github.com/orbbec/OrbbecSDK_ROS2.git" "main"
 clone_if_missing "$ROSPKG/src/audio_common" "https://github.com/mgonzs13/audio_common.git"
 clone_if_missing "$ROSPKG/src/vosk_ros2" "https://github.com/ShiWarai/vosk_ros2.git"

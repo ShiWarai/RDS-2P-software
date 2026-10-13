@@ -67,6 +67,17 @@ else
     echo "ℹ️ mpu6500 библиотека уже существует"
 fi
 
+# RDS-2P overlay: runtime-переназначение шины IMU (SPI/I2C из ROS2-параметров).
+# Вендор клонится свежим без сеттеров — накладка обязательна для сборки mpu6500_ros.
+MPU_PATCH="patches/mpu6500-runtime-bus-override.patch"
+if [ -f "$MPU_PATCH" ]; then
+    if git -C "$MPU6500_LIB_PATH" apply --check "$MPU_PATCH" 2>/dev/null; then
+        git -C "$MPU6500_LIB_PATH" apply "$MPU_PATCH" && echo "🩹 RDS-2P mpu6500 overlay применён (runtime SPI/I2C)"
+    else
+        echo "ℹ️ RDS-2P mpu6500 overlay уже применён (или не подходит к HEAD) — пропускаю"
+    fi
+fi
+
 # Клонируем OrbbecSDK_ROS2 если его нет
 ORBBEC_ROS2_PATH="src/OrbbecSDK_ROS2"
 if [ ! -d "$ORBBEC_ROS2_PATH" ]; then
