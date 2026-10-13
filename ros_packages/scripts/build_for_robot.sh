@@ -178,13 +178,19 @@ fi
 
 # RDS-2P overlay: runtime-переназначение шины IMU (SPI/I2C из ROS2-параметров).
 # Вендор клонится свежим без сеттеров — накладка обязательна для сборки mpu6500_ros.
-MPU_PATCH="patches/mpu6500-runtime-bus-override.patch"
+MPU_PATCH="$ROSPKG_DIR/patches/mpu6500-runtime-bus-override.patch"
 if [ -f "$MPU_PATCH" ]; then
     if git -C "$MPU6500_LIB_PATH" apply --check "$MPU_PATCH" 2>/dev/null; then
         git -C "$MPU6500_LIB_PATH" apply "$MPU_PATCH" && echo "🩹 RDS-2P mpu6500 overlay применён (runtime SPI/I2C)"
+    elif git -C "$MPU6500_LIB_PATH" apply --reverse --check "$MPU_PATCH" 2>/dev/null; then
+        echo "ℹ️ RDS-2P mpu6500 overlay уже применён — пропускаю"
     else
-        echo "ℹ️ RDS-2P mpu6500 overlay уже применён (или не подходит к HEAD) — пропускаю"
+        echo "ERROR: $MPU_PATCH не накладывается на HEAD вендора libdriver/mpu6500 — обновите патч или запиньте коммит клона." >&2
+        exit 1
     fi
+else
+    echo "ERROR: не найден патч оверлея mpu6500: $MPU_PATCH (mpu6500_ros не соберётся без сеттеров)." >&2
+    exit 1
 fi
 
 # obj-меши для twin: canonical-источник — urdf_src/export/.../meshes/obj (GIT),
