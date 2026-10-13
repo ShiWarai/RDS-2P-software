@@ -1,13 +1,19 @@
 #!/bin/bash
 
-# Сборка пакетов для компьютера (без mpu6500_ros, с камерой Orbbec)
+# Сборка пакетов для компьютера (без mpu6500_ros, с камерой Orbbec).
+# Режимы (параметр вместо отдельного docker/build_desktop.sh):
+#   (без параметров)   native — установка в живую систему (colcon + dist-packages)
+#   --prepare-only     подготовить docker-контекст и выйти (эквивалент PREPARE_ONLY=1)
+#   --docker           подготовить контекст и выполнить docker build
+# Env для docker-режимов: IMAGE, PREPARE_ONLY=1 (compat).
 set -e
 
-# Определяем путь к самому скрипту и корневой папке проекта
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROSPKG_DIR="$(dirname "$SCRIPT_DIR")"
+ROOT_DIR="$(dirname "$ROSPKG_DIR")"
+DOCKER_DIR="$ROOT_DIR/docker"
 
-# Парсим аргументы командной строки
+MODE=native
 ROS_DEPS_IGNORE=false
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -15,50 +21,49 @@ while [[ $# -gt 0 ]]; do
             ROS_DEPS_IGNORE=true
             shift
             ;;
+        --docker)
+            MODE=docker
+            shift
+            ;;
+        --prepare-only)
+            MODE=prepare
+            shift
+            ;;
         *)
             echo "Неизвестный аргумент: $1"
-            echo "Использование: $0 [--ros-deps-ignore]"
+            echo "Использование: $0 [--ros-deps-ignore] [--docker | --prepare-only]"
             exit 1
             ;;
     esac
 done
+if [ "${PREPARE_ONLY:-0}" = "1" ] && [ "$MODE" = native ]; then
+    MODE=prepare
+fi
+IMAGE="${IMAGE:-rds2p/desktop:humble}"
 
-echo "💻 Сборка пакетов для компьютера..."
+echo "💻 Сборка пакетов для компьютера (режим: $MODE)..."
 
-# Засекаем время начала выполнения скрипта
 SCRIPT_START_TIME=$(date +%s)
 
-# Проверяем директорию и переходим в ros_packages, если нужно
-if [ ! -d "$ROSPKG_DIR/src" ]; then
-    echo "❌ Скрипт должен быть в папке ros_packages/scripts/"
+show_duration() {
+    local d=$(( $(date +%s) - SCRIPT_START_TIME ))
+    local h=$((d/3600)) m=$(((d%3600)/60)) s=$((d%60))
+    echo ""
+    echo "⏱️  Общее время выполнения скрипта:"
+    if [ $h -gt 0 ]; then echo "   ${h}ч ${m}м ${s}с"
+    elif [ $m -gt 0 ]; then echo "   ${m}м ${s}с"
+    else echo "   ${s}с"; fi
+}
+
+cd "$ROSPKG_DIR"
+if [ ! -d "src" ]; then
+    echo "❌ Нет src/ рядом со скриптом — повреждена копия ros_packages"
     exit 1
 fi
 
-cd "$ROSPKG_DIR" || exit 1
+# ================= общий prepare (все режимы) =================
 
-# Устанавливаем зависимости
 echo "📦 Устанавливаем зависимости..."
-
-# Устанавливаем desktop-зависимости (rviz2, xacro)
-echo "🖥️ Проверяем и устанавливаем desktop-зависимости..."
-DESKTOP_DEPS_MISSING=false
-if ! dpkg -s ros-${ROS_DISTRO:-humble}-rviz2 >/dev/null 2>&1; then
-    echo "   📦 rviz2 не установлен"
-    DESKTOP_DEPS_MISSING=true
-fi
-if ! dpkg -s ros-${ROS_DISTRO:-humble}-xacro >/dev/null 2>&1; then
-    echo "   📦 xacro не установлен"
-    DESKTOP_DEPS_MISSING=true
-fi
-
-if [ "$DESKTOP_DEPS_MISSING" = true ]; then
-    echo "🔐 Устанавливаем desktop-зависимости (требуется sudo)..."
-    sudo apt update -qq
-    sudo apt install -y ros-${ROS_DISTRO:-humble}-rviz2 ros-${ROS_DISTRO:-humble}-xacro
-    echo "✅ Desktop-зависимости установлены"
-else
-    echo "✅ Desktop-зависимости уже установлены"
-fi
 
 # Проверяем и подгружаем OnnxRuntime (единая логика — fetch_onnxruntime.sh)
 bash "$SCRIPT_DIR/fetch_onnxruntime.sh"
@@ -87,7 +92,6 @@ if [ ! -d "$ORBBEC_ROS2_PATH" ]; then
     echo "✅ OrbbecSDK_ROS2 клонирован (ветка main)"
 else
     echo "ℹ️ OrbbecSDK_ROS2 уже существует, проверяем ветку..."
-    # Проверяем, что это действительно git репозиторий
     if [ -d "$ORBBEC_ROS2_PATH/.git" ] || [ -f "$ORBBEC_ROS2_PATH/.git" ]; then
         pushd "$ORBBEC_ROS2_PATH" >/dev/null
         CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
@@ -140,36 +144,41 @@ if [ ! -d "$VOSK_MODEL_PATH" ]; then
     pushd "$VOSK_MODEL_DIR" >/dev/null
     VOSK_MODEL_ZIP="vosk-model-small-ru-0.22.zip"
     if [ ! -f "$VOSK_MODEL_ZIP" ]; then
-        wget -q --show-progress https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip
+        if [ "$MODE" = native ]; then
+            wget -q --show-progress https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip
+        else
+            timeout 180 wget -q -T 30 --tries=1 https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip 2>/dev/null || true
+        fi
     fi
-    if [ -f "$VOSK_MODEL_ZIP" ]; then
-        # Используем Python для распаковки ZIP (не требует установки unzip)
+    if [ -f "$VOSK_MODEL_ZIP" ] && [ -s "$VOSK_MODEL_ZIP" ]; then
         python3 -m zipfile -e "$VOSK_MODEL_ZIP" .
         rm -f "$VOSK_MODEL_ZIP"
         echo "✅ Модель Vosk установлена в $VOSK_MODEL_PATH"
     else
-        echo "⚠️ Не удалось скачать модель Vosk"
+        echo "⚠️ Модель Vosk не скачалась (сеть/таймаут). Для образа модель — runtime-актив."
+        rm -f "$VOSK_MODEL_ZIP" 2>/dev/null || true
     fi
     popd >/dev/null
 else
     echo "ℹ️ Модель Vosk уже установлена: $VOSK_MODEL_PATH"
 fi
 
-# mujoco_playground (locomotion/rds2p) — вендорный subset в deps/, внешних клонов нет.
-# twin находит его через PYTHONPATH (ament env-hook пакета rds_2p_inference).
-SIM_DEPS_DIR="deps"
-if [ ! -d "$SIM_DEPS_DIR/mujoco_playground" ]; then
-    echo "⚠️  deps/mujoco_playground отсутствует — twin не будет работать (проверь, что subset закоммичен)" >&2
-    mkdir -p "$SIM_DEPS_DIR"
-    touch "$SIM_DEPS_DIR/COLCON_IGNORE"
+# mujoco_playground (locomotion/rds2p) — вендорный subset прямо в репозитории
+# (ros_packages/deps/mujoco_playground). Внешних клонов нет; если каталога нет —
+# desktop собирается без twin (warn, как в desktop.Dockerfile).
+SIM_DEPS_DIR="$ROSPKG_DIR/deps"
+mkdir -p "$SIM_DEPS_DIR"
+touch "$SIM_DEPS_DIR/COLCON_IGNORE"
+if [ ! -d "$SIM_DEPS_DIR/mujoco_playground/_src" ]; then
+    echo "⚠️  ros_packages/deps/mujoco_playground отсутствует — desktop будет собран без twin" >&2
 else
-    echo "ℹ️ $SIM_DEPS_DIR/mujoco_playground уже существует"
+    echo "ℹ️ $SIM_DEPS_DIR/mujoco_playground на месте (vendored)"
 fi
 
 # obj-меши для twin: canonical-источник — urdf_src/export/.../meshes/obj (GIT, по
 # аналогии с dae для URDF), в subset-е в git не лежат — кладутся сюда при prepare.
 MP_MESHES="$SIM_DEPS_DIR/mujoco_playground/_src/locomotion/rds2p/xmls/meshes"
-URDF_OBJ_DIR="$(dirname "$ROSPKG_DIR")/urdf_src/export/rds-2p/meshes/obj"
+URDF_OBJ_DIR="$ROOT_DIR/urdf_src/export/rds-2p/meshes/obj"
 if [ -d "$SIM_DEPS_DIR/mujoco_playground/_src" ]; then
     if [ ! -d "$URDF_OBJ_DIR" ] || [ -z "$(ls -A "$URDF_OBJ_DIR" 2>/dev/null)" ]; then
         echo "ERROR: subset mujoco_playground на месте, но obj-меши не найдены в urdf_src/export/rds-2p/meshes/obj — twin упадёт на base.obj" >&2
@@ -180,11 +189,91 @@ if [ -d "$SIM_DEPS_DIR/mujoco_playground/_src" ]; then
     echo "📦 twin-меши (.obj) скопированы в deps/mujoco_playground."
 fi
 
+# меши rds_2p: в git не лежат (rds_2p/.gitignore), берутся из urdf_src/export —
+# как это делает urdf_src/update_rds2p.sh. Нужны для install(DIRECTORY meshes) в colcon.
+if [ ! -d "$ROSPKG_DIR/src/rds_2p/meshes/dae" ] && [ -d "$ROOT_DIR/urdf_src/export/rds-2p/meshes/dae" ]; then
+    echo "📥 Копируем меши rds_2p из urdf_src/export..."
+    mkdir -p "$ROSPKG_DIR/src/rds_2p/meshes"
+    cp -a "$ROOT_DIR/urdf_src/export/rds-2p/meshes/dae" "$ROSPKG_DIR/src/rds_2p/meshes/"
+fi
+
+# Модель RNNoise (rnnoise_data-<ver>.tar.gz): предзагружаем в deps/, чтобы сборка
+# не зависела от media.xiph.org (в контейнере она часто недоступна).
+RNN_VER="$(cat "$SIM_DEPS_DIR/rnnoise_src/model_version" 2>/dev/null || echo 0b50c45)"
+RNN_MODEL_TGZ="$SIM_DEPS_DIR/rnnoise_data-$RNN_VER.tar.gz"
+if [ ! -s "$RNN_MODEL_TGZ" ]; then
+    echo "📥 Скачиваем модель RNNoise (rnnoise_data-$RNN_VER.tar.gz)..."
+    RNN_DL_OK=false
+    for url in \
+        "https://cdn.netbsd.org/pub/pkgsrc/distfiles/rnnoise-0.2/rnnoise_data-$RNN_VER.tar.gz" \
+        "https://media.xiph.org/rnnoise/models/rnnoise_data-$RNN_VER.tar.gz"; do
+        if timeout 240 curl -fL --connect-timeout 15 --max-time 230 -o "$RNN_MODEL_TGZ" "$url" 2>/dev/null \
+           && [ -s "$RNN_MODEL_TGZ" ] && tar -tzf "$RNN_MODEL_TGZ" >/dev/null 2>&1; then
+            RNN_DL_OK=true
+            break
+        fi
+        rm -f "$RNN_MODEL_TGZ" 2>/dev/null || true
+    done
+    if [ "$RNN_DL_OK" = true ]; then
+        echo "✅ Модель RNNoise готова в ros_packages/deps/."
+    else
+        echo "⚠️  Модель RNNoise не скачалась — сборка/Dockerfile попробует зеркала сам, иначе audio_filters будет пропущен."
+    fi
+else
+    echo "ℹ️ Модель RNNoise уже на месте: $RNN_MODEL_TGZ"
+fi
+
+# ================= docker/prepare: хвост контекста и сборка образа =================
+if [ "$MODE" != native ]; then
+    cp -f "$DOCKER_DIR/.dockerignore" "$ROOT_DIR/.dockerignore"
+
+    if [ "$MODE" = prepare ]; then
+        echo "✅ Контекст desktop-сборки подготовлен (--prepare-only/PREPARE_ONLY=1) — docker build пропущен"
+        show_duration
+        exit 0
+    fi
+
+    if ! docker info >/dev/null 2>&1; then
+        echo "❌ Docker daemon недоступен. Проверьте: sudo systemctl start docker / группы docker."
+        exit 1
+    fi
+
+    echo "🐳 docker build -f docker/desktop.Dockerfile -t $IMAGE"
+    docker build -f "$DOCKER_DIR/desktop.Dockerfile" -t "$IMAGE" "$ROOT_DIR"
+
+    rm -f "$ROOT_DIR/.dockerignore"
+    echo "✅ Образ $IMAGE собран. Запуск: docker/run_desktop.sh"
+    show_duration
+    exit 0
+fi
+
+# ================= native: установка в живую систему =================
+
+# Устанавливаем desktop-зависимости (rviz2, xacro)
+echo "🖥️ Проверяем и устанавливаем desktop-зависимости..."
+DESKTOP_DEPS_MISSING=false
+if ! dpkg -s ros-${ROS_DISTRO:-humble}-rviz2 >/dev/null 2>&1; then
+    echo "   📦 rviz2 не установлен"
+    DESKTOP_DEPS_MISSING=true
+fi
+if ! dpkg -s ros-${ROS_DISTRO:-humble}-xacro >/dev/null 2>&1; then
+    echo "   📦 xacro не установлен"
+    DESKTOP_DEPS_MISSING=true
+fi
+
+if [ "$DESKTOP_DEPS_MISSING" = true ]; then
+    echo "🔐 Устанавливаем desktop-зависимости (требуется sudo)..."
+    sudo apt update -qq
+    sudo apt install -y ros-${ROS_DISTRO:-humble}-rviz2 ros-${ROS_DISTRO:-humble}-xacro
+    echo "✅ Desktop-зависимости установлены"
+else
+    echo "✅ Desktop-зависимости уже установлены"
+fi
+
 # Устанавливаем Python-зависимости из всех requirements.txt (после скачивания всех пакетов)
 echo "🐍 Ищем и устанавливаем Python-зависимости..."
 REQ_FILES=$(find "src" -maxdepth 2 -name "requirements.txt" -type f 2>/dev/null)
 
-# Кэш для хэшей requirements (чтобы не переустанавливать без изменений)
 CACHE_FILE="$SCRIPT_DIR/.requirements_cache"
 declare -A REQ_CACHE
 if [ -f "$CACHE_FILE" ]; then
@@ -194,8 +283,7 @@ if [ -f "$CACHE_FILE" ]; then
 fi
 if [ -n "$REQ_FILES" ]; then
     ROS_PYTHON_DIR="/opt/ros/${ROS_DISTRO:-humble}/local/lib/python3.10/dist-packages"
-    
-    # Проверяем права доступа к директории
+
     if [ -d "$ROS_PYTHON_DIR" ]; then
         if [ ! -w "$ROS_PYTHON_DIR" ]; then
             echo "🔐 Директория $ROS_PYTHON_DIR принадлежит root, исправляем права (требуется sudo)..."
@@ -203,23 +291,19 @@ if [ -n "$REQ_FILES" ]; then
             echo "✅ Права доступа исправлены"
         fi
     else
-        # Директория не существует - вероятно ROS не установлен
         echo "❌ Директория $ROS_PYTHON_DIR не существует!" >&2
         echo "   Убедитесь, что ROS 2 Humble установлен правильно:" >&2
         echo "   sudo apt install ros-humble-desktop" >&2
         exit 1
     fi
-    
-    # Выбираем команду установки (uv если есть, иначе pip)
+
     if command -v uv &> /dev/null; then
         echo "   ⚡ Используем uv для ускорения"
-        # Явно указываем системный Python, чтобы игнорировать активный venv и использовать правильную версию для ROS
         INSTALL_CMD="uv pip install --python /usr/bin/python3 --target=$ROS_PYTHON_DIR"
     else
-        # Используем системный pip напрямую
         INSTALL_CMD="/usr/bin/python3 -m pip install --target=$ROS_PYTHON_DIR"
     fi
-    
+
     for REQ_FILE in $REQ_FILES; do
         REQ_PATH=$(realpath "$REQ_FILE")
         REQ_HASH=$(sha256sum "$REQ_FILE" | awk '{print $1}')
@@ -238,7 +322,6 @@ if [ -n "$REQ_FILES" ]; then
         fi
     done
 
-    # Сохраняем кэш
     : > "$CACHE_FILE"
     for path in "${!REQ_CACHE[@]}"; do
         echo "${path}|${REQ_CACHE[$path]}" >> "$CACHE_FILE"
@@ -252,18 +335,14 @@ fi
 # Устанавливаем зависимости через rosdep (если не отключено)
 if [ "$ROS_DEPS_IGNORE" = false ]; then
     if command -v rosdep &> /dev/null; then
-        # Подавляем предупреждения о deprecation
         export PYTHONWARNINGS="ignore::DeprecationWarning"
-        
-        # Оптимизация: обновляем rosdep только если прошло больше 24 часов
+
         ROSDEP_CACHE_DIR="$HOME/.ros/rosdep"
-        ROSDEP_UPDATE_INTERVAL=86400  # 24 часа в секундах
+        ROSDEP_UPDATE_INTERVAL=86400
         NEED_UPDATE=true
-        
+
         if [ -d "$ROSDEP_CACHE_DIR" ]; then
-            # Находим самый новый файл в кэше (используем stat для совместимости)
             if command -v stat &> /dev/null; then
-                # Получаем время модификации самого нового файла
                 LAST_UPDATE_FILE=$(find "$ROSDEP_CACHE_DIR" -type f -exec stat -c '%Y %n' {} \; 2>/dev/null | sort -n | tail -1 | cut -d' ' -f1)
                 if [ -n "$LAST_UPDATE_FILE" ] && [ "$LAST_UPDATE_FILE" != "0" ]; then
                     CURRENT_TIME=$(date +%s)
@@ -281,8 +360,7 @@ if [ "$ROS_DEPS_IGNORE" = false ]; then
                 fi
             fi
         fi
-        
-        # Проверяем, инициализирован ли rosdep (до попытки update/install)
+
         if ! rosdep db 1>/dev/null 2>&1; then
             echo "❌ rosdep не инициализирован. Пожалуйста, выполните команды:" >&2
             echo "    sudo rosdep init" >&2
@@ -293,7 +371,6 @@ if [ "$ROS_DEPS_IGNORE" = false ]; then
         else
             if [ "$NEED_UPDATE" = true ]; then
                 echo "🔄 Обновляем rosdep кэш (только для $ROS_DISTRO)..."
-                # Обновляем только нужный дистрибутив, чтобы не загружать end-of-life дистрибутивы
                 if [ -n "$ROS_DISTRO" ]; then
                     rosdep update --rosdistro=$ROS_DISTRO 2>/dev/null || true
                 else
@@ -318,8 +395,6 @@ RNN_INST="$(pwd)/deps/rnnoise_install"
 STUB="$(pwd)/src/audio_filters/third_party/rnnoise/rnnoise_os_support_stub.h"
 JOBS="$(nproc 2>/dev/null || echo 4)"
 if [[ ! -f "${RNN_INST}/lib/librnnoise.a" ]] || [[ ! -f "${RNN_INST}/include/rnnoise.h" ]]; then
-    mkdir -p "$(pwd)/deps"
-    touch "$(pwd)/deps/COLCON_IGNORE"
     if [[ ! -f "${RNN_SRC}/src/denoise.c" ]]; then
         echo "📥 Клонируем xiph/rnnoise (v0.2)..."
         rm -rf "${RNN_SRC}"
@@ -330,23 +405,21 @@ if [[ ! -f "${RNN_INST}/lib/librnnoise.a" ]] || [[ ! -f "${RNN_INST}/include/rnn
         exit 1
     fi
     cp -f "${STUB}" "${RNN_SRC}/src/os_support.h"
-    # Модель rnnoise: локальный tarball в deps/ (предзагружен), иначе time-boxed-загрузка
-    # с зеркал (media.xiph.org из роботов часто недоступна). Без модели — пропускаем rnnoise.
-    RNN_VER="$(cat "${RNN_SRC}/model_version" 2>/dev/null || echo 0b50c45)"
-    RNN_MODEL_TGZ="$(pwd)/deps/rnnoise_data-${RNN_VER}.tar.gz"
-    RNN_MODEL_LOCAL="${RNN_SRC}/rnnoise_data-${RNN_VER}.tar.gz"
-    if [[ ! -f "${RNN_MODEL_LOCAL}" ]] && [[ -s "${RNN_MODEL_TGZ}" ]]; then
-        cp -f "${RNN_MODEL_TGZ}" "${RNN_MODEL_LOCAL}"
+    RNN_VER_LOCAL="$(cat "${RNN_SRC}/model_version" 2>/dev/null || echo 0b50c45)"
+    RNN_MODEL_TGZ_LOCAL="$(pwd)/deps/rnnoise_data-${RNN_VER_LOCAL}.tar.gz"
+    RNN_MODEL_LOCAL="${RNN_SRC}/rnnoise_data-${RNN_VER_LOCAL}.tar.gz"
+    if [[ ! -f "${RNN_MODEL_LOCAL}" ]] && [[ -s "${RNN_MODEL_TGZ_LOCAL}" ]]; then
+        cp -f "${RNN_MODEL_TGZ_LOCAL}" "${RNN_MODEL_LOCAL}"
         echo "ℹ️ Модель RNNoise взята из deps/ (локальный tarball)."
     fi
     if [[ ! -f "${RNN_MODEL_LOCAL}" ]]; then
         echo "📥 Скачиваем модель RNNoise (time-boxed, зеркала)..."
         for url in \
-            "https://cdn.netbsd.org/pub/pkgsrc/distfiles/rnnoise-0.2/rnnoise_data-${RNN_VER}.tar.gz" \
-            "https://media.xiph.org/rnnoise/models/rnnoise_data-${RNN_VER}.tar.gz"; do
+            "https://cdn.netbsd.org/pub/pkgsrc/distfiles/rnnoise-0.2/rnnoise_data-${RNN_VER_LOCAL}.tar.gz" \
+            "https://media.xiph.org/rnnoise/models/rnnoise_data-${RNN_VER_LOCAL}.tar.gz"; do
             if timeout 240 curl -fL --connect-timeout 15 --max-time 230 -o "${RNN_MODEL_LOCAL}" "$url" 2>/dev/null \
                && [[ -s "${RNN_MODEL_LOCAL}" ]] && tar -tzf "${RNN_MODEL_LOCAL}" >/dev/null 2>&1; then
-                cp -f "${RNN_MODEL_LOCAL}" "${RNN_MODEL_TGZ}"
+                cp -f "${RNN_MODEL_LOCAL}" "${RNN_MODEL_TGZ_LOCAL}"
                 break
             fi
             rm -f "${RNN_MODEL_LOCAL}" 2>/dev/null || true
@@ -381,11 +454,6 @@ fi
 # Собираем все пакеты кроме...
 echo "🔨 Собираем пакеты (кроме тех, что запускаются только на роботе, и orbbec_camera - собираем только сообщения, mtf02p_ros - только на роботе)"
 
-# rkllm_ros2 — нода с vendor RK-рантаймом (aarch64), только для робота;
-# сообщения rkllm_ros2_msgs собираются (нужны rds_2p_commands)
-# rds_2p_face — морда (display_face/GPIO, touchpad-пайплайн), только для робота;
-# --packages-ignore (а не skip): rds_2p объявляет exec_depend на неё, skip бы оставил
-# её в графе зависимостей и colcon ждал бы её в install/
 COLCON_SKIP_EXTRA=""
 if [[ ! -f "${RNN_INST}/lib/librnnoise.a" ]]; then
     COLCON_SKIP_EXTRA="audio_filters"
@@ -407,24 +475,8 @@ else
     echo "ℹ️ Уже добавлено в .bashrc"
 fi
 
-# Source пакета
 echo "🔄 Загружаем переменные окружения..."
 source install/setup.bash
 echo "✅ Переменные загружены!"
 
-# Вычисляем и выводим общее время выполнения скрипта
-SCRIPT_END_TIME=$(date +%s)
-SCRIPT_DURATION=$((SCRIPT_END_TIME - SCRIPT_START_TIME))
-HOURS=$((SCRIPT_DURATION / 3600))
-MINUTES=$(((SCRIPT_DURATION % 3600) / 60))
-SECONDS=$((SCRIPT_DURATION % 60))
-
-echo ""
-echo "⏱️  Общее время выполнения скрипта:"
-if [ $HOURS -gt 0 ]; then
-    echo "   ${HOURS}ч ${MINUTES}м ${SECONDS}с"
-elif [ $MINUTES -gt 0 ]; then
-    echo "   ${MINUTES}м ${SECONDS}с"
-else
-    echo "   ${SECONDS}с"
-fi
+show_duration
