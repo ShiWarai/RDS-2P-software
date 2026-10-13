@@ -170,9 +170,14 @@ fi
 # аналогии с dae для URDF), в subset-е в git не лежат — кладутся сюда при prepare.
 MP_MESHES="$SIM_DEPS_DIR/mujoco_playground/_src/locomotion/rds2p/xmls/meshes"
 URDF_OBJ_DIR="$(dirname "$ROSPKG_DIR")/urdf_src/export/rds-2p/meshes/obj"
-if [ -d "$SIM_DEPS_DIR/mujoco_playground/_src" ] && [ -d "$URDF_OBJ_DIR" ]; then
+if [ -d "$SIM_DEPS_DIR/mujoco_playground/_src" ]; then
+    if [ ! -d "$URDF_OBJ_DIR" ] || [ -z "$(ls -A "$URDF_OBJ_DIR" 2>/dev/null)" ]; then
+        echo "ERROR: subset mujoco_playground на месте, но obj-меши не найдены в urdf_src/export/rds-2p/meshes/obj — twin упадёт на base.obj" >&2
+        exit 1
+    fi
     mkdir -p "$MP_MESHES"
     cp -a "$URDF_OBJ_DIR/." "$MP_MESHES/"
+    echo "📦 twin-меши (.obj) скопированы в deps/mujoco_playground."
 fi
 
 # Устанавливаем Python-зависимости из всех requirements.txt (после скачивания всех пакетов)

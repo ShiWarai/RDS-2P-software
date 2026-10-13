@@ -41,10 +41,18 @@ touch "$ROSPKG/deps/COLCON_IGNORE"
 # obj-меши для twin: canonical-источник — urdf_src/export/.../meshes/obj (GIT, по
 # аналогии с dae для URDF), в subset-е в git не лежат — кладутся сюда при prepare.
 MP_MESHES="$ROSPKG/deps/mujoco_playground/_src/locomotion/rds2p/xmls/meshes"
-if [ -d "$ROSPKG/deps/mujoco_playground/_src" ] && [ -d "$ROOT_DIR/urdf_src/export/rds-2p/meshes/obj" ]; then
-  mkdir -p "$MP_MESHES"
-  cp -a "$ROOT_DIR/urdf_src/export/rds-2p/meshes/obj/." "$MP_MESHES/"
+URDF_OBJ_MESHES="$ROOT_DIR/urdf_src/export/rds-2p/meshes/obj"
+if [ ! -d "$ROSPKG/deps/mujoco_playground/_src" ]; then
+  echo "ERROR: нет vendored subset deps/mujoco_playground/_src — twin не соберётся" >&2
+  exit 1
 fi
+if [ ! -d "$URDF_OBJ_MESHES" ] || [ -z "$(ls -A "$URDF_OBJ_MESHES" 2>/dev/null)" ]; then
+  echo "ERROR: obj-меши не найдены в urdf_src/export/rds-2p/meshes/obj — virtual_twin_node упадёт на base.obj" >&2
+  exit 1
+fi
+mkdir -p "$MP_MESHES"
+cp -a "$URDF_OBJ_MESHES/." "$MP_MESHES/"
+echo "📦 twin-меши (.obj) скопированы в deps/mujoco_playground."
 
 clone_if_missing "$ROSPKG/src/audio_common" "https://github.com/mgonzs13/audio_common.git"
 clone_if_missing "$ROSPKG/src/vosk_ros2" "https://github.com/ShiWarai/vosk_ros2.git" "dev"

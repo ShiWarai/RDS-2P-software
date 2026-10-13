@@ -135,6 +135,23 @@ clone_if_missing "$ROSPKG/src/vosk_ros2" "https://github.com/ShiWarai/vosk_ros2.
 # там же её используют build_for_robot.sh / build_for_desktop.sh).
 bash "$ROSPKG/scripts/fetch_onnxruntime.sh" "$ROSPKG"
 
+# obj-меши для twin: canonical-источник — urdf_src/export/.../meshes/obj (GIT),
+# в vendored subset (deps/mujoco_playground) не лежат — кладутся при prepare
+# (та же логика, что в build_desktop.sh). Без них virtual_twin_node падает на base.obj.
+MP_MESHES="$ROSPKG/deps/mujoco_playground/_src/locomotion/rds2p/xmls/meshes"
+URDF_OBJ_MESHES="$ROOT_DIR/urdf_src/export/rds-2p/meshes/obj"
+if [ ! -d "$ROSPKG/deps/mujoco_playground/_src" ]; then
+  echo "ERROR: нет vendored subset deps/mujoco_playground/_src — twin не соберётся" >&2
+  exit 1
+fi
+if [ ! -d "$URDF_OBJ_MESHES" ] || [ -z "$(ls -A "$URDF_OBJ_MESHES" 2>/dev/null)" ]; then
+  echo "ERROR: obj-меши не найдены в urdf_src/export/rds-2p/meshes/obj — virtual_twin_node упадёт на base.obj" >&2
+  exit 1
+fi
+mkdir -p "$MP_MESHES"
+cp -a "$URDF_OBJ_MESHES/." "$MP_MESHES/"
+echo "📦 twin-меши (.obj) скопированы в deps/mujoco_playground."
+
 VOSK_MODEL="$ROSPKG/src/vosk_ros2/models/vosk-model-small-ru-0.22"
 if [ ! -d "$VOSK_MODEL" ]; then
   mkdir -p "$ROSPKG/src/vosk_ros2/models"

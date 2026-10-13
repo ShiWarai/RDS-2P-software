@@ -78,6 +78,23 @@ if [ -f "$MPU_PATCH" ]; then
     fi
 fi
 
+# obj-меши для twin: canonical-источник — urdf_src/export/.../meshes/obj (GIT),
+# в vendored subset (deps/mujoco_playground) не лежат — кладутся при prepare
+# (та же логика, что в build_desktop.sh / docker/build_robot.sh).
+MP_MESHES="$(dirname "$SCRIPT_DIR")/deps/mujoco_playground/_src/locomotion/rds2p/xmls/meshes"
+URDF_OBJ_MESHES="$(dirname "$SCRIPT_DIR")/../urdf_src/export/rds-2p/meshes/obj"
+if [ ! -d "$(dirname "$MP_MESHES")" ]; then
+    echo "ERROR: нет vendored subset deps/mujoco_playground/_src — twin не соберётся" >&2
+    exit 1
+fi
+if [ ! -d "$URDF_OBJ_MESHES" ] || [ -z "$(ls -A "$URDF_OBJ_MESHES" 2>/dev/null)" ]; then
+    echo "ERROR: obj-меши не найдены в urdf_src/export/rds-2p/meshes/obj — virtual_twin_node упадёт на base.obj" >&2
+    exit 1
+fi
+mkdir -p "$MP_MESHES"
+cp -a "$URDF_OBJ_MESHES/." "$MP_MESHES/"
+echo "📦 twin-меши (.obj) скопированы в deps/mujoco_playground."
+
 # Клонируем OrbbecSDK_ROS2 если его нет
 ORBBEC_ROS2_PATH="src/OrbbecSDK_ROS2"
 if [ ! -d "$ORBBEC_ROS2_PATH" ]; then
