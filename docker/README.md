@@ -60,7 +60,7 @@ docker/run_desktop.sh      # окно MuJoCo через WSLg (DISPLAY/Wayland м
 - Нет окна / X-ошибка: проверить `echo $DISPLAY` в WSL (WSLg даёт `:0`), на хосте Windows `xhost +local:` не нужен в WSLg по умолчанию; для Wayland — `WAYLAND_DISPLAY=wayland-0`.
 - `libsoxr.so.0 not found` при импорте playground — в образе должен стоять `libsoxr0` (пересобрать).
 - ROS-CLI на хосте не обязателен: `docker exec -it <ctn> bash` даёт готовый окруженный shell (entrypoint source'ит `/opt/ros/humble` и `/opt/rds2p/install`).
-- DDS: контейнер в `--network host`, domain id по умолчанию `ROS_DOMAIN_ID` хоста.
+- DDS: контейнер в `--network host`. Run-скрипты фиксуют дефолты проекта: `ROS_DOMAIN_ID=2` (как в `~/.bashrc` рабочих машин) и `RMW_IMPLEMENTATION=rmw_fastrtps_cpp` (в образах cyclone не ставим; оба стенда — Fast DDS, discovery по Wi-Fi между ними проверен). Переопределяются одноимёнными env. Сетевой xml-профиль: `DDS_PROFILES_FILE=/path/to.xml ./docker/run_robot.sh` — монтируется в контейнер и подключается к активному rmw: `FASTRTPS_DEFAULT_PROFILES_FILE` для fastdds-`<profiles>` (пример: `learning/export_inference/configs/fastdds_network.xml`) или `CYCLONEDDS_URI=file://` для cyclone-`<CycloneDDS>` (пример: `configs/cyclonedds_network.xml`).
 
 ## Robot (arm64)
 
