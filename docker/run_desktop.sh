@@ -4,18 +4,17 @@ set -euo pipefail
 IMAGE="${IMAGE:-rds2p/desktop:humble}"
 LAUNCH="${LAUNCH_OVERRIDE:-ros2 launch rds_2p_inference virtual_twin_desktop.launch.py}"
 
-# Сеть DDS: дефолты проекта (domain 2 = как на рабочих машинах, Fast DDS = что реально стоит в образах).
+# Сеть DDS: по умолчанию — штатные дефолты ROS 2 (domain 0, rmw по умолчанию образа).
 # DDS_PROFILES_FILE — xml профиля активного rmw:
 #   fastdds  (fastrtps) -> FASTRTPS_DEFAULT_PROFILES_FILE   (<profiles xmlns="...fastRTPS_Profiles">)
-#   cyclonedds (cyclone) -> CYCLONEDDS_URI=file://            (<CycloneDDS><Domain>...)
+#   cyclonedds (cyclone) -> CYCLONEDDS_URI=file://           (<CycloneDDS><Domain>...)
 DDS_PROFILES_FILE="${DDS_PROFILES_FILE:-}"
-ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-2}"
-RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}"
 
-ARGS=(docker run --rm -i --network host --shm-size=1g
-      -e "ROS_DOMAIN_ID=${ROS_DOMAIN_ID}"
-      -e "RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION}")
+ARGS=(docker run --rm -i --network host --shm-size=1g)
 if [ -t 0 ]; then ARGS+=(-t); fi
+
+[ -n "${ROS_DOMAIN_ID:-}" ] && ARGS+=(-e "ROS_DOMAIN_ID=${ROS_DOMAIN_ID}")
+[ -n "${RMW_IMPLEMENTATION:-}" ] && ARGS+=(-e "RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION}")
 
 if [ -n "$DDS_PROFILES_FILE" ]; then
   if [ -f "$DDS_PROFILES_FILE" ]; then
