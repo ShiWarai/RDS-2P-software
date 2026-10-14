@@ -59,17 +59,32 @@ else
   sleep 1
   [ $found -eq 1 ] || { echo "ОШИБКА: джойстик не найден за 30 сек — проверь режим сопряжения."; exit 1; }
 
-  echo "pair..."
-  bluetoothctl -- pair "$JOYSTICK_MAC" 2>&1 | grep -iE "successful|failed" | sed 's/^/  /'
-  sleep 1
-  [ "$(st Paired)" = "yes" ] || { echo "ОШИБКА: не спарился. Повтори: PS+Share, затем этот скрипт."; exit 1; }
-  echo "trust + connect..."
-  bluetoothctl -- trust "$JOYSTICK_MAC" >/dev/null 2>&1
-  bluetoothctl -- connect "$JOYSTICK_MAC" 2>&1 | grep -iE "successful|failed" | sed 's/^/  /'
-  sleep 3
+  echo "pair/trust/connect в ОДНОЙ сессии bluetoothctl (агент зарегистрирован на всю операцию)..."
+  # Критично: DS4 требует, чтобы host-агент (NoInputNoOutput) принимал SSP-подтверждения
+  # в момент pair. Отдельные `bluetoothctl -- pair` запускают агента в мёртвом процессе ->
+  # pairing "успешен", но link key не сохраняется -> Bonded: no -> ядро отклоняет HIDP
+  # ("Rejected connection from !bonded device"), /dev/input/js* не появляется.
+  FIFO=$(mktemp -u); mkfifo "$FIFO"
+  bluetoothctl < "$FIFO" > /tmp/ps4_bt_out.$$ 2>&1 &
+  BTC=$!
+  exec 7>"$FIFO"
+  printf 'agent NoInputNoOutput\n' >&7; sleep 1
+  printf 'default-agent\n'         >&7; sleep 1
+  printf 'pair %s\n' "$JOYSTICK_MAC" >&7
+  for i in $(seq 1 30); do sleep 1; grep -qiE "successful|failed" /tmp/ps4_bt_out.$$ && break; done
+  grep -iE "pairing (successful|failed)" /tmp/ps4_bt_out.$$ | sed 's/^/  /'
+  printf 'trust %s\n' "$JOYSTICK_MAC" >&7; sleep 1
+  printf 'connect %s\n' "$JOYSTICK_MAC" >&7
+  for i in $(seq 1 20); do sleep 1; grep -qiE "Connection (successful|failed)|org.bluez.Error" /tmp/ps4_bt_out.$$ && break; done
+  grep -iE "connection successful|failed to connect|org.bluez.Error" /tmp/ps4_bt_out.$$ | sed 's/^/  /'
+  printf 'quit\n' >&7
+  exec 7>&-; wait $BTC 2>/dev/null; rm -f "$FIFO" /tmp/ps4_bt_out.$$
+  sleep 2
+
+  [ "$(st Bonded)" = "yes" ] || echo "⚠️  Bonded=$(st Bonded) — без ключа пары HIDP не пустит; перепусти скрипт при включённом в режим сопряжения джойстике."
 fi
 
-echo "Статус: Paired=$(st Paired) Connected=$(st Connected) Trusted=$(st Trusted) ServicesResolved=$(st ServicesResolved)"
+echo "Статус: Paired=$(st Paired) Bonded=$(st Bonded) Connected=$(st Connected) Trusted=$(st Trusted) ServicesResolved=$(st ServicesResolved)"
 
 # --- 4. устройства ввода для контейнера ---
 if ls /dev/input/js* >/dev/null 2>&1 || ls /dev/hidraw* >/dev/null 2>&1; then
