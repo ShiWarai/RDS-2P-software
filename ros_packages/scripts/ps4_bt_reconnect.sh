@@ -13,8 +13,14 @@
 #  • ds4drv  — ядро без HIDP-сокетов (RepkaPi/H6 и др.): HID забирает демон
 #    ds4drv (L2CAP+uinput -> js0). Нюанс: с выключенным плагином input bluez
 #    НЕ пишет [LinkKey] на диск, поэтому на время ПАРЫ плагин включается
-#    (ключ сохраняется), затем снова выключается (иначе bluez рвёт ACL неудачным
-#    HIDP), а ds4drv подхватывает геймпад по ACL. MAC пишется в /etc/default/ds4drv.
+#    (ключ сохраняется), затем снова выключается. Выключение — это `-P input`
+#    (noplugin): с `-p input` bluez наоборот ЗАГРУЖАЕТ input-плагин, слушает
+#    PSM 17/19 и после ребута платы перехватывает HID-каналы геймпада (поток
+#    0x11 уходит в bluez, ds4drv слепнет). С выключенным плагином звонки
+#    геймпада отклоняются, и он переходит на каналы ds4drv. MAC пишется в /etc/default/ds4drv.
+#    Переподключение обычно идёт «быстрым путём»: включаешь геймпад (PS/PS+Share),
+#    скрипт проверяет js0 и при необходимости перезапускает ds4drv — без перепары;
+#    power-cycle (PS 10с + PS) и полный ритуал — крайние меры.
 #
 # Запуск из программы: stdin не читает; sudo не интерактивный (-n); вывод в лог;
 # все вызовы под timeout; flock от параллельных запусков.
@@ -60,7 +66,7 @@ except OSError:
 input_plugin_off() {
   [ -f "$UNIT" ] && return 0
   mkdir -p "$(dirname "$UNIT")"
-  printf '[Service]\nExecStart=\nExecStart=/usr/libexec/bluetooth/bluetoothd -p input\n' > "$UNIT"
+  printf '[Service]\nExecStart=\nExecStart=/usr/libexec/bluetooth/bluetoothd -P input\n' > "$UNIT"
   systemctl daemon-reload; systemctl restart bluetooth; sleep 2
   timeout 8 bluetoothctl -- power on >/dev/null 2>&1
 }
@@ -117,6 +123,44 @@ else
   command -v ds4drv >/dev/null || echo "⚠️  ds4drv не установлен — см. docker/host/ds4drv.service"
 fi
 
+# --- fast-path: bonded-геймпад после включения (PS) сам дозванивается до хоста.
+# Полный ритуал (перепара) нужен только когда линка нет вообще. Сначала ничего
+# не ломаем: живой js0 -> выход; есть Connected -> просто перезапустить ds4drv;
+# нет линка -> короткая попытка connect (геймпад должен быть включён). ---
+quick_ready() {  # 0 = поток поднят
+  js_live 5 && return 0
+  [ "$(st Connected)" = "yes" ] || return 1
+  systemctl restart ds4drv 2>/dev/null
+  local i
+  for i in 1 2 3 4 5 6; do
+    js_live 5 && return 0
+  done
+  return 1
+}
+in_container_hint() { echo "В контейнере: ros2 launch rds_2p_joystick ps4_joystick.launch.py"; }
+
+if [ "$MODE" = ds4drv ]; then
+  if quick_ready; then
+    banner "Успешно! Джойстик подключен и готов к использованию."
+    in_container_hint
+    exit 0
+  fi
+  if [ "$(st Connected)" != "yes" ]; then
+    echo "Линка нет. Пробую быстрое подключение без перепары — ВКЛЮЧИ ГЕЙМПАД (PS)..."
+    for _a in 1 2 3; do
+      timeout 12 bluetoothctl -- connect "$JOYSTICK_MAC" >/dev/null 2>&1
+      sleep 3
+      [ "$(st Connected)" = "yes" ] && break
+    done
+    if quick_ready; then
+      banner "Успешно! Джойстик подключен и готов к использованию."
+      in_container_hint
+      exit 0
+    fi
+  fi
+  echo "Быстрый путь не сработал — перехожу к полному ритуалу сопряжения."
+fi
+
 # --- для ds4drv: на время ПАРЫ включить input-плагин, чтобы bluez сохранил ключ ---
 [ "$MODE" = ds4drv ] && input_plugin_on
 
@@ -130,6 +174,20 @@ sleep 1
 timeout 8 bluetoothctl -- remove "$JOYSTICK_MAC" >/dev/null 2>&1
 sleep 1
 timeout 8 bluetoothctl -- power on >/dev/null 2>&1; sleep 1
+# remove при выключенном адаптере sometimes не срабатывает молча: старый объект
+# остаётся в bluez, и «Устройство обнаружено!» появляется мгновенно, пока
+# геймпад ещё спит (пара уходит в никуда). Проверяем и повторяем remove.
+for _i in 1 2; do
+  if timeout 8 bluetoothctl -- info "$JOYSTICK_MAC" 2>/dev/null | grep -q "not available"; then
+    break
+  fi
+  echo "  Старый объект ещё в bluez — снимаю повторно ($_i)"
+  timeout 8 bluetoothctl -- remove "$JOYSTICK_MAC" >/dev/null 2>&1
+  sleep 1
+done
+if ! timeout 8 bluetoothctl -- info "$JOYSTICK_MAC" 2>/dev/null | grep -q "not available"; then
+  echo "⚠️  Объект не удаляется (геймпад уже на связи?) — продолжаю, пара обновит его."
+fi
 
 echo "Сканируем (до ${SCAN_SECONDS}с)... ЗАЖМИТЕ PS+Share (быстрые двойные вспышки) и держите мигающим до 'Pairing successful'."
 timeout $((SCAN_SECONDS + 90)) bluetoothctl -- scan on >/dev/null 2>&1 &
@@ -228,5 +286,8 @@ for i in 1 2 3 4 5 6; do
   sleep 3
 done
 banner "ВНИМАНИЕ: спарено, но поток с джойстика не поднялся за ~30с."
-echo "Джойстик должен гореть ровно; повторите запуск (PS+Share на скане)."
+echo "Режим ds4drv: 1) включи геймпад (PS или PS+Share) и запусти скрипт ещё раз —"
+echo "   он попробует быстрое подключение без перепары;"
+echo "2) не помогло — POWER-CYCLE геймпада (PS зажать 10с до гашения) и подожди 1-2 мин;"
+echo "3) всё ещё нет — повторный полный ритуал (PS+Share на скане)."
 exit 1

@@ -12,7 +12,9 @@ ExecStartPre=-/usr/bin/hciconfig hci0 up
 #   DS4_MACS="AA:BB:CC:DD:EE:FF 11:22:33:44:55:66"
 # ros_packages/scripts/ps4_bt_reconnect.sh добавляет MAC туда автоматически при сопряжении
 EnvironmentFile=-/etc/default/ds4drv
-ExecStart=/usr/local/bin/ds4drv
+# --udp: DSU-сервер (127.0.0.1:26760) — из него ps4_touchpad_node берёт тачпад
+# на ядрах без HIDP, где /dev/hidraw недоступен
+ExecStart=/usr/local/bin/ds4drv --udp
 Restart=always
 RestartSec=5
 

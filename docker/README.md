@@ -111,10 +111,10 @@ ros2 launch rds_2p astra_mini.launch.py
 
 ### Wireless PS4 джойстик (Bluetooth)
 
-Подключение — **на хосте** (не в контейнере); контейнеру нужен только `/dev/input/js0`, который `run_robot.sh --privileged` пробрасывает, а `joy_node`/`teleop_twist_joy` уже в образе. Два сценария по типу ядра:
+Подключение — **на хосте** (не в контейнере); контейнеру нужен `/dev/input/js0` (пробрасывается `--privileged`) и — для тачпада на ядрах без HIDP — UDP `127.0.0.1:26760` (DSU-сервер `ds4drv --udp`; `run_robot.sh` идёт с `--network host`). `joy_node`/`teleop_twist_joy` уже в образе. Два сценария по типу ядра:
 
 - **Ядро с рабочим HIDP** (OrangePi 5 Pro и большинство SBC): `ps4_bt_reconnect.sh <MAC>` — сопряжение штатным bluez, ядро само поднимает HID → `/dev/input/js0`.
-- **Ядро без HIDP-сокетов** (RepkaPi/Allwinner H6: `socket(AF_BLUETOOTH,HIDP)` → `ESOCKTNOSUPPORT`): kernel-HID не поднимается, его заменяет userspace-демон `ds4drv` (L2CAP + uinput → js0). Один раз — `ps4_ds4drv_setup.sh` (ставит PyBluez+ds4drv, патчи, bluez drop-in `-p input`, `AutoEnable=true`, systemd-юнит `docker/host/ds4drv.service`); затем на каждое подключение — `ps4_bt_reconnect.sh <MAC>`.
+- **Ядро без HIDP-сокетов** (RepkaPi/Allwinner H6: `socket(AF_BLUETOOTH,HIDP)` → `ESOCKTNOSUPPORT`): kernel-HID не поднимается, его заменяет userspace-демон `ds4drv` (L2CAP + uinput → js0; DSU UDP `--udp` → тачпад). Один раз — `ps4_ds4drv_setup.sh` (ставит PyBluez+ds4drv, патчи, bluez drop-in `-P input` (выключает input-плагин), `AutoEnable=true`, systemd-юнит `docker/host/ds4drv.service` с `--udp`); затем на каждое подключение — `ps4_bt_reconnect.sh <MAC>`.
 
 ```bash
 # одноразово (только для ядер без HIDP):
