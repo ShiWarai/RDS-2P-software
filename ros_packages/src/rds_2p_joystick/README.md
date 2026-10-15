@@ -211,6 +211,25 @@ ros2 launch rds_2p_joystick ps4_joystick.launch.py
 2. Проверить логи: `journalctl -f` или `dmesg | tail -50`
 3. Использовать стандартный драйвер Linux (без IMU данных, но без `ds4drv`)
 
+## Подключение джойстика по Bluetooth (wireless)
+
+Для беспроводного DS4 на роботе есть отдельные **хост-скрипты** (вне контейнера), которые готовят `/dev/input/js0` до запуска launch-файла:
+
+- `ros_packages/scripts/ps4_bt_reconnect.sh [MAC]` — сопряжение/переподключение. Сам определяет режим:
+  - **classic** — ядро с рабочим HIDP (OrangePi 5 Pro и большинство SBC): штатный bluez, HID цепляет ядро;
+  - **ds4drv** — ядро без HIDP-сокетов (RepkaPi/Allwinner H6, где `socket(AF_BLUETOOTH,HIDP)` → `ESOCKTNOSUPPORT`): HID ведёт userspace-демон `ds4drv` (L2CAP + uinput → js0).
+  - Запуск: на хосте от root; на надписи «Сканируем» зажать **PS+Share** до быстрых двойных вспышек. Успех = живой поток на `/dev/input/js0`.
+- `ros_packages/scripts/ps4_ds4drv_setup.sh` — **одноразовая** установка ds4drv-стека на ядрах без HIDP (PyBluez + ds4drv-cemuhook + патчи `fn→fd`/fast-path/`connect`-retry + bluez drop-in `-p input` + `AutoEnable=true` + systemd-юнит). Идемпотентен.
+- `docker/host/ds4drv.service` — systemd-юнит ds4drv; список MAC лежит в `/etc/default/ds4drv` (`DS4_MACS=...`), `ps4_bt_reconnect.sh` дописывает туда MAC автоматически.
+
+Скрипты пригодны для запуска из программы: не читают stdin, root без интерактива (`sudo -n`), вывод дублируется в `/var/log/ps4_bt_reconnect.log`, все внешние вызовы под `timeout`, `flock` против параллельных запусков. Коды возврата: `0` успех (живой js0) / `1` не поднялось / `2` окружение (не root, нет bluez/адаптера) / `3` уже запущен другой экземпляр.
+
+**Важно про надёжность:** DS4 (VID `054C` PID `09CC`) после disconnect/ребута **сам стабильно не переподключается** — это известный баг bluez ([bluez#488](https://github.com/bluez/bluez/issues/488): «Connection refused - security block» → «Authentication Failure (0x05)»). Поэтому рабочий ритуал — запуск `ps4_bt_reconnect.sh` + PS+Share (полная перепара со снятием старого сопряжения), а не ожидание авто-реконнекта. Config-воркараунды (`FastConnectable`, `JustWorksRepairing`) на этом геймпаде нестабильны — не полагаемся на них.
+
+На ядрах без HIDP (режим `ds4drv`) беспроводной **тачпад недоступен** (нет `/dev/hidraw`): кнопки/стики/IMU работают, тачпад — только при USB-подключении (`ds4drv --hidraw`).
+
+Про docker-развёртывание робота — см. `docker/README.md`, секция «Wireless PS4 джойстик (Bluetooth)».
+
 ## Пример использования в других launch файлах
 
 ```python

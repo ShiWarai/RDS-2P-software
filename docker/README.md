@@ -109,6 +109,26 @@ ros2 launch rds_2p astra_mini.launch.py
 ```
 По умолчанию стартует `rds_2p_complete.launch.py` (моторы + bridges joints<->motors).
 
+### Wireless PS4 джойстик (Bluetooth)
+
+Подключение — **на хосте** (не в контейнере); контейнеру нужен только `/dev/input/js0`, который `run_robot.sh --privileged` пробрасывает, а `joy_node`/`teleop_twist_joy` уже в образе. Два сценария по типу ядра:
+
+- **Ядро с рабочим HIDP** (OrangePi 5 Pro и большинство SBC): `ps4_bt_reconnect.sh <MAC>` — сопряжение штатным bluez, ядро само поднимает HID → `/dev/input/js0`.
+- **Ядро без HIDP-сокетов** (RepkaPi/Allwinner H6: `socket(AF_BLUETOOTH,HIDP)` → `ESOCKTNOSUPPORT`): kernel-HID не поднимается, его заменяет userspace-демон `ds4drv` (L2CAP + uinput → js0). Один раз — `ps4_ds4drv_setup.sh` (ставит PyBluez+ds4drv, патчи, bluez drop-in `-p input`, `AutoEnable=true`, systemd-юнит `docker/host/ds4drv.service`); затем на каждое подключение — `ps4_bt_reconnect.sh <MAC>`.
+
+```bash
+# одноразово (только для ядер без HIDP):
+sudo ros_packages/scripts/ps4_ds4drv_setup.sh
+# каждое подключение (держать PS+Share на надписи «Сканируем»):
+sudo ros_packages/scripts/ps4_bt_reconnect.sh 48:18:8D:65:1A:F5
+# затем в контейнере:
+ros2 launch rds_2p_joystick ps4_joystick.launch.py
+```
+
+Оба скрипта идемпотентны и пригодны для вызова из программы: root без интерактива, вывод в `/var/log/ps4_bt_reconnect.log`, коды `0/1/2/3`, `flock`. MAC-список ds4drv живёт в `/etc/default/ds4drv` (`DS4_MACS=...`), скрипт дописывает туда MAC сам.
+
+**Надёжность:** DS4 (`054C:09CC`) после disconnect/ребута сам стабильно не переподключается — известный баг bluez ([#488](https://github.com/bluez/bluez/issues/488): «security block» → «Authentication Failure»). Рабочий ритуал — перепара через `ps4_bt_reconnect.sh` + PS+Share, а не авто-реконнект; config-воркараунды (`FastConnectable`/`JustWorksRepairing`) нестабильны. Подробности — в `ros_packages/src/rds_2p_joystick/README.md`.
+
 ## Известные грабли
 - `libonnxruntime.so.1`: CMake пакета ставит в install только `libonnxruntime.so` и `.so.1.19.2`, а бинарь линкуется на SONAME `.so.1` — Dockerfile досоздаёт этот симлинк (слои `ln -sf` после colcon). При нативной сборке на хосте это тоже актуально.
 - ROS-CLI хоста в WSL может не видеть топики контейнера (DDS multicast через WSL NAT) — отлаживай внутри: `docker exec <ctn> bash -c 'source /opt/rds2p/install/setup.bash; ros2 topic list'`.
