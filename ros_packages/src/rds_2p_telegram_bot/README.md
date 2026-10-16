@@ -12,7 +12,7 @@ ROS2 пакет с Telegram‑ботом, который служит просл
 
 ## Запуск
 ```bash
-cd ~/RDS-2P-simulator/ros_packages
+cd ~/RDS-2P-software/ros_packages
 source install/setup.bash
 
 ros2 launch rds_2p_telegram_bot telegram_bot.launch.py \

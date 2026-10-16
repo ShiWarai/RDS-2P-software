@@ -2,10 +2,10 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>rds_2p</name>
-  <version>0.0.1</version>
-  <description>RDS-2P quadruped robot package</description>
-  <maintainer email="zhuravliov.pav@yandex.ru">Zhuravliov Pavel</maintainer>
-  <license>MIT License</license>
+  <version>1.0.0</version>
+  <description>Основной пакет четвероногого робота RDS-2P: URDF/меши, мост мотор↔суставы, launch и RViz/Gazebo конфигурация</description>
+  <maintainer email="zhuravliov.pav@yandex.ru">ShiWarai</maintainer>
+  <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
@@ -19,6 +19,14 @@
   <depend>teleop_twist_keyboard</depend>
   <depend>compressed_image_transport</depend>
   <depend>compressed_depth_image_transport</depend>
+
+  <!-- Мета-launch: voice_system.launch.py (аудио — IncludeLaunchDescription в rds_2p_audio) -->
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>rds_2p_audio</exec_depend>
+  <exec_depend>vosk_ros2</exec_depend>
+  <exec_depend>paroli_ros2</exec_depend>
+  <exec_depend>rds_2p_face</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

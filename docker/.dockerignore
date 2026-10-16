@@ -1,0 +1,16 @@
+.git
+**/.git
+.kilo
+.vscode
+experiments/
+urdf_src/
+mjcf_src/
+ros_packages/build/
+ros_packages/install/
+ros_packages/log/
+ros_packages/deps/rnnoise_src/
+ros_packages/scripts/__pycache__/
+**/__pycache__/
+**/node_modules/
+**/*.pyc
+**/*.log

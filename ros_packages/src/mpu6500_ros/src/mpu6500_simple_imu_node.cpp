@@ -28,8 +28,8 @@ public:
         bool enable_calibration = this->declare_parameter("enable_calibration", true);
         bool enable_temperature = this->declare_parameter("enable_temperature", false);
         
-        // Инициализация I2C (выбор шины на основе адреса)
-        std::string i2c_bus = (address == 0) ? "/dev/i2c-1" : "/dev/i2c-0";
+        // Инициализация I2C (выбор шины: параметр i2c_device или по умолчанию по адресу)
+        std::string i2c_bus = this->declare_parameter("i2c_device", (address == 0) ? "/dev/i2c-1" : "/dev/i2c-0");
         i2c_fd_ = open(i2c_bus.c_str(), O_RDWR);
         if (i2c_fd_ < 0) {
             RCLCPP_ERROR(this->get_logger(), "Failed to open I2C bus %s", i2c_bus.c_str());

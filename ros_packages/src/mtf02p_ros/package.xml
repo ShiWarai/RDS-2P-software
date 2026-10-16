@@ -2,9 +2,9 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>mtf02p_ros</name>
-  <version>0.1.0</version>
-  <description>ROS2 package for MTF-02P optical flow sensor odometry</description>
-  <maintainer email="maintainer@example.com">RDS-2P Team</maintainer>
+  <version>1.0.0</version>
+  <description>Узлы ROS 2 для одометрии по оптическому потоку датчика MTF-02P (publish в nav_msgs/tf)</description>
+  <maintainer email="zhuravliov.pav@yandex.ru">ShiWarai</maintainer>
   <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>

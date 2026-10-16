@@ -22,10 +22,25 @@ DisplayFaceNode::DisplayFaceNode() : Node("display_face"),
     res_chip_(nullptr), dc_chip_(nullptr), cs_chip_(nullptr),
     res_line_(nullptr), dc_line_(nullptr), cs_line_(nullptr), 
     spi_fd_(-1), display_initialized_(false) {
-    // Инициализация GPIO через gpiod (разные чипы для разных пинов)
-    res_chip_ = gpiod_chip_open_by_name(RES_PIN_CHIP);
-    dc_chip_ = gpiod_chip_open_by_name(DC_PIN_CHIP);
-    cs_chip_ = gpiod_chip_open_by_name(CS_PIN_CHIP);
+    // Чтение конфигурации SPI/GPIO из параметров (фолбэк на #define по умолчанию)
+    spi_device_ = this->declare_parameter("spi_device", SPI_DEVICE);
+    spi_mode_ = this->declare_parameter("spi_mode", SPI_MODE);
+    spi_speed_ = this->declare_parameter("spi_speed", SPI_SPEED);
+    res_chip_name_ = this->declare_parameter("gpio_reset_chip", std::string(RES_PIN_CHIP));
+    res_line_idx_ = this->declare_parameter("gpio_reset_line", RES_PIN_LINE);
+    dc_chip_name_ = this->declare_parameter("gpio_dc_chip", std::string(DC_PIN_CHIP));
+    dc_line_idx_ = this->declare_parameter("gpio_dc_line", DC_PIN_LINE);
+    cs_chip_name_ = this->declare_parameter("gpio_cs_chip", std::string(CS_PIN_CHIP));
+    cs_line_idx_ = this->declare_parameter("gpio_cs_line", CS_PIN_LINE);
+
+    RCLCPP_INFO(this->get_logger(), "SPI device: %s (mode=%d speed=%d Hz)", spi_device_.c_str(), spi_mode_, spi_speed_);
+    RCLCPP_INFO(this->get_logger(), "GPIO: RST %s:%d DC %s:%d CS %s:%d",
+        res_chip_name_.c_str(), res_line_idx_, dc_chip_name_.c_str(), dc_line_idx_, cs_chip_name_.c_str(), cs_line_idx_);
+
+    // Иницизация GPIO через gpiod (разные чипы для разных пинов)
+    res_chip_ = gpiod_chip_open_by_name(res_chip_name_.c_str());
+    dc_chip_ = gpiod_chip_open_by_name(dc_chip_name_.c_str());
+    cs_chip_ = gpiod_chip_open_by_name(cs_chip_name_.c_str());
     
     if (!res_chip_ || !dc_chip_ || !cs_chip_) {
         RCLCPP_FATAL(this->get_logger(), "Ошибка открытия GPIO чипов: %s", std::strerror(errno));
@@ -36,9 +51,9 @@ DisplayFaceNode::DisplayFaceNode() : Node("display_face"),
     }
     
     // Получаем GPIO линии
-    res_line_ = gpiod_chip_get_line(res_chip_, RES_PIN_LINE);
-    dc_line_ = gpiod_chip_get_line(dc_chip_, DC_PIN_LINE);
-    cs_line_ = gpiod_chip_get_line(cs_chip_, CS_PIN_LINE);
+    res_line_ = gpiod_chip_get_line(res_chip_, res_line_idx_);
+    dc_line_ = gpiod_chip_get_line(dc_chip_, dc_line_idx_);
+    cs_line_ = gpiod_chip_get_line(cs_chip_, cs_line_idx_);
     
     if (!res_line_ || !dc_line_ || !cs_line_) {
         RCLCPP_FATAL(this->get_logger(), "Ошибка получения GPIO линий: %s", std::strerror(errno));
@@ -62,9 +77,9 @@ DisplayFaceNode::DisplayFaceNode() : Node("display_face"),
     RCLCPP_INFO(this->get_logger(), "GPIO инициализирован успешно");
 
     // Инициализация SPI через стандартный Linux интерфейс
-    spi_fd_ = open(SPI_DEVICE, O_RDWR);
+    spi_fd_ = open(spi_device_.c_str(), O_RDWR);
     if (spi_fd_ < 0) {
-        RCLCPP_FATAL(this->get_logger(), "Ошибка открытия SPI устройства %s: %s", SPI_DEVICE, std::strerror(errno));
+        RCLCPP_FATAL(this->get_logger(), "Ошибка открытия SPI устройства %s: %s", spi_device_.c_str(), std::strerror(errno));
         RCLCPP_FATAL(this->get_logger(), "Добавьте пользователя в группу spidev: sudo usermod -a -G spidev $USER");
         RCLCPP_FATAL(this->get_logger(), "Затем перелогиньтесь или выполните: newgrp spidev");
         if (res_chip_) gpiod_chip_close(res_chip_);
@@ -74,7 +89,7 @@ DisplayFaceNode::DisplayFaceNode() : Node("display_face"),
     }
     
     // Настройка SPI режима
-    uint8_t mode = SPI_MODE;
+    uint8_t mode = spi_mode_;
     if (ioctl(spi_fd_, SPI_IOC_WR_MODE, &mode) < 0) {
         RCLCPP_ERROR(this->get_logger(), "Ошибка установки SPI режима: %s", std::strerror(errno));
         close(spi_fd_);
@@ -85,7 +100,7 @@ DisplayFaceNode::DisplayFaceNode() : Node("display_face"),
     }
     
     // Настройка скорости SPI
-    uint32_t speed = SPI_SPEED;
+    uint32_t speed = static_cast<uint32_t>(spi_speed_);
     if (ioctl(spi_fd_, SPI_IOC_WR_MAX_SPEED_HZ, &speed) < 0) {
         RCLCPP_ERROR(this->get_logger(), "Ошибка установки скорости SPI: %s", std::strerror(errno));
         close(spi_fd_);
@@ -125,7 +140,7 @@ void DisplayFaceNode::send_command(uint8_t cmd) {
     struct spi_ioc_transfer transfer = {};
     transfer.tx_buf = reinterpret_cast<unsigned long>(&cmd);
     transfer.len = 1;
-    transfer.speed_hz = SPI_SPEED;
+    transfer.speed_hz = static_cast<uint32_t>(spi_speed_);
     transfer.bits_per_word = 8;
     
     if (ioctl(spi_fd_, SPI_IOC_MESSAGE(1), &transfer) < 0) {
@@ -142,7 +157,7 @@ void DisplayFaceNode::send_data(const std::vector<uint8_t>& data) {
     struct spi_ioc_transfer transfer = {};
     transfer.tx_buf = reinterpret_cast<unsigned long>(data.data());
     transfer.len = data.size();
-    transfer.speed_hz = SPI_SPEED;
+    transfer.speed_hz = static_cast<uint32_t>(spi_speed_);
     transfer.bits_per_word = 8;
     
     if (ioctl(spi_fd_, SPI_IOC_MESSAGE(1), &transfer) < 0) {
