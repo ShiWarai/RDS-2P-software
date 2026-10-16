@@ -76,3 +76,5 @@ ros2 launch ftservo_ros motor_gui.launch.py \
 # Из системного пакета ROS 2 Humble (joy + teleop)
 ros2 launch teleop_twist_joy teleop-launch.py joy_config:=ps3
 ```
+
+> **Про скорость шины моторов:** SCS40 работают на 1 Мбит/с, но штатный UART Repka Pi 4 (Allwinner H6) физически не может выдать 1M — реальная линия получается 750k, и моторы не отвечают. Подробности и варианты (USB-UART или перевод шины на 500k) — в [ros_packages/src/ftservo_ros/README.md](ros_packages/src/ftservo_ros/README.md).
