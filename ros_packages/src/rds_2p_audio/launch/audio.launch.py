@@ -32,6 +32,7 @@ def _opaque_audio_nodes(context, *_args, **_kwargs):
         parameters=[{
             "topic": LaunchConfiguration("output_topic"),
             "device": ParameterValue(LaunchConfiguration("output_device"), value_type=int),
+            "device_name": LaunchConfiguration("output_device_name"),
             "pulse_sink": LaunchConfiguration("pulse_sink"),
             "channels": ParameterValue(LaunchConfiguration("output_channels"), value_type=int),
             "output_sample_rate": ParameterValue(
@@ -79,7 +80,12 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "output_device",
             default_value="-1",
-            description="PortAudio индекс выхода (−1 = default ALSA)",
+            description="PortAudio индекс выхода (−1 = default ALSA; используется, если output_device_name пуст)",
+        ),
+        DeclareLaunchArgument(
+            "output_device_name",
+            default_value="es8388",
+            description="Подстрока имени выходного PortAudio-устройства (встроенный динамик = es8388)",
         ),
         DeclareLaunchArgument(
             "pulse_sink",

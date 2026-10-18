@@ -28,6 +28,7 @@
 source install/setup.bash
 
 ros2 launch rds_2p_audio audio.launch.py \
+  output_device_name:=es8388 \
   output_device:=-1 \
   pulse_sink:=alsa_output.platform-es8388-sound.stereo-fallback \
   output_channels:=1 \
@@ -47,7 +48,7 @@ ros2 launch rds_2p_audio audio.launch.py enable_capturer:=false
 ```
 ### Параметры launch (минимально нужные аргументы)
 
-**Воспроизведение:** `output_topic`, `output_device` (−1 = default ALSA), **`pulse_sink`** (имя sink Pulse для `PULSE_SINK` у `audio_player`; пустая строка — не менять окружение), `output_channels`, `output_sample_rate`, плюс внутренние микшера `mix_period_ms`, `source_evict_sec`, `qos_depth`.
+**Воспроизведение:** `output_topic`, **`output_device_name`** (подстрока имени выходного PortAudio-устройства; по умолчанию `es8388` — встроенный динамик Orange Pi RDS; пустая строка — использовать `output_device`), `output_device` (−1 = default ALSA; используется, только если `output_device_name` пуст; числовые индексы PortAudio на плате нестабильны между запусками), **`pulse_sink`** (имя sink Pulse для `PULSE_SINK` у `audio_player`; пустая строка — не менять окружение), `output_channels`, `output_sample_rate`, плюс внутренние микшера `mix_period_ms`, `source_evict_sec`, `qos_depth`.
 
 **Захват:** при `enable_capturer:=true` — `capturer_device`, `capturer_rate`, `capturer_channels`, `capturer_chunk`, необязательно `capturer_format` (чаще **8** = int16 как в `audio_common`), `capturer_topic`, `capturer_respawn`.
 
@@ -58,7 +59,8 @@ ros2 launch rds_2p_audio audio.launch.py enable_capturer:=false
 | Parameter | По умолчанию | Описание |
 |-----------|---------------|----------|
 | `topic` | `/audio/output` | Подписка на шину |
-| `device` | `−1` | Индекс PortAudio для выхода |
+| `device` | `−1` | Индекс PortAudio для выхода (fallback, когда `device_name` пуст) |
+| `device_name` | `""` (в launch — `es8388`) | Подстрока имени выходного устройства (регистронезависимо); нода сама резолвит текущий индекс. Надёжнее числового `device`, т.к. индексы PortAudio на Orange Pi RDS меняются между запусками (общий i2s-тактовый сигнал) |
 | `pulse_sink` | `""` | Если непустая строка — перед открытием потока выставить `PULSE_SINK` (маршрутизация default через Pulse); в `audio.launch.py` по умолчанию задан sink ES8388 для Orange Pi RDS |
 | `channels` | `1` | Каналы динамика |
 | `output_sample_rate` | `44100` | Договорная Fs |

@@ -103,6 +103,7 @@ class AudioPlayer(Node):
         self.declare_parameter("output_prime_ticks", 6)
         # Выравнивать blocksize PortAudio под mix_tick (меньше рассинхрона с микшером).
         self.declare_parameter("stream_blocksize_match", True)
+        self.declare_parameter("device_name", "")
 
         topic = self.get_parameter("topic").get_parameter_value().string_value
         self._device = self.get_parameter("device").get_parameter_value().integer_value
@@ -180,6 +181,30 @@ class AudioPlayer(Node):
                 self._mixed_chunks.append(silent_blk.copy())
 
         dev_param = None if self._device < 0 else int(self._device)
+        device_name = (
+            self.get_parameter("device_name").get_parameter_value().string_value or ""
+        ).strip()
+        if device_name:
+            match_idx = next(
+                (
+                    d["index"]
+                    for d in sd.query_devices()
+                    if d["max_output_channels"] > 0
+                    and device_name.lower() in str(d["name"]).lower()
+                ),
+                None,
+            )
+            if match_idx is None:
+                self.get_logger().warn(
+                    f"device_name={device_name!r}: PortAudio-устройство не найдено, "
+                    f"fallback на device={self._device}"
+                )
+            else:
+                self.get_logger().info(
+                    f"device_name={device_name!r}: выбран индекс {match_idx} "
+                    f"({sd.query_devices(match_idx)['name']})"
+                )
+                dev_param = match_idx
         stream_kw: dict = {
             "samplerate": self._output_sr,
             "channels": self._channels,
