@@ -1,0 +1,4 @@
+# audio_player_node: sounddevice + numpy
+# numpy<=1.26.4: совместимость с rknn-toolkit2 на роботе (rknn требует <=1.26.4)
+sounddevice>=0.4.6
+numpy>=1.20.0,<=1.26.4

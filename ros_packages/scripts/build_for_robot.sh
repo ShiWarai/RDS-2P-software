@@ -5,6 +5,9 @@
 #   (без параметров)   native — установка в живую систему (colcon + dist-packages)
 #   --prepare-only     подготовить docker-контекст и выйти (эквивалент PREPARE_ONLY=1)
 #   --docker           подготовить контекст и выполнить docker build
+#   --models           скачивать runtime-модели (Vosk, RNNoise) и в docker/prepare
+#                      режимах (по умолчанию только native: модели — runtime-активы,
+#                      монтируются в /models, в контекст/образ не нужны)
 # Env для docker-режимов: IMAGE, PLATFORM (rk3588|rk3576|rk3562|rk3568|rk3588s|generic|auto),
 # ALLOW_CROSS=1, BUILD_WORKERS, PREPARE_ONLY=1 (compat).
 # Общая логика prepare (клоны, OnnxRuntime, twin-меши, Vosk, RNNoise-модель) едина для всех режимов.
@@ -17,10 +20,15 @@ DOCKER_DIR="$ROOT_DIR/docker"
 
 MODE=native
 ROS_DEPS_IGNORE=false
+MODELS=false
 while [[ $# -gt 0 ]]; do
     case $1 in
         --ros-deps-ignore)
             ROS_DEPS_IGNORE=true
+            shift
+            ;;
+        --models)
+            MODELS=true
             shift
             ;;
         --docker)
@@ -33,7 +41,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "Неизвестный аргумент: $1"
-            echo "Использование: $0 [--ros-deps-ignore] [--docker | --prepare-only]"
+            echo "Использование: $0 [--ros-deps-ignore] [--models] [--docker | --prepare-only]"
             exit 1
             ;;
     esac
@@ -278,22 +286,27 @@ else
     echo "ℹ️ vosk_ros2 уже существует"
 fi
 
-# Скачиваем модель Vosk если её нет (docker-режим — time-boxed и tolerant:
-# модель — runtime-актив, монтируется в /models; сборка образа продолжается без неё)
+# Модель Vosk — runtime-актив (монтируется в /models): native качает её всегда,
+# docker/prepare — только с флагом --models (иначе лишние 44+88 МБ едут в контекст/образ).
+# Качаем с HF-зеркала: alphacephei.com подвешивает тело ответа; размер сверен с ETag.
 VOSK_MODEL_PATH="src/vosk_ros2/models/vosk-model-small-ru-0.22"
 VOSK_MODEL_DIR="src/vosk_ros2/models"
-if [ ! -d "$VOSK_MODEL_PATH" ]; then
+if [ -d "$VOSK_MODEL_PATH" ]; then
+    echo "ℹ️ Модель Vosk уже установлена: $VOSK_MODEL_PATH"
+elif [ "$MODE" = native ] || [ "$MODELS" = true ]; then
     echo "📥 Скачиваем модель Vosk (vosk-model-small-ru-0.22)..."
     mkdir -p "$VOSK_MODEL_DIR"
     pushd "$VOSK_MODEL_DIR" >/dev/null
     VOSK_MODEL_ZIP="vosk-model-small-ru-0.22.zip"
-    VOSK_URL="https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip"
+    # Зеркало на HF: alphacephei.com подвешивает тело ответа (соединение открывается,
+    # байты не идут); размер файла сверен с официальным ETag: 46236750 байт
+    VOSK_URL="https://huggingface.co/localstack/vosk-models/resolve/main/vosk-model-small-ru-0.22.zip"
     if [ "$MODE" = native ]; then
         if [ ! -f "$VOSK_MODEL_ZIP" ]; then
-            wget -q --show-progress "$VOSK_URL"
+            wget -q --show-progress -O "$VOSK_MODEL_ZIP" "$VOSK_URL"
         fi
     else
-        timeout 180 wget -q -T 30 --tries=1 "$VOSK_URL" 2>/dev/null || true
+        timeout 180 wget -q -T 30 --tries=1 -O "$VOSK_MODEL_ZIP" "$VOSK_URL" 2>/dev/null || true
     fi
     if [ -f "$VOSK_MODEL_ZIP" ] && [ -s "$VOSK_MODEL_ZIP" ]; then
         python3 -m zipfile -e "$VOSK_MODEL_ZIP" .
@@ -305,15 +318,63 @@ if [ ! -d "$VOSK_MODEL_PATH" ]; then
     fi
     popd >/dev/null
 else
-    echo "ℹ️ Модель Vosk уже установлена: $VOSK_MODEL_PATH"
+    echo "ℹ️ Модель Vosk не качаем (docker/prepare): runtime-актив, монтируется в /models; --models — чтобы положить в контекст"
 fi
 
-# Модель RNNoise (rnnoise_data-<ver>.tar.gz): предзагружаем в deps/, чтобы сборка
-# (особенно docker build) не зависела от media.xiph.org. Fallback — зеркала/тайм-бокс
-# внутри нативной сборки ниже, либо time-boxed-загрузка в Dockerfile.
+# Vendor для rkllm_ros2: RKLLM/RKNN runtime (.so + заголовки). Качаем с GitHub
+# airockchip/rknn-llm; fallback — локальный клон (~/rknn-llm, override: RKLLM_SRC).
+# Ref закреплён на теге (override: RKLLM_REF): в main API rkllm_init() уже изменено
+# (RKLLMCallback*, без img_start), а rkllm_node.cpp написан под SDK 1.2.3.
+# CMakeLists rkllm_ros2 фаталит без этих файлов, поэтому в native режиме отсутствующие
+# файлы = ошибка сборки, в docker-prepare — предупреждение (NPU=0 всё равно скипает пакет).
+RKLLM_VENDOR_DIR="src/rkllm_ros2/vendor"
+RKLLM_REF="${RKLLM_REF:-release-v1.2.3}"
+RKLLM_RAW="https://raw.githubusercontent.com/airockchip/rknn-llm/$RKLLM_REF"
+RKLLM_LOCAL_CLONE="${RKLLM_SRC:-$HOME/rknn-llm}"
+_rkllm_sz() { stat -c%s "$1" 2>/dev/null || echo 0; }
+rkllm_ensure_file() {
+    local dst="$RKLLM_VENDOR_DIR/$1" src_rel="$2" min="$3"
+    if [ -f "$dst" ] && [ "$(_rkllm_sz "$dst")" -ge "$min" ]; then
+        return 0
+    fi
+    mkdir -p "$(dirname "$dst")"
+    if [ "$MODE" = native ]; then
+        curl -fsSL --connect-timeout 15 -o "$dst" "$RKLLM_RAW/$src_rel" || rm -f "$dst"
+    else
+        timeout 120 curl -fsSL --connect-timeout 15 -o "$dst" "$RKLLM_RAW/$src_rel" 2>/dev/null || rm -f "$dst"
+    fi
+    if [ ! -f "$dst" ] && [ -f "$RKLLM_LOCAL_CLONE/$src_rel" ]; then
+        cp "$RKLLM_LOCAL_CLONE/$src_rel" "$dst"
+        echo "   📂 $1 — из локального клона $RKLLM_LOCAL_CLONE"
+    fi
+    if [ -f "$dst" ] && [ "$(_rkllm_sz "$dst")" -lt "$min" ]; then
+        rm -f "$dst"
+    fi
+    [ -f "$dst" ]
+}
+echo "🧩 Готовим vendor rkllm_ros2 (librkllmrt.so / librknnrt.so / rkllm.h / rknn_api.h)..."
+RKLLM_OK=true
+rkllm_ensure_file "lib/librkllmrt.so" "rkllm-runtime/Linux/librkllm_api/aarch64/librkllmrt.so" 1000000 || RKLLM_OK=false
+rkllm_ensure_file "lib/librknnrt.so" "examples/multimodal_model_demo/deploy/3rdparty/librknnrt/Linux/librknn_api/aarch64/librknnrt.so" 1000000 || RKLLM_OK=false
+rkllm_ensure_file "include/rkllm.h" "rkllm-runtime/Linux/librkllm_api/include/rkllm.h" 1000 || RKLLM_OK=false
+rkllm_ensure_file "include/rknn_api.h" "examples/multimodal_model_demo/deploy/3rdparty/librknnrt/Linux/librknn_api/include/rknn_api.h" 1000 || RKLLM_OK=false
+if [ "$RKLLM_OK" != true ]; then
+    if [ "$MODE" = native ]; then
+        echo "❌ rkllm_ros2: vendor-библиотеки не получены (ни GitHub, ни локальный клон)." >&2
+        echo "   Задайте RKLLM_SRC=/путь/к/rknn-llm или склонируйте: git clone --depth 1 https://github.com/airockchip/rknn-llm ~/rknn-llm" >&2
+        exit 1
+    fi
+    echo "⚠️  rkllm_ros2: vendor неполный — docker-образ с NPU=1 не соберётся (NPU=0 скипнет пакет)." >&2
+fi
+
+# Модель RNNoise (rnnoise_data-<ver>.tar.gz): native предзагружает в deps/, чтобы
+# сборка не зависела от media.xiph.org. В docker/prepare — только с --models;
+# без него Dockerfile скачает её сам (time-boxed fallback), либо audio_filters скипнется.
 RNN_VER="$(cat "$ROSPKG_DIR/deps/rnnoise_src/model_version" 2>/dev/null || echo 0b50c45)"
 RNN_MODEL_TGZ="$ROSPKG_DIR/deps/rnnoise_data-$RNN_VER.tar.gz"
-if [ ! -s "$RNN_MODEL_TGZ" ]; then
+if [ -s "$RNN_MODEL_TGZ" ]; then
+    echo "ℹ️ Модель RNNoise уже на месте: $RNN_MODEL_TGZ"
+elif [ "$MODE" = native ] || [ "$MODELS" = true ]; then
     mkdir -p "$ROSPKG_DIR/deps"
     echo "📥 Скачиваем модель RNNoise (rnnoise_data-$RNN_VER.tar.gz)..."
     RNN_DL_OK=false
@@ -333,7 +394,7 @@ if [ ! -s "$RNN_MODEL_TGZ" ]; then
         echo "⚠️  Модель RNNoise не скачалась — нативная сборка/Dockerfile попробует зеркала сам, иначе audio_filters будет пропущен."
     fi
 else
-    echo "ℹ️ Модель RNNoise уже на месте: $RNN_MODEL_TGZ"
+    echo "ℹ️ Модель RNNoise не качаем (docker/prepare): скачает Dockerfile (time-boxed) или --models"
 fi
 
 # ================= docker/prepare: хвост контекста и сборка образа =================
@@ -437,18 +498,19 @@ else
     echo "ℹ️ requirements.txt файлы не найдены в src/"
 fi
 
-# Установка ds4drv (PS4 контроллер драйвер)
+# Установка ds4drv (PS4 контроллер драйвер) — CLI-демон, поэтому ставится в систему
+# (в dist-packages из find-цикла он не попадёт на PATH); состав — в requirements пакета.
 echo "🎮 Проверяем установку ds4drv..."
 if ! command -v ds4drv &> /dev/null; then
-    echo "📥 Устанавливаем ds4drv..."
+    echo "📥 Устанавливаем ds4drv (из src/rds_2p_joystick/requirements.txt)..."
     if command -v pip3 &> /dev/null; then
-        sudo pip3 install ds4drv
+        sudo pip3 install -r "$ROSPKG_DIR/src/rds_2p_joystick/requirements.txt"
         echo "✅ ds4drv установлен через pip3"
     elif command -v pip &> /dev/null; then
-        sudo pip install ds4drv
+        sudo pip install -r "$ROSPKG_DIR/src/rds_2p_joystick/requirements.txt"
         echo "✅ ds4drv установлен через pip"
     else
-        echo "⚠️ pip не найден. Установите ds4drv вручную: sudo pip3 install ds4drv"
+        echo "⚠️ pip не найден. Установите вручную: sudo pip3 install -r src/rds_2p_joystick/requirements.txt"
     fi
 else
     echo "ℹ️ ds4drv уже установлен: $(which ds4drv)"
@@ -615,6 +677,19 @@ else
 fi
 
 # Собираем все пакеты
+# colcon требует ROS-окружение (ament_cmake через AMENT_PREFIX_PATH); при запуске
+# из «чистого» шелла саурсим /opt/ros сами, иначе все пакеты падают на find_package.
+if [[ ":${AMENT_PREFIX_PATH:-}:" != *":/opt/ros/${ROS_DISTRO:-humble}:"* ]]; then
+    ROS_SETUP="/opt/ros/${ROS_DISTRO:-humble}/setup.bash"
+    if [ -f "$ROS_SETUP" ]; then
+        echo "🐚 Саурсим ROS-окружение: $ROS_SETUP"
+        # shellcheck disable=SC1091
+        source "$ROS_SETUP"
+    else
+        echo "❌ ROS не найден: $ROS_SETUP (нужен ros-${ROS_DISTRO:-humble})" >&2
+        exit 1
+    fi
+fi
 echo "🔨 Собираем пакеты..."
 COLCON_SKIP=""
 if [[ ! -f "${RNN_INST}/lib/librnnoise.a" ]]; then

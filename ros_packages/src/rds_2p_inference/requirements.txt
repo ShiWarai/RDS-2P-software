@@ -1,10 +1,9 @@
+# Runtime-зависимости twin-симуляции (ставятся на робота/десктоп и в образы).
+# Тренировочное окружение (jax/flax/brax и т.п.) — в requirements-train.txt,
+# в native-цикл и docker-слои НЕ попадает.
+# numpy<=1.26.4: совместимость с rknn-toolkit2 на роботе.
 etils
 glfw
 mujoco==3.3.5
-mujoco_mjx==3.3.5
-ml_collections
-flax
-brax
-tqdm
 numba
-coverage>=7
+numpy<=1.26.4

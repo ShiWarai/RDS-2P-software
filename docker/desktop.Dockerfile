@@ -50,14 +50,16 @@ RUN set -eux; \
       make install; \
     fi
 
-# Runtime-pip только из нужного: twin = mujoco+etils+glfw+numba (без jax/flax/brax —
-# они нужны только тренировочному окружению, из requirements.txt в образ не берём)
+# Runtime-pip: единственный источник зависимостей — requirements каждого пакета
+# (rds_2p_inference/requirements.txt — runtime-подмножество, train-флот во flax/brax
+# вынесен в requirements-train.txt). rds_2p_joystick/ds4drv не берём: джойстик —
+# только на роботе. Констрейнт numpy<=1.26.4 закреплён в самих файлах.
 RUN cd /opt/rds2p/ros-ws \
     && python3 -m pip install --no-cache-dir \
-         etils "mujoco==3.3.5" glfw numba \
          -r src/vosk_ros2/requirements.txt \
          -r src/rds_2p_telegram_bot/requirements.txt \
-         "numpy<2" sounddevice
+         -r src/rds_2p_inference/requirements.txt \
+         -r src/rds_2p_audio/requirements.txt
 
 RUN mkdir -p /opt/rds2p/ros-ws/deps/mujoco_playground; \
     if [ -z "$(ls -A /opt/rds2p/ros-ws/deps/mujoco_playground)" ]; then \

@@ -5,6 +5,8 @@
 #   (без параметров)   native — установка в живую систему (colcon + dist-packages)
 #   --prepare-only     подготовить docker-контекст и выйти (эквивалент PREPARE_ONLY=1)
 #   --docker           подготовить контекст и выполнить docker build
+#   --models           скачивать runtime-модели (Vosk, RNNoise) и в docker/prepare
+#                      режимах (по умолчанию только native: модели монтируются на runtime)
 # Env для docker-режимов: IMAGE, PREPARE_ONLY=1 (compat).
 set -e
 
@@ -15,10 +17,15 @@ DOCKER_DIR="$ROOT_DIR/docker"
 
 MODE=native
 ROS_DEPS_IGNORE=false
+MODELS=false
 while [[ $# -gt 0 ]]; do
     case $1 in
         --ros-deps-ignore)
             ROS_DEPS_IGNORE=true
+            shift
+            ;;
+        --models)
+            MODELS=true
             shift
             ;;
         --docker)
@@ -31,7 +38,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "Неизвестный аргумент: $1"
-            echo "Использование: $0 [--ros-deps-ignore] [--docker | --prepare-only]"
+            echo "Использование: $0 [--ros-deps-ignore] [--models] [--docker | --prepare-only]"
             exit 1
             ;;
     esac
@@ -135,19 +142,24 @@ else
     echo "ℹ️ vosk_ros2 уже существует"
 fi
 
-# Скачиваем модель Vosk если её нет
+# Модель Vosk — runtime-актив: native качает всегда, docker/prepare — только с --models.
+# Зеркало на HF: alphacephei.com подвешивает тело ответа — соединение открывается,
+# но байты не идут; размер файла сверен с официальным ETag: 46236750 байт.
 VOSK_MODEL_PATH="src/vosk_ros2/models/vosk-model-small-ru-0.22"
 VOSK_MODEL_DIR="src/vosk_ros2/models"
-if [ ! -d "$VOSK_MODEL_PATH" ]; then
+if [ -d "$VOSK_MODEL_PATH" ]; then
+    echo "ℹ️ Модель Vosk уже установлена: $VOSK_MODEL_PATH"
+elif [ "$MODE" = native ] || [ "$MODELS" = true ]; then
     echo "📥 Скачиваем модель Vosk (vosk-model-small-ru-0.22)..."
     mkdir -p "$VOSK_MODEL_DIR"
     pushd "$VOSK_MODEL_DIR" >/dev/null
     VOSK_MODEL_ZIP="vosk-model-small-ru-0.22.zip"
+    VOSK_URL="https://huggingface.co/localstack/vosk-models/resolve/main/vosk-model-small-ru-0.22.zip"
     if [ ! -f "$VOSK_MODEL_ZIP" ]; then
         if [ "$MODE" = native ]; then
-            wget -q --show-progress https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip
+            wget -q --show-progress -O "$VOSK_MODEL_ZIP" "$VOSK_URL"
         else
-            timeout 180 wget -q -T 30 --tries=1 https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip 2>/dev/null || true
+            timeout 180 wget -q -T 30 --tries=1 -O "$VOSK_MODEL_ZIP" "$VOSK_URL" 2>/dev/null || true
         fi
     fi
     if [ -f "$VOSK_MODEL_ZIP" ] && [ -s "$VOSK_MODEL_ZIP" ]; then
@@ -160,7 +172,7 @@ if [ ! -d "$VOSK_MODEL_PATH" ]; then
     fi
     popd >/dev/null
 else
-    echo "ℹ️ Модель Vosk уже установлена: $VOSK_MODEL_PATH"
+    echo "ℹ️ Модель Vosk не качаем (docker/prepare): runtime-актив; --models — чтобы положить в контекст"
 fi
 
 # mujoco_playground (locomotion/rds2p) — вендорный subset прямо в репозитории
@@ -197,11 +209,14 @@ if [ ! -d "$ROSPKG_DIR/src/rds_2p/meshes/dae" ] && [ -d "$ROOT_DIR/urdf_src/expo
     cp -a "$ROOT_DIR/urdf_src/export/rds-2p/meshes/dae" "$ROSPKG_DIR/src/rds_2p/meshes/"
 fi
 
-# Модель RNNoise (rnnoise_data-<ver>.tar.gz): предзагружаем в deps/, чтобы сборка
-# не зависела от media.xiph.org (в контейнере она часто недоступна).
+# Модель RNNoise (rnnoise_data-<ver>.tar.gz): native предзагружает в deps/, чтобы
+# сборка не зависела от media.xiph.org (в контейнере она часто недоступна).
+# В docker/prepare — только с --models; без него Dockerfile попробует сам (time-boxed).
 RNN_VER="$(cat "$SIM_DEPS_DIR/rnnoise_src/model_version" 2>/dev/null || echo 0b50c45)"
 RNN_MODEL_TGZ="$SIM_DEPS_DIR/rnnoise_data-$RNN_VER.tar.gz"
-if [ ! -s "$RNN_MODEL_TGZ" ]; then
+if [ -s "$RNN_MODEL_TGZ" ]; then
+    echo "ℹ️ Модель RNNoise уже на месте: $RNN_MODEL_TGZ"
+elif [ "$MODE" = native ] || [ "$MODELS" = true ]; then
     echo "📥 Скачиваем модель RNNoise (rnnoise_data-$RNN_VER.tar.gz)..."
     RNN_DL_OK=false
     for url in \
@@ -220,7 +235,7 @@ if [ ! -s "$RNN_MODEL_TGZ" ]; then
         echo "⚠️  Модель RNNoise не скачалась — сборка/Dockerfile попробует зеркала сам, иначе audio_filters будет пропущен."
     fi
 else
-    echo "ℹ️ Модель RNNoise уже на месте: $RNN_MODEL_TGZ"
+    echo "ℹ️ Модель RNNoise не качаем (docker/prepare): попробует Dockerfile или --models"
 fi
 
 # ================= docker/prepare: хвост контекста и сборка образа =================
@@ -452,6 +467,19 @@ else
 fi
 
 # Собираем все пакеты кроме...
+# colcon требует ROS-окружение (ament_cmake через AMENT_PREFIX_PATH); при запуске
+# из «чистого» шелла саурсим /opt/ros сами, иначе все пакеты падают на find_package.
+if [[ ":${AMENT_PREFIX_PATH:-}:" != *":/opt/ros/${ROS_DISTRO:-humble}:"* ]]; then
+    ROS_SETUP="/opt/ros/${ROS_DISTRO:-humble}/setup.bash"
+    if [ -f "$ROS_SETUP" ]; then
+        echo "🐚 Саурсим ROS-окружение: $ROS_SETUP"
+        # shellcheck disable=SC1091
+        source "$ROS_SETUP"
+    else
+        echo "❌ ROS не найден: $ROS_SETUP (нужен ros-${ROS_DISTRO:-humble})" >&2
+        exit 1
+    fi
+fi
 echo "🔨 Собираем пакеты (кроме тех, что запускаются только на роботе, и orbbec_camera - собираем только сообщения, mtf02p_ros - только на роботе)"
 
 COLCON_SKIP_EXTRA=""

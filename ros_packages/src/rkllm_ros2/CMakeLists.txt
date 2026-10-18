@@ -61,8 +61,9 @@ ament_target_dependencies(rkllm_node
   cv_bridge
 )
 
-rosidl_get_typesupport_target(cpp_typesupport_target "rkllm_ros2_msgs" "rosidl_typesupport_cpp")
-target_link_libraries(rkllm_node "${cpp_typesupport_target}")
+# rkllm_ros2_msgs — внешний пакет: rosidl_get_typesupport_target работает только
+# для целей того же пакета; сюда линкуем импортированные цели из find_package.
+target_link_libraries(rkllm_node ${rkllm_ros2_msgs_TARGETS})
 
 # Исполняемый файл: lib/<pkg>/rkllm_node, .so: lib/<pkg>/vendor/lib → $ORIGIN/vendor/lib
 set_target_properties(rkllm_node PROPERTIES

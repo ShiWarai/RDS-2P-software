@@ -72,14 +72,17 @@ RUN set -eux; \
       fi; \
     fi
 
-# Runtime-pip только из нужного: twin = mujoco+etils+glfw+numba (без jax/flax/brax —
-# они нужны только тренировочному окружению, из requirements.txt в образ не берём)
+# Runtime-pip: единственный источник зависимостей — requirements каждого пакета
+# (rds_2p_inference/requirements.txt — runtime-подмножество; тренировочный флот
+# flax/brax/jax вынесен в requirements-train.txt и в образ не идёт).
+# Констрейнт numpy<=1.26.4 (rknn-toolkit2) закреплён в самих requirements-файлах.
 RUN cd /opt/rds2p/ros-ws \
     && python3 -m pip install --no-cache-dir \
-         etils "mujoco==3.3.5" glfw numba \
          -r src/vosk_ros2/requirements.txt \
          -r src/rds_2p_telegram_bot/requirements.txt \
-          "numpy<2" sounddevice ds4drv
+         -r src/rds_2p_inference/requirements.txt \
+         -r src/rds_2p_audio/requirements.txt \
+         -r src/rds_2p_joystick/requirements.txt
 
 # Колонки colcon: на 2GB SBC 4 компилятора параллельно вызывают OOM — build_robot.sh
 # считает значение по MemTotal. Ручной override: --build-arg BUILD_WORKERS=N.

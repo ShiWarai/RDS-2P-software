@@ -135,6 +135,6 @@ ros2 launch rds_2p_joystick ps4_joystick.launch.py
 - Ходьба = `inference_node` (cmd_vel→ONNX→joint_commands) + twin; один `run_desktop.sh` даёт стоящего и дышащего симом робота.
 - `arm64` apt может не иметь `ros-humble-orbbec-camera` — сборка robot это переживает (см. выше).
 - `rkllm` хочет большой `/dev/shm` — 4g в `run_robot.sh`, не уменьшать.
-- NumPy 2.x и cv_bridge Humble: образы пинят `numpy<2` в pip — не ослаблять.
+- NumPy 2.x и cv_bridge Humble / rknn-toolkit2: пин `numpy<=1.26.4` закреплён в requirements-файлах пакетов (vosk, telegram_bot, audio, inference) — единственный источник для pip, не ослаблять.
 - udev-правила ds4drv из `build_for_robot.sh` внутрь образа не переносятся: при `--privileged` hidraw/uinput доступны всем; для точечных прав правила создавать на хосте.
 - Хостам робота/desktop ROS2 не нужен; сборочные скрипты хоста (`ros_packages/scripts/build_for_*`) остаются для нативной разработки — docker-путь от них независим.
