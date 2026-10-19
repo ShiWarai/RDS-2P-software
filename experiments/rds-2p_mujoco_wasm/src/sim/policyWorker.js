@@ -15,10 +15,17 @@ self.onmessage = async (e) => {
   const m = e.data;
   if (m.type === "load") {
     try {
-      ort = await import(/* webpackIgnore: true */ m.ortUrl);
+      if (session) {
+        try { await session.release(); } catch { /* noop */ }
+        session = null;
+      }
+      ort = ort || await import(/* webpackIgnore: true */ m.ortUrl);
       ort.env.wasm.wasmPaths = m.ortDir;
       ort.env.logLevel = "error";
-      session = await ort.InferenceSession.create(m.modelUrl, {
+      // Модель приходит байтами с главного потока (загрузчик с докачкой и
+      // прогрессом, см. policyRunner.js); путь по URL — запасной, для совместимости.
+      const source = m.model ? new Uint8Array(m.model) : m.modelUrl;
+      session = await ort.InferenceSession.create(source, {
         executionProviders: ["wasm"],
         graphOptimizationLevel: "all",
       });

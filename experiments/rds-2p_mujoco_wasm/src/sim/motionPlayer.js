@@ -178,16 +178,20 @@ export class MotionPlayer {
       }
       case "policy": {
         // Нейросетевая походка: stop=true — выключить, иначе включить с cmd_vel.
+        // «Запасного варианта» нет: тротом ходьбу не подменяем (так просил не делать).
         if (step.stop) {
+          // stopPolicy сам задаёт дедлайн: 0.4 с бленда к нулевой стойке.
+          // Затирать его нельзя (this.stepDoneAt = simTime убивал бленд —
+          // приводы замерзали в позе ходьбы, а не вставала стойка).
           this.stopPolicy();
-          this.stepDoneAt = this.simTime;
-        } else if (this.policy?.available) {
-          this.startPolicy(step);
-          this.stepDoneAt = Infinity;
         } else {
-          // Политики нет — честный фолбэк на процедурный трот.
-          this.startGait();
-          this.stepDoneAt = Infinity;
+          this.startPolicy(step);
+          // Управление сразу переходит к следующему шагу: ходьба продолжается,
+          // пока идёт wait (он и задаёт длительность), затем policy-stop тормозит.
+          this.stepDoneAt = this.simTime;
+          // Модель ещё качается/поднимается — шаг просто ждёт её (policyRunner
+          // докачивает сам); пойдём ровно с командой, когда сессия будет готова.
+          if (!this.policy?.available) { this.policy?.load?.(); }
         }
         this.notifyActive();
         break;
@@ -216,8 +220,15 @@ export class MotionPlayer {
   /** Вызывается из цикла симуляции с приращением модельного времени (сек). */
   tick(dt) {
     this.simTime += dt;
-    if (this.policyOn && this.policy?.available) {
-      this.tickPolicy();
+    if (this.policyOn) {
+      this.tickPolicy(dt);
+      // Дедлайн шага надо проверять и при активной политике: длительность
+      // ходьбы задаёт wait-шаг, следующий за policy-шагом. Без этого wait и
+      // policy-stop недостижимы и Панда «бежит» вечно. После конца программы
+      // (cursor за пределами steps) advance не крутим — иначе спам notifyActive.
+      if (this.policy?.available && this.simTime >= this.stepDoneAt && this.cursor < this.steps.length) {
+        this.advance(0);
+      }
       return;
     }
     if (this.gaitOn) {
@@ -318,12 +329,15 @@ export class MotionPlayer {
   }
 
   /** 50 Гц: собрать obs → отправить в worker → ctrl из последнего ответа. */
-  tickPolicy() {
+  tickPolicy(dt = 0) {
     if (!this.policy?.available) {
-      // Воркер политики умер/не готов — честный откат на процедурный трот.
-      this.policyOn = false;
-      this.startGait();
-      this.notifyActive();
+      // Воркер политики упал/поднимается — НЕ откат на трот: просим подняться
+      // заново и мягко сводим приводы к нулевой стойке, пока ждём (секунды:
+      // байты модели уже скачаны, сессия пересоздаётся на главном потоке).
+      this.policy?.load?.();
+      const ctrl = this.data.ctrl;
+      const decay = Math.min(1, dt * 2.5);
+      for (let i = 0; i < this.model.nu; i++) { ctrl[i] *= (1 - decay); }
       return;
     }
     if (this.simTime >= this.policyNextAt) {

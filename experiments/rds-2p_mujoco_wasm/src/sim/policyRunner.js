@@ -8,13 +8,28 @@
  * default_angles = нули (home keyframe, как в inference_node.cpp).
  * Фильтр 0.8 + клип ±1 + scale 0.18 — в policyWorker.js.
  * Инференс живёт в Web Worker, чтобы не дроссировать контур (50 Гц).
+ *
+ * Загрузка: модель скачивается на главном потоке докачиваемым загрузчиком
+ * (Range + прогресс, см. modelDownload.js) и передаётся в воркер байтами —
+ * пилюля показывает честный процент, а обрыв сети не превращается в «сбой»:
+ * трансферные ошибки ретраятся бесконечно с бэкоффом и докачкой с места
+ * обрыва. Терминальной считается только явная HTTP 4xx (файла нет на
+ * сервере). Никакого «запасного варианта»: пока модель не докачана —
+ * ходьба ждёт, а не подменяется процедурной походкой.
  */
+
+import { downloadResumable } from "./modelDownload.js";
 
 const CMD_SCALE = [0.5, 0.5, 1.0];
 
-const ORT_URL = "/node_modules/onnxruntime-web/dist/ort.wasm.min.mjs";
-const ORT_DIR = "/node_modules/onnxruntime-web/dist/";
-const MODEL_URL = "/models/policy/rds2p_policy.onnx";
+const ORT_URL = new URL("node_modules/onnxruntime-web/dist/ort.wasm.min.mjs", document.baseURI).href;
+const ORT_DIR = new URL("node_modules/onnxruntime-web/dist/", document.baseURI).href;
+const MODEL_URL = new URL("models/policy/rds2p_policy.onnx", document.baseURI).href;
+
+const RETRY_MIN_MS = 1500;
+const RETRY_MAX_MS = 10000;
+const SESSION_ATTEMPTS = 6;
+const SESSION_TIMEOUT_MS = 60000;
 
 export class PolicyRunner {
   constructor() {
@@ -23,46 +38,159 @@ export class PolicyRunner {
     this.error = null;
     this.lastAction = new Float32Array(12);
     this.onActions = null;
+    this.onStatus = null;
+    // state: idle | downloading | starting | retry | ready | error
+    this.status = { state: "idle", progress: 0, attempt: 0, retryUntil: 0, error: null };
     this._load = null;
+    this._done = false;
+    this._model = null;
+    this._dlState = null;
   }
 
   get available() {
     return this.ready;
   }
 
+  _emit(patch) {
+    this.status = { ...this.status, ...patch };
+    try { this.onStatus?.(this.status); } catch { /* подписчик не должен ломать загрузку */ }
+  }
+
+  /** Идемпотентный запуск: во время попытки — ждёт её; после терминального
+   *  провала — начинает новую (так «клик — повторить» реально повторяет). */
   load() {
-    if (this._load) { return this._load; }
-    this._load = new Promise((resolve) => {
-      try {
-        this.worker = new Worker(new URL("./policyWorker.js", import.meta.url), { type: "module" });
-      } catch (err) {
-        this.error = String(err?.message || err);
-        resolve(false);
-        return;
-      }
-      this.worker.onmessage = (e) => {
-        const m = e.data || {};
-        if (m.type === "ready") {
-          this.ready = true;
-          this.error = null;
-          resolve(true);
-        } else if (m.type === "actions") {
-          this.lastAction = new Float32Array(m.act);
-          if (this.onActions) { this.onActions(new Float32Array(m.cmd)); }
-        } else if (m.type === "error") {
-          this.error = m.message;
-          this.ready = false;
-          resolve(false);
-        }
-      };
-      this.worker.onerror = (e) => {
-        this.error = String(e?.message || "worker error");
-        this.ready = false;
-        resolve(false);
-      };
-      this.worker.postMessage({ type: "load", ortUrl: ORT_URL, ortDir: ORT_DIR, modelUrl: MODEL_URL });
+    if (this.ready) { return Promise.resolve(true); }
+    if (this._load && !this._done) { return this._load; }
+    this._done = false;
+    this._load = this._run().then((ok) => {
+      this._done = true;
+      return ok;
     });
     return this._load;
+  }
+
+  async _run() {
+    try {
+      const model = this._model || await this._downloadModel();
+      await this._startSession(model);
+    } catch (err) {
+      this.error = describeError(err);
+      this.ready = false;
+      this._emit({ state: "error", error: this.error, retryUntil: 0 });
+      return false;
+    }
+    this.ready = true;
+    this.error = null;
+    this._emit({ state: "ready", progress: 1, error: null, retryUntil: 0 });
+    return true;
+  }
+
+  /** Скачивание модели: трансферные ошибки — бесконечные ретраи с докачкой,
+   *  терминальные HTTP 4xx — наверх (сервер явно не отдаёт файл). */
+  async _downloadModel() {
+    if (this._model) { return this._model; }
+    const state = this._dlState || (this._dlState = { chunks: [], got: 0, size: 0 });
+    let attempt = 0;
+    for (;;) {
+      attempt += 1;
+      this._emit({ state: "downloading", attempt, error: null, retryUntil: 0 });
+      try {
+        const buf = await downloadResumable(MODEL_URL, state, (frac) => {
+          this._emit({ state: "downloading", progress: frac });
+        });
+        this._model = buf;
+        this._dlState = null;
+        return buf;
+      } catch (err) {
+        const status = err?.status;
+        const permanent = status >= 400 && status < 500 && status !== 408 && status !== 429;
+        this.error = describeError(err);
+        if (permanent) { throw err; }
+        const delay = Math.min(RETRY_MAX_MS, RETRY_MIN_MS * 2 ** Math.min(attempt - 1, 3));
+        this._emit({ state: "retry", error: this.error, retryUntil: Date.now() + delay });
+        await sleep(delay);
+      }
+    }
+  }
+
+  /** Подъём воркера + ORT-сессии по уже скачанным байтам. */
+  async _startSession(model) {
+    for (let attempt = 1; ; attempt += 1) {
+      this._emit({ state: "starting", attempt, error: null, retryUntil: 0 });
+      try {
+        await this._spawnWorker(model);
+        return;
+      } catch (err) {
+        this.error = describeError(err);
+        this._terminateWorker();
+        if (attempt >= SESSION_ATTEMPTS) { throw err; }
+        const delay = Math.min(RETRY_MAX_MS, RETRY_MIN_MS * 2 ** Math.min(attempt - 1, 2));
+        this._emit({ state: "retry", error: this.error, retryUntil: Date.now() + delay });
+        await sleep(delay);
+      }
+    }
+  }
+
+  _spawnWorker(model) {
+    return new Promise((resolve, reject) => {
+      let worker;
+      try {
+        worker = new Worker(new URL("./policyWorker.js", import.meta.url), { type: "module" });
+      } catch (err) {
+        reject(err);
+        return;
+      }
+      let timer = null;
+      const fail = (message) => {
+        if (timer) { clearTimeout(timer); }
+        try { worker.terminate(); } catch { /* noop */ }
+        reject(new Error(message));
+      };
+      timer = setTimeout(() => fail("таймаут инициализации (60 с)"), SESSION_TIMEOUT_MS);
+      worker.onmessage = (e) => {
+        const m = e.data || {};
+        if (m.type === "ready") {
+          clearTimeout(timer);
+          this.worker = worker;
+          worker.onmessage = (ev) => this._onMessage(ev);
+          worker.onerror = (ev) => {
+            this.error = String(ev?.message || "worker error");
+            this.ready = false;
+            this._emit({ state: "error", error: this.error });
+          };
+          resolve();
+        } else if (m.type === "error") {
+          fail(m.message || "ошибка воркера");
+        }
+      };
+      worker.onerror = (e) => fail(String(e?.message || "worker error"));
+      // Байты модели передаём копией (без transfer): кэш this._model нужен
+      // для повторного подъёма воркера, а structured clone 4 МБ незаметен.
+      worker.postMessage({ type: "load", ortUrl: ORT_URL, ortDir: ORT_DIR, model });
+    });
+  }
+
+  _onMessage(e) {
+    const m = e.data || {};
+    if (m.type === "actions") {
+      this.lastAction = new Float32Array(m.act);
+      if (this.onActions) { this.onActions(new Float32Array(m.cmd)); }
+      return;
+    }
+    if (m.type === "error") {
+      // Ошибка уже поднятой сессии (инференс): честно гасим готовность —
+      // следующий load() поднимет воркер заново (модель уже скачана).
+      this.error = m.message || "ошибка инференса";
+      this.ready = false;
+      this._emit({ state: "error", error: this.error });
+    }
+  }
+
+  _terminateWorker() {
+    if (this.worker) {
+      try { this.worker.terminate(); } catch { /* noop */ }
+      this.worker = null;
+    }
   }
 
   reset() {
@@ -81,6 +209,15 @@ export class PolicyRunner {
       return false;
     }
   }
+}
+
+function describeError(err) {
+  if (err instanceof Error) { return err.message; }
+  return String(err ?? "неизвестно");
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /** Пакет наблюдений из данных MuJoCo (порт observation-части inference_controller). */

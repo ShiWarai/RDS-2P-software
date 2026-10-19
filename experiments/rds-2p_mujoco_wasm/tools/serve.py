@@ -55,6 +55,10 @@ class Handler(SimpleHTTPRequestHandler):
     # HTTP/1.1 — keep-alive: без него каждый файл (а их в node_modules сотни)
     # открывает новое TCP-соединение, что заметно замедляет первую загрузку.
     protocol_version = "HTTP/1.1"
+    # Таймаут сокета: простаивающие keep-alive соединения (брошенные вкладки,
+    # ушедшие по Wi-Fi ноутбуки) не держат поток-на-соединение вечно —
+    # BaseHTTPRequestHandler сам закрывает такое соединение после паузы.
+    timeout = 75
 
     def guess_cache(self, path: str) -> str:
         if any(path.startswith(p) for p in LONG_CACHE_PREFIXES):
@@ -143,8 +147,10 @@ class Handler(SimpleHTTPRequestHandler):
                         break
                     self.wfile.write(chunk)
                     remaining -= len(chunk)
-        except (BrokenPipeError, ConnectionResetError):
-            pass
+        except (BrokenPipeError, ConnectionResetError, TimeoutError):
+            # Включая TimeoutError: сокет с timeout=75 может «отвалиться» на
+            # отправке медленному/зависшему клиенту — просто закрываем соединение.
+            self.close_connection = True
 
     @staticmethod
     def _parse_range(header: str, size: int):
@@ -284,7 +290,14 @@ def main() -> None:
     Handler.nlu_headers = parse_auth(args.nlu_header)
 
     handler = partial(Handler, directory=str(args.directory))
-    server = ThreadingHTTPServer((args.host, args.port), handler)
+
+    class ThreadedServer(ThreadingHTTPServer):
+        # Backlog accept-очереди. По умолчанию 5: при «холодном старте» класса
+        # (десятки браузеров × до 6 одновременных соединений на хост) лишние
+        # коннекты иначе отбивались бы до того, как сервер успеет их принять.
+        request_queue_size = 128
+
+    server = ThreadedServer((args.host, args.port), handler)
 
     if args.https:
         cert, key = ensure_cert(args.cert_dir)

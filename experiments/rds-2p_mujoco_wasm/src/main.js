@@ -323,28 +323,28 @@ async function ensurePolicy() {
   const policy = app.sim?.policy;
   if (!policy) { return false; }
   if (policy.available) { return true; }
-  setPolicyPill("busy", "🕹️ Загружаю политику…", "Ходьба-нейросеть rds2p_policy.onnx (rospkg rds_2p_inference)");
-  const ok = await policy.load();
-  if (ok) {
-    setPolicyPill("ok", "🕹️ Ходьба готова", "Нейросеть ходьбы загружена — W/A/S/D или стрелки");
-  } else {
-    setPolicyPill("bad", "🕹️ Ходьба: сбой", `Не загрузилась: ${policy.error || "неизвестно"}. Клик — повторить`);
-  }
-  return ok;
+  // Пилюлю рисует подписка на policy.onStatus (прогресс/докачка/повтор),
+  // а load() ждёт текущую попытку и перезапускает её после терминального сбоя.
+  return policy.load();
 }
 
 async function playSteps(steps, note) {
-  let plan = steps;
   if (steps.some((s) => s.kind === "policy" && !s.stop)) {
+    const policy = app.sim?.policy;
+    if (policy && !policy.available) {
+      $("hud-status").textContent = "Панда: ждёт загрузку нейросети ходьбы…";
+    }
     const ok = await ensurePolicy();
     if (!ok) {
-      plan = steps.map((s) => (s.kind === "policy" && !s.stop
-        ? { kind: "gait", on: true, label: "бежит на месте (трот)" }
-        : s));
-      toast("Политика ходьбы недоступна — бегу процедурным тротом", { kind: "err", timeout: 7000 });
+      // «Запасного варианта» нет: ходьбу умеет только нейросеть, а её модель
+      // докачивается сама (Range + ретраи, см. policyRunner.js). Сюда попадаем
+      // лишь при явной HTTP 4xx — модель отсутствует на сервере.
+      toast("Нейросеть ходьбы не готова 🕹️ посмотри статус у пилюли", { kind: "err", timeout: 9000 });
+      $("hud-status").textContent = "🐼 Панда ждёт нейросеть ходьбы";
+      return;
     }
   }
-  runProgram(plan, note);
+  runProgram(steps, note);
 }
 
 function runProgram(steps, note) {
@@ -533,7 +533,6 @@ function initSpeech() {
 /* ── управление политикой: клик по симулятору + WASD/стрелки ── */
 
 let driving = false;
-let policyLoading = null;
 const drivingKeys = new Set();
 
 function keyCmd(code) {
@@ -575,13 +574,10 @@ function enableDriving() {
   driving = true;
   $("sim").classList.add("driving");
   updateDriveHint();
+  // Политика стартует ещё на boot (параллельно голосу и ИИ), но если её
+  // отложили — догружаем сейчас; пилюля покажет прогресс через onStatus.
   if (app.sim?.policy && !app.sim.policy.available) {
-    policyLoading = policyLoading || app.sim.policy.load().then((ok) => {
-      setPolicyPill(ok ? "ok" : "bad",
-        ok ? "🕹️ Ходьба готова" : "🕹️ Ходьба: сбой",
-        ok ? "Нейросеть ходьбы загружена — W/A/S/D или стрелки" : `Не загрузилась: ${app.sim.policy.error || "?"}`);
-      return ok;
-    });
+    app.sim.policy.load();
   }
 }
 
@@ -803,7 +799,34 @@ function initStatus(laya) {
 }
 
 function initPolicyPill() {
-  setPolicyPill("", "🕹️ Ходьба: не загружена", "Нейросеть ходьбы (rospkg rds_2p_inference). Клик — загрузить; работает по клику на симулятор и стрелкам");
+  let tick = null;
+  const render = () => {
+    const st = app.sim?.policy?.status || { state: "idle" };
+    if (st.state === "downloading") {
+      setPolicyPill("busy",
+        `🕹️ Скачиваю ходьбу… ${Math.round((st.progress || 0) * 100)}%`,
+        st.attempt > 1
+          ? `Нейросеть ходьбы rds2p_policy.onnx — попытка ${st.attempt}, докачиваю с места обрыва`
+          : "Нейросеть ходьбы rds2p_policy.onnx (rospkg rds_2p_inference) — качается параллельно голосу и ИИ");
+    } else if (st.state === "starting") {
+      setPolicyPill("busy", "🕹️ Запускаю ходьбу…", "Собираю ORT-сессию нейросети");
+    } else if (st.state === "retry") {
+      const sec = Math.max(0, Math.ceil(((st.retryUntil || 0) - Date.now()) / 1000));
+      setPolicyPill("busy", `🕹️ Ходьба: повтор через ${sec} с…`,
+        `Не получилось: ${st.error}. Докачаю сам — нажимать ничего не надо`);
+    } else if (st.state === "ready") {
+      setPolicyPill("ok", "🕹️ Ходьба готова", "Нейросеть ходьбы загружена — стрелки или клик по симулятору");
+    } else if (st.state === "error") {
+      setPolicyPill("bad", "🕹️ Ходьба: сбой", `Не загрузилась: ${st.error || "?"}. Клик — повторить`);
+    } else {
+      setPolicyPill("", "🕹️ Ходьба: не загружена", "Нейросеть ходьбы (rospkg rds_2p_inference). Клик — загрузить; работает по клику на симулятор и стрелкам");
+    }
+    const counting = st.state === "retry";
+    if (counting && !tick) { tick = setInterval(render, 1000); }
+    if (!counting && tick) { clearInterval(tick); tick = null; }
+  };
+  if (app.sim?.policy) { app.sim.policy.onStatus = render; }
+  render();
   $("pill-policy").onclick = async () => {
     if (app.sim?.policy?.available) { return; }
     await ensurePolicy();
@@ -967,9 +990,11 @@ async function boot() {
   initDriving();
   app.resetModelCache = resetModelCache;
   $("btn-models-reset")?.addEventListener("click", resetModelCache);
-  // Модели грузим ПОСЛЕДОВАТЕЛЬНО: сначала голос (46 МБ), потом ИИ (646 МБ).
-  // Параллельно они дерутся за квоту IndexedDB — распаковка голоса виснет на 92%.
-  // Голос в любом случае не держим дольше 45 с, чтобы не блокировать ИИ.
+  // Все три модели качаются ПАРАЛЛЕЛЬНО и показывают прогресс:
+  //   голос Vosk (46 МБ, IndexedDB), ИИ Laya (646 МБ, IndexedDB) и политика
+  //   ходьбы (4 МБ, HTTP-кэш; Range-докачка + бесконечные ретраи — см.
+  //   policyRunner.js). Голос не держим дольше 45 с, чтобы не оттягивать ИИ.
+  app.sim?.policy?.load();
   const voiceDone = voskSupported() && !voskModelReady()
     ? Promise.race([warmVoice(), new Promise((r) => setTimeout(r, 45000))])
     : Promise.resolve();
