@@ -1,0 +1,27 @@
+# Типизированная обёртка над POST /v1/systemone сервиса system-one-rknn.
+# Один вопрос за вызов; type задаёт форму criteria:
+#   choice — labels[] метки, descriptions[] — их описания (параллельно; пусто = без описаний)
+#   noul   — descriptions = [описание "нет", описание "да"] (элементы можно опускать)
+#   score  — descriptions = пункты шкалы по порядку (от младшего к старшему)
+
+string model          # kev-0.8b | kev-latest | laya-multilingual | multilingual; пусто = default ноды
+string state          # состояние/контекст, к которому применяется вопрос
+string type           # choice | noul | score
+string instructions   # дополнительные инструкции (опционально)
+string[] labels       # choice: метки критериев (noul/score не используют)
+string[] descriptions # choice: описания (параллельно labels); noul: [false, true]; score: шкала
+
+---
+
+bool success               # false при ошибке валидации/HTTP/таймауте
+string message             # "ok" или текст ошибки
+uint32 http_status         # HTTP-код system-one (0 — ответа не было)
+string choice              # type=choice: выбранная метка
+float64 noul               # type=noul: вероятность "да"
+float64 score              # type=score: ожидаемое значение по шкале
+float64 confidence         # choice/score: уверенность по формуле API
+string probabilities_json  # JSON {"label": p, ...}; для score ключи — "0", "1", …
+string legend_json         # type=score: JSON {"0": "описание", ...}; иначе "{}"
+uint32 latency_ms          # HTTP round-trip по часам ноды
+uint32 input_tokens        # usage.input_tokens из ответа
+uint32 output_tokens       # usage.output_tokens из ответа

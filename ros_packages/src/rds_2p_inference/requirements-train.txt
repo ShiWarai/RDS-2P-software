@@ -1,0 +1,9 @@
+# Тренировочное окружение rds_2p_inference (workstation, не робот и не образ).
+# Ставится вручную: pip install -r requirements-train.txt
+-r requirements.txt
+mujoco_mjx==3.3.5
+ml_collections
+flax
+brax
+tqdm
+coverage>=7

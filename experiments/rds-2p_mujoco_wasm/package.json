@@ -1,0 +1,19 @@
+{
+  "name": "rds-2p-mujoco-wasm",
+  "version": "0.1.0",
+  "description": "Мастер-класс: правила из блоков + голос + робот Панда (RDS-2P) в MuJoCo WebAssembly",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "serve": "python3 tools/serve.py",
+    "poses": "python3 tools/yaml_to_json.py"
+  },
+  "dependencies": {
+    "@huggingface/tokenizers": "^0.2.0",
+    "blockly": "^13.4.0",
+    "mujoco-js": "0.0.7",
+    "onnxruntime-web": "^1.30.0",
+    "three": "0.181.2",
+    "vosk-browser": "^0.0.8"
+  }
+}

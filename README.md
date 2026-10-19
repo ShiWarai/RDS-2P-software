@@ -10,8 +10,8 @@
 | [`ros_packages/scripts/`](ros_packages/scripts/) | Скрипты быстрой сборки (`build_for_desktop.sh`, `build_for_robot.sh`) и вспомогательные утилиты |
 | `urdf_src/` | Исходники/черновики URDF |
 | `mjcf_src/` | Скрипты и конфигурации для MJCF |
-| `inverse_kinematic/` | Наброски по обратной кинематике |
-| [`wasm_demo/`](wasm_demo/README.md) | Браузерная симуляция (MuJoCo + three.js) |
+| `experiments/inverse_kinematic/` | Наброски по обратной кинематике |
+| [`experiments/wasm_demo/`](experiments/wasm_demo/README.md) | Браузерная симуляция (MuJoCo + three.js) |
 
 Подробная установка и запуск ROS 2 — в [ros_packages/README.md](ros_packages/README.md).
 
@@ -76,3 +76,5 @@ ros2 launch ftservo_ros motor_gui.launch.py \
 # Из системного пакета ROS 2 Humble (joy + teleop)
 ros2 launch teleop_twist_joy teleop-launch.py joy_config:=ps3
 ```
+
+> **Про скорость шины моторов:** SCS40 работают на 1 Мбит/с, но штатный UART Repka Pi 4 (Allwinner H6) физически не может выдать 1M — реальная линия получается 750k, и моторы не отвечают. Подробности и варианты (USB-UART или перевод шины на 500k) — в [ros_packages/src/ftservo_ros/README.md](ros_packages/src/ftservo_ros/README.md).

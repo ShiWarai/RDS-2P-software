@@ -30,6 +30,8 @@ public:
         this->declare_parameter("frame_id", "imu_link");
         this->declare_parameter("enable_calibration", true);
         this->declare_parameter("debug_mode", false);
+        this->declare_parameter("i2c_device", "/dev/i2c-1");
+        this->declare_parameter("spi_device", "/dev/spidev0.0");
         
         // Get parameters
         interface_type_ = this->get_parameter("interface").as_string();
@@ -38,6 +40,8 @@ public:
         frame_id_ = this->get_parameter("frame_id").as_string();
         enable_calibration_ = this->get_parameter("enable_calibration").as_bool();
         debug_mode_ = this->get_parameter("debug_mode").as_bool();
+        i2c_device_ = this->get_parameter("i2c_device").as_string();
+        spi_device_ = this->get_parameter("spi_device").as_string();
         
         RCLCPP_INFO(this->get_logger(), "MPU6500 IMU Node initialized with:");
         RCLCPP_INFO(this->get_logger(), "  Interface: %s", interface_type_.c_str());
@@ -46,6 +50,15 @@ public:
         RCLCPP_INFO(this->get_logger(), "  Frame ID: %s", frame_id_.c_str());
         RCLCPP_INFO(this->get_logger(), "  Calibration: %s", enable_calibration_ ? "enabled" : "disabled");
         RCLCPP_INFO(this->get_logger(), "  Debug mode: %s", debug_mode_ ? "enabled" : "disabled");
+        RCLCPP_INFO(this->get_logger(), "  I2C device: %s", i2c_device_.c_str());
+        RCLCPP_INFO(this->get_logger(), "  SPI device: %s", spi_device_.c_str());
+        
+        // Apply runtime-overridable bus device (falls back to the parameter default)
+        if (interface_type_ == "spi") {
+            mpu6500_interface_set_spi_device(spi_device_.c_str());
+        } else {
+            mpu6500_interface_set_iic_device(i2c_device_.c_str());
+        }
         
         // Create publisher
         imu_publisher_ = this->create_publisher<sensor_msgs::msg::Imu>("/imu", 10);
@@ -603,6 +616,8 @@ private:
     std::string frame_id_;
     bool enable_calibration_;
     bool debug_mode_;
+    std::string i2c_device_;
+    std::string spi_device_;
 };
 
 int main(int argc, char** argv)

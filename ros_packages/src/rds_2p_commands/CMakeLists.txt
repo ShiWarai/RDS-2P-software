@@ -15,7 +15,7 @@ find_package(builtin_interfaces REQUIRED)
 
 # Generate interfaces (должно быть ДО установки Python пакета)
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "action/Say.action"
+  "action/PandaCommand.action"
   DEPENDENCIES action_msgs unique_identifier_msgs builtin_interfaces
 )
 
@@ -66,6 +66,18 @@ install(PROGRAMS
   RENAME unified_action_server
 )
 
+install(PROGRAMS
+  rds_2p_commands/set_face.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME set_face
+)
+
+install(PROGRAMS
+  rds_2p_commands/llm_layer_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME llm_layer
+)
+
 # Install launch files
 install(DIRECTORY
   launch/
@@ -76,6 +88,12 @@ install(DIRECTORY
 install(DIRECTORY
   config/
   DESTINATION share/${PROJECT_NAME}/config
+)
+
+# Panda faces/sounds bundled with package
+install(DIRECTORY
+  data/
+  DESTINATION share/${PROJECT_NAME}/data
 )
 
 # Удаляем директорию local/lib, созданную ament_cmake_python, т.к. мы используем ручную установку

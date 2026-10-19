@@ -1,0 +1,3 @@
+# ONNX/RKNN и espeak-ng-data — локально из paroli-tts (см. models/README.md).
+models/**
+!models/README.md

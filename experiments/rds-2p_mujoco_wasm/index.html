@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Панда учится понимать 🐼</title>
+  <meta name="description" content="Мастер-класс: собери правило из блоков и скажи фразу роботу-панде Панде">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='10' r='4' fill='%23ff8f3c'/%3E%3Ccircle cx='4' cy='5' r='2' fill='%234cc9f0'/%3E%3Ccircle cx='12' cy='5' r='2' fill='%23ffd166'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./src/ui/theme.css">
+  <script src="./node_modules/blockly/blockly.min.js"></script>
+  <script src="./node_modules/blockly/msg/ru.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./node_modules/three/build/three.module.js",
+        "three/addons/": "./node_modules/three/examples/jsm/",
+        "mujoco-js": "./node_modules/mujoco-js/dist/mujoco_wasm.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="app">
+    <header id="topbar">
+      <div id="brand">
+        <span class="brand-emoji">🐼</span>
+        <span class="brand-main">Панда</span>
+      </div>
+      <div id="statusbar">
+        <span id="pill-voice" class="pill hidden"></span>
+        <span id="pill-model" class="pill hidden"></span>
+        <span id="pill-policy" class="pill hidden"></span>
+        <span id="pill-ep" class="pill hidden"></span>
+        <button id="btn-models-reset" class="pill reset-btn" title="Сбросить кэш моделей (голос и ИИ) и загрузить их заново">♻️ Сбросить модели</button>
+      </div>
+    </header>
+
+    <main id="split">
+      <section id="panel-left" aria-label="Конструктор правил">
+        <div id="toolbar">
+          <button id="btn-mic" class="btn icon-btn mic-btn" title="Готовлюсь…" disabled>🎤</button>
+          <input id="phrase-input" type="text" placeholder="…или напиши фразу" autocomplete="off" title="Напиши фразу словами, если микрофон недоступен">
+          <button id="btn-check" class="btn icon-btn accent" title="Готовлюсь…" disabled>▶</button>
+          <span id="run-time" class="run-time" title="Сколько думала модель: запуск вопросов и развилок">⏱ —</span>
+          <span class="sep"></span>
+          <button id="btn-poses" class="btn icon-btn" title="Открыть редактор моих поз">🐾</button>
+        </div>
+        <div id="loadbars">
+          <div class="loadbar hidden" id="bar-voice">
+            <span class="loadbar-label">🎙 Голос</span>
+            <div class="loadbar-track"><div class="loadbar-fill"></div></div>
+            <span class="loadbar-pct">0%</span>
+          </div>
+          <div class="loadbar hidden" id="bar-laya">
+            <span class="loadbar-label">🧠 Модель ИИ</span>
+            <div class="loadbar-track"><div class="loadbar-fill"></div></div>
+            <span class="loadbar-pct">0%</span>
+          </div>
+        </div>
+        <div id="blocklyDiv"></div>
+      </section>
+
+      <section id="panel-right" aria-label="Симулятор">
+        <div id="sim">
+          <div id="say-bubble" class="hidden" aria-live="polite"></div>
+          <div id="drive-hint" class="hidden">🚶 ⬆️⬇️ — вперёд/назад · ⬅️➡️ — поворот · 🛑/Esc — стоп</div>
+        </div>
+
+        <aside id="pose-drawer" class="drawer hidden" aria-label="Редактор поз">
+          <div class="drawer-head">
+            <span>Позы Панды</span>
+            <button id="btn-poses-close" class="btn icon-btn" title="Закрыть">✕</button>
+          </div>
+          <div class="drawer-hint">ползунки двигают лапы прямо сейчас</div>
+          <div id="pose-presets" class="chips"></div>
+          <div id="pose-sliders"></div>
+          <div class="pose-actions">
+            <input id="pose-name" type="text" placeholder="имя позы" autocomplete="off">
+            <button id="btn-pose-save" class="btn icon-btn accent" title="Сохранить эту позу в мои позы">💾</button>
+            <button id="btn-pose-center" class="btn icon-btn center-half" title="Поставить все ползунки в середину">½</button>
+          </div>
+        </aside>
+
+        <div id="hud">
+          <div id="hud-status">Панда ждёт команд 🐾</div>
+          <div id="command-buttons"></div>
+          <div id="hud-row">
+            <button id="btn-pause" class="btn icon-btn" title="Пауза/продолжить">⏸︎</button>
+            <button id="btn-reset" class="btn icon-btn" title="Поставить панду на место (базовая стойка)">↺</button>
+            <span class="grow"></span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div id="toasts"></div>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

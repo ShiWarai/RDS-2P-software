@@ -1,0 +1,240 @@
+{
+  "name": "Команды Панды",
+  "version": 3,
+  "rules": [
+    {
+      "kind": "start",
+      "then": [
+        {
+          "kind": "question",
+          "id": "q_commands_full",
+          "qtype": "choice",
+          "name": "Команды",
+          "instructions": "Какая команда подходит к фразе?",
+          "options": [
+            {
+              "id": "r_paw",
+              "name": "Дай лапу",
+              "examples": [
+                "дай лапу",
+                "лапу",
+                "поздоровайся",
+                "дай пять"
+              ],
+              "then": [
+                {
+                  "kind": "command",
+                  "command": "give_paw",
+                  "label": "дай лапу"
+                }
+              ]
+            },
+            {
+              "id": "r_attention",
+              "name": "Равняйся",
+              "examples": [
+                "равняйся",
+                "стой ровно",
+                "замри"
+              ],
+              "then": [
+                {
+                  "kind": "command",
+                  "command": "stand_at_attention",
+                  "label": "равняйся"
+                }
+              ]
+            },
+            {
+              "id": "r_dismiss",
+              "name": "Отставить",
+              "examples": [
+                "отставить",
+                "вставай",
+                "свободен"
+              ],
+              "then": [
+                {
+                  "kind": "command",
+                  "command": "dismiss",
+                  "label": "отставить"
+                }
+              ]
+            },
+            {
+              "id": "r_lie",
+              "name": "Лежать",
+              "examples": [
+                "лежать",
+                "ложись",
+                "ляг"
+              ],
+              "then": [
+                {
+                  "kind": "command",
+                  "command": "lie_down",
+                  "label": "лежать"
+                }
+              ]
+            },
+            {
+              "id": "r_pray",
+              "name": "Служить",
+              "examples": [
+                "служить",
+                "служи",
+                "поклон"
+              ],
+              "then": [
+                {
+                  "kind": "command",
+                  "command": "pray",
+                  "label": "служить"
+                }
+              ]
+            },
+            {
+              "id": "r_flip",
+              "name": "Кувырок",
+              "examples": [
+                "кувырок",
+                "перевернись",
+                "сальто",
+                "вращайся"
+              ],
+              "then": [
+                {
+                  "kind": "command",
+                  "command": "rotate",
+                  "label": "кувырок"
+                }
+              ]
+            },
+            {
+              "id": "r_run",
+              "name": "Беги",
+              "examples": [
+                "беги",
+                "бег",
+                "побежали",
+                "пошли"
+              ],
+              "then": [
+                {
+                  "kind": "command",
+                  "command": "step_forward",
+                  "label": "шаг вперёд"
+                }
+              ]
+            },
+            {
+              "id": "r_stop",
+              "name": "Стой",
+              "examples": [
+                "смирно",
+                "стоп",
+                "остановись",
+                "хватит бежать"
+              ],
+              "then": [
+                {
+                  "kind": "command",
+                  "command": "stop_running",
+                  "label": "стой"
+                }
+              ]
+            },
+            {
+              "id": "r_hello",
+              "name": "Приветствие",
+              "examples": [
+                "привет",
+                "здравствуй",
+                "добрый день"
+              ],
+              "then": [
+                {
+                  "kind": "command",
+                  "command": "stand_at_attention",
+                  "label": "равняйся"
+                },
+                {
+                  "kind": "wait",
+                  "ms": 600
+                },
+                {
+                  "kind": "command",
+                  "command": "give_paw",
+                  "label": "дай лапу"
+                },
+                {
+                  "kind": "say",
+                  "text": "Привет!"
+                }
+              ]
+            },
+            {
+              "id": "r_exercise",
+              "name": "Зарядка",
+              "examples": [
+                "зарядка",
+                "разминка",
+                "сделай зарядку"
+              ],
+              "then": [
+                {
+                  "kind": "command",
+                  "command": "stand_at_attention",
+                  "label": "равняйся"
+                },
+                {
+                  "kind": "wait",
+                  "ms": 800
+                },
+                {
+                  "kind": "command",
+                  "command": "give_paw",
+                  "label": "дай лапу"
+                },
+                {
+                  "kind": "wait",
+                  "ms": 800
+                },
+                {
+                  "kind": "command",
+                  "command": "dismiss",
+                  "label": "отставить"
+                }
+              ]
+            },
+            {
+              "id": "r_sleep",
+              "name": "Спать",
+              "examples": [
+                "спи",
+                "спать",
+                "отбой"
+              ],
+              "then": [
+                {
+                  "kind": "command",
+                  "command": "lie_down",
+                  "label": "лежать"
+                },
+                {
+                  "kind": "wait",
+                  "ms": 2000
+                },
+                {
+                  "kind": "command",
+                  "command": "dismiss",
+                  "label": "отставить"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

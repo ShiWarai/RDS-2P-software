@@ -4,10 +4,11 @@
 
 ## Описание
 
-Пакет содержит три ноды:
+Пакет содержит четыре ноды:
 - **`touchpad_drawer`** - преобразует данные касаний тачпада PS4 контроллера в черно-белое изображение, которое можно использовать для отображения "лица" робота. Нода подписывается на данные тачпада и джойстика, рисует линии и точки на изображении с настраиваемой толщиной кисти, и публикует результат в виде ROS2 изображения.
 - **`image_processor`** - обрабатывает изображения из `/face/raw_image`: масштабирует до заданного разрешения и конвертирует в rgb8 формат. Поддерживает любые входные форматы (цветные и ч/б) и разрешения.
 - **`display_face`** - отображает изображения из ROS2 топика на физическом дисплее ST7789 (280x240) через SPI интерфейс.
+- **`lip_sync_face`** (Python) — липсинк по `AudioStamped`: манифест [config/lip_sync_manifest.json](config/lip_sync_manifest.json) (правила рисунка и уровни `picture_ru`), PNG в `data/lip_sync`.
 
 ## Возможности
 
@@ -25,6 +26,7 @@
 - `geometry_msgs` - ROS2 сообщения для геометрических данных
 - `cv_bridge` - мост между ROS и OpenCV для работы с изображениями
 - `image_transport` - транспорт для изображений в ROS
+- `rclpy`, `audio_common_msgs`, `python3-numpy`, `python3-pil` — для ноды **`lip_sync_face`**
 
 ### Системные зависимости
 - `OpenCV` - библиотека компьютерного зрения (требуется для нод `touchpad_drawer` и `image_processor`)
@@ -95,6 +97,22 @@
   - Разрешение: 280x240 пикселей
   - Автоматически преобразуется в RGB565 для отображения на дисплее ST7789
 
+### lip_sync_face
+
+Подписка на **`/audio/output`** (`audio_common_msgs/msg/AudioStamped`), по умолчанию только `header.frame_id` = `tts.paroli` (совместимо с `paroli_ros2`).
+
+Публикация в **`/face/image`** (`sensor_msgs/msg/Image`, rgb8, 280×240 по умолчанию).
+
+Манифест: **`share/rds_2p_face/config/lip_sync_manifest.json`** (поля `_drawing_rules_ru`, `picture_ru` по уровням). PNG: **`share/rds_2p_face/data/lip_sync/`**.
+
+Запуск:
+
+```bash
+ros2 launch rds_2p_face lip_sync_face.launch.py
+```
+
+Не публикуйте одновременно липсинк и тачпад-пайплайн в один и тот же **`/face/image`** без отдельной ноды-смешивания (см. комментарий в launch).
+
 ## Управление
 
 ### touchpad_drawer
@@ -125,7 +143,7 @@
 ## Установка и сборка
 
 ```bash
-cd ~/RDS-2P-simulator/ros_packages
+cd ~/RDS-2P-software/ros_packages
 colcon build --packages-select rds_2p_face
 source install/setup.bash
 ```
@@ -193,7 +211,7 @@ ros2 run rds_2p_face image_processor --ros-args -p output_width:=320 -p output_h
 Самый простой способ - использовать скрипт-обёртку:
 
 ```bash
-cd ~/RDS-2P-simulator/ros_packages
+cd ~/RDS-2P-software/ros_packages
 source install/setup.bash
 ./install/rds_2p_face/lib/rds_2p_face/display_face_sudo.sh
 ```
@@ -201,7 +219,7 @@ source install/setup.bash
 С указанием уровня логирования:
 
 ```bash
-cd ~/RDS-2P-simulator/ros_packages
+cd ~/RDS-2P-software/ros_packages
 source install/setup.bash
 ./install/rds_2p_face/lib/rds_2p_face/display_face_sudo.sh log_level:=debug
 ```
@@ -209,7 +227,7 @@ source install/setup.bash
 Или напрямую из исходников:
 
 ```bash
-cd ~/RDS-2P-simulator/ros_packages/src/rds_2p_face/scripts
+cd ~/RDS-2P-software/ros_packages/src/rds_2p_face/scripts
 ./display_face_sudo.sh
 ```
 
@@ -349,7 +367,7 @@ rviz2
 ros2 run ваш_пакет publisher_node
 
 # Терминал 2: Отображение на дисплее (требует sudo)
-cd ~/RDS-2P-simulator/ros_packages
+cd ~/RDS-2P-software/ros_packages
 source install/setup.bash
 ./install/rds_2p_face/lib/rds_2p_face/display_face_sudo.sh
 ```
@@ -380,7 +398,7 @@ ros2 launch rds_2p_face touchpad_drawer.launch.py
 ros2 launch rds_2p_face image_processor.launch.py
 
 # Терминал 4: Отображение на физическом дисплее (требует sudo)
-cd ~/RDS-2P-simulator/ros_packages
+cd ~/RDS-2P-software/ros_packages
 source install/setup.bash
 ./install/rds_2p_face/lib/rds_2p_face/display_face_sudo.sh
 ```
@@ -399,7 +417,7 @@ ros2 run rds_2p_face publish_image.py /home/orangepi/face/image/smile3.png
 Или напрямую из исходников:
 
 ```bash
-cd ~/RDS-2P-simulator/ros_packages/src/rds_2p_face
+cd ~/RDS-2P-software/ros_packages/src/rds_2p_face
 python3 scripts/publish_image.py /home/orangepi/face/image/smile3.png
 ```
 

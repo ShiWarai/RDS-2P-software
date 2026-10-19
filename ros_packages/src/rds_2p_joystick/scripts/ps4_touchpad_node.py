@@ -7,9 +7,10 @@ ROS2 узел для чтения данных тачпада с контрол�
 
 Тачпад поддерживает мультитач (до 2 одновременных касаний).
 
-Требования:
-- Доступ к устройствам /dev/hidraw* (пользователь должен быть в группе 'input')
-- ds4drv должен быть запущен с флагом --hidraw
+Требования (любой из вариантов):
+- /dev/hidraw* c тачпадом (например, kernel HID или uhid-мост), или
+- DSU/cemuhook UDP-сервер ds4drv (--udp, порт 26760): fallback для плат без
+  kernel HIDP (RepkaPi) — тач читается из UDP-потока ds4drv.
 """
 
 import rclpy
@@ -105,12 +106,19 @@ class PS4TouchpadNode(Node):
         self.declare_parameter('frame_id', 'ps4_controller')
         self.declare_parameter('publish_rate', 50.0)  # Гц
         self.declare_parameter('debug_touchpad', False)  # Включить отладочное логирование
+        # Fallback через DSU (cemuhook) UDP-сервер ds4drv, если hidraw недоступен
+        self.declare_parameter('use_udp', True)
+        self.declare_parameter('udp_host', '127.0.0.1')
+        self.declare_parameter('udp_port', 26760)
         
         # Get parameters
         self.hidraw_device_param = self.get_parameter('hidraw_device').get_parameter_value().string_value
         self.frame_id = self.get_parameter('frame_id').get_parameter_value().string_value
         self.publish_rate = self.get_parameter('publish_rate').get_parameter_value().double_value
         self.debug_touchpad = self.get_parameter('debug_touchpad').get_parameter_value().bool_value
+        self.use_udp = self.get_parameter('use_udp').get_parameter_value().bool_value
+        self.udp_host = self.get_parameter('udp_host').get_parameter_value().string_value
+        self.udp_port = self.get_parameter('udp_port').get_parameter_value().integer_value
     
     def _setup_data_structures(self) -> None:
         """Инициализация структур данных и блокировок."""
@@ -128,6 +136,9 @@ class PS4TouchpadNode(Node):
         
         # Дескриптор hidraw файла
         self.hidraw_file = None
+        # DSU UDP режим (fallback без hidraw)
+        self.udp_mode = False
+        self.udp_sock = None
         self.running = True
     
     def _setup_device(self) -> bool:
@@ -138,7 +149,7 @@ class PS4TouchpadNode(Node):
         if not os.path.exists(hidraw_device):
             hidraw_device = self._find_hidraw_device()
             if not hidraw_device:
-                return True  # Продолжить в любом случае
+                return self._setup_udp()
         
         # Try to open the hidraw device
         try:
@@ -147,10 +158,27 @@ class PS4TouchpadNode(Node):
                 self.get_logger().info(f"Найдено hidraw устройство PS4: {hidraw_device}")
                 return True
             else:
-                return True  # Continue anyway
+                return self._setup_udp()
         except (PermissionError, OSError, Exception):
             self.hidraw_file = None
-            return True  # Continue anyway
+            return self._setup_udp()
+
+    def _setup_udp(self) -> bool:
+        """Fallback: чтение тача из DSU-потока ds4drv (--udp), когда hidraw нет."""
+        if not self.use_udp:
+            self.get_logger().warn(
+                "hidraw недоступен и use_udp=false — данные тачпада читаться не будут")
+            return True
+        import socket as _socket
+        try:
+            self.udp_sock = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
+            self.udp_sock.setblocking(False)
+            self.udp_mode = True
+            self.get_logger().info(
+                f"hidraw недоступен — читаю тач из DSU UDP {self.udp_host}:{self.udp_port} (ds4drv --udp)")
+        except OSError as e:
+            self.get_logger().error(f"Не удалось открыть UDP сокет: {e}")
+        return True
     
     def _find_hidraw_device(self) -> Optional[str]:
         """Попытка автоматически найти hidraw устройство контроллера PS4.
@@ -210,8 +238,9 @@ class PS4TouchpadNode(Node):
         self.publish_timer = self.create_timer(publish_timer_period, self.publish_touchpad)
     
     def _start_reading_thread(self) -> None:
-        """Запуск потока для чтения данных hidraw."""
-        self.reading_thread = threading.Thread(target=self._read_hidraw_data, daemon=True)
+        """Запуск потока чтения (hidraw или DSU UDP)."""
+        target = self._read_udp_data if self.udp_mode else self._read_hidraw_data
+        self.reading_thread = threading.Thread(target=target, daemon=True)
         self.reading_thread.start()
     
     def _parse_touchpad_data(self, report_data: bytes) -> None:
@@ -395,6 +424,65 @@ class PS4TouchpadNode(Node):
                 except:
                     pass
     
+    @staticmethod
+    def _dsu_data_request() -> bytes:
+        """DSU data-request: регистрация клиента (сервер ждёт повтор <5с)."""
+        import binascii
+        payload = bytes([0x00, 0x00] + [0x00] * 6)
+        pkt = bytearray(b'DSUS')
+        pkt += struct.pack('<H', 1001)
+        pkt += struct.pack('<H', len(payload) + 4)
+        pkt += b'\x00\x00\x00\x00'
+        pkt += b'\xff\xff\xff\xff'
+        pkt += b'\x02\x00\x10\x00'
+        pkt += payload
+        pkt[8:12] = struct.pack('<I', binascii.crc32(bytes(pkt)) & 0xffffffff)
+        return bytes(pkt)
+
+    def _read_udp_data(self) -> None:
+        """Чтение тачпада из DSU-потока ds4drv (fallback без hidraw)."""
+        import time as _time
+        last_req = 0.0
+        while self.running:
+            now = _time.time()
+            if now - last_req >= 1.0:
+                try:
+                    self.udp_sock.sendto(self._dsu_data_request(), (self.udp_host, self.udp_port))
+                    last_req = now
+                except OSError:
+                    pass
+            try:
+                ready, _, _ = select.select([self.udp_sock], [], [], 0.1)
+            except OSError:
+                break
+            if not ready:
+                continue
+            try:
+                data, _addr = self.udp_sock.recvfrom(2048)
+            except OSError:
+                continue
+            if len(data) < 62 or data[:4] != b'DSUS' or data[16:20] != b'\x02\x00\x10\x00':
+                continue
+
+            # DSU data: touch0 = active(1), id(1), x u16le(2), y u16le(2)
+            active = data[56] != 0
+            touch_id = data[57]
+            x_raw = data[58] | (data[59] << 8)
+            y_raw = data[60] | (data[61] << 8)
+
+            # Синтез HID-отчёта, совместимого с _parse_touchpad_data
+            buf = bytearray(TouchpadConstants.REPORT_SIZE)
+            buf[0] = 0x11
+            buf[1] = 0xC0
+            base = TouchpadConstants.TOUCHPAD_DATA_OFFSET + 2  # 37 при 0x11 0xC0
+            buf[base] = (touch_id & TouchpadConstants.TOUCH_ID_MASK) | (
+                0x00 if active else TouchpadConstants.TOUCH_ACTIVE_MASK)
+            buf[base + 1] = x_raw & 0xFF
+            buf[base + 2] = ((x_raw >> 8) & 0x0F) | ((y_raw & 0x0F) << 4)
+            buf[base + 3] = (y_raw >> 4) & 0xFF
+            buf[base + 4] = 0x80  # touch1 неактивен
+            self._parse_touchpad_data(buf)
+    
     def _get_primary_touch_point(self) -> Optional[TouchPoint]:
         """Получение основной точки касания (первое активное касание или среднее, если оба активны).
         
@@ -480,6 +568,11 @@ class PS4TouchpadNode(Node):
     def destroy_node(self) -> None:
         """Очистка при уничтожении узла."""
         self.running = False
+        if self.udp_sock:
+            try:
+                self.udp_sock.close()
+            except Exception:
+                pass
         if self.hidraw_file:
             try:
                 self.hidraw_file.close()

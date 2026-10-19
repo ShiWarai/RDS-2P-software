@@ -10,6 +10,9 @@
 | `ftservo_ros` | Контроллер сервоприводов |
 | `mpu6500_ros`, `mtf02p_ros` | IMU и дальномер |
 | `rds_2p_inference`, `rds_2p_commands`, `rds_2p_dance`, `rds_2p_audio`, `rds_2p_face`, `rds_2p_joystick`, `rds_2p_telegram_bot` | Прикладная логика и интерфейсы |
+| `audio_filters` | Фильтрация аудио (RNNoise, SoXR) |
+| `paroli_ros2` | TTS Paroli для RK3588 (ONNX + RKNN) |
+| `rkllm_ros2` | LLM инференс (RKNN vision encoder + RKLLM) |
 | `ros2_perf_test` | Тесты производительности |
 
 Подробности по отдельным пакетам — в их `README.md` внутри `src/<пакет>/`.

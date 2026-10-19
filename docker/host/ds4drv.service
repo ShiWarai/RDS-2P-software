@@ -1,0 +1,22 @@
+[Unit]
+Description=DS4 userspace Bluetooth joystick driver (bluez pair + L2CAP HIDP + uinput)
+Documentation=file:/etc/default/ds4drv (MAC-список ведёт ros_packages/scripts/ps4_bt_reconnect.sh)
+After=bluetooth.service
+Wants=bluetooth.service
+
+[Service]
+# страховка включения адаптера (основной путь — AutoEnable=true в /etc/bluetooth/main.conf);
+# путь hciconfig различается по дистрибутивам, '-' = не считать ошибкой его отсутствие
+ExecStartPre=-/usr/bin/hciconfig hci0 up
+# список MAC геймпадов для fast-path подключения — НЕ здесь, а в /etc/default/ds4drv:
+#   DS4_MACS="AA:BB:CC:DD:EE:FF 11:22:33:44:55:66"
+# ros_packages/scripts/ps4_bt_reconnect.sh добавляет MAC туда автоматически при сопряжении
+EnvironmentFile=-/etc/default/ds4drv
+# --udp: DSU-сервер (127.0.0.1:26760) — из него ps4_touchpad_node берёт тачпад
+# на ядрах без HIDP, где /dev/hidraw недоступен
+ExecStart=/usr/local/bin/ds4drv --udp
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
