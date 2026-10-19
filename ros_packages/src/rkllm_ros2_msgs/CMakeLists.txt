@@ -7,6 +7,7 @@ find_package(sensor_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "action/ChatCompletion.action"
+  "srv/SystemOne.srv"
   DEPENDENCIES sensor_msgs
 )
 

@@ -84,6 +84,9 @@ install(DIRECTORY launch/
 install(PROGRAMS
   scripts/example_chat.py
   scripts/example_vision.py
+  scripts/clear_kv_cache.py
+  scripts/system_one_node.py
+  scripts/system_one_docker.sh
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)

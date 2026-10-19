@@ -357,11 +357,11 @@ private:
     img_start_owned_ = get_parameter("img_start").as_string();
     img_end_owned_ = get_parameter("img_end").as_string();
     img_content_owned_ = get_parameter("img_content").as_string();
-    param.img_start = img_start_owned_.c_str();
-    param.img_end = img_end_owned_.c_str();
-    param.img_content = img_content_owned_.c_str();
 
-    const int ret_init = rkllm_init(&llm_handle_, &param, LlmCallback);
+    RKLLMCallback rkllm_callback = {};
+    rkllm_callback.result_callback = LlmCallback;
+
+    const int ret_init = rkllm_init(&llm_handle_, &param, &rkllm_callback);
     if (ret_init != 0) {
       RCLCPP_FATAL(get_logger(), "rkllm_init failed ret=%d", ret_init);
       return false;
@@ -593,11 +593,14 @@ private:
 
       rkllm_input.input_type = RKLLM_INPUT_MULTIMODAL;
       rkllm_input.multimodal_input.prompt = prompt_buf.data();
-      rkllm_input.multimodal_input.image_embed = img_vec_.data();
-      rkllm_input.multimodal_input.n_image_tokens = n_image_tokens_;
-      rkllm_input.multimodal_input.n_image = 1;
-      rkllm_input.multimodal_input.image_height = image_height_;
-      rkllm_input.multimodal_input.image_width = image_width_;
+      rkllm_input.multimodal_input.image.image_embed = img_vec_.data();
+      rkllm_input.multimodal_input.image.n_image_tokens = n_image_tokens_;
+      rkllm_input.multimodal_input.image.n_image = 1;
+      rkllm_input.multimodal_input.image.image_start = img_start_owned_.c_str();
+      rkllm_input.multimodal_input.image.image_end = img_end_owned_.c_str();
+      rkllm_input.multimodal_input.image.image_content = img_content_owned_.c_str();
+      rkllm_input.multimodal_input.image.image_height = image_height_;
+      rkllm_input.multimodal_input.image.image_width = image_width_;
     } else {
       prompt_buf.assign(user_text.begin(), user_text.end());
       prompt_buf.push_back('\0');
@@ -610,13 +613,8 @@ private:
     infer_params.mode = RKLLM_INFER_GENERATE;
     infer_params.keep_history = persist_session_kv_ ? 1 : (goal->keep_history ? 1 : 0);
 
-    if (goal->max_new_tokens != 0 &&
-      goal->max_new_tokens != max_new_tokens_)
-    {
-      RCLCPP_WARN_THROTTLE(
-        get_logger(), *get_clock(), 5000,
-        "goal.max_new_tokens=%d ignored (RKLLM uses init-time max_new_tokens=%d)",
-        goal->max_new_tokens, max_new_tokens_);
+    if (goal->max_new_tokens > 0) {
+      infer_params.max_new_tokens = goal->max_new_tokens;
     }
 
     RunSession session;
