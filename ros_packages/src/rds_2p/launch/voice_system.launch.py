@@ -32,6 +32,7 @@ def _setup(context, *_args, **_kwargs):
         "output_sample_rate": LaunchConfiguration("output_sample_rate"),
         "capturer_rate": LaunchConfiguration("capturer_rate"),
         "capturer_channels": LaunchConfiguration("capturer_channels"),
+        "capturer_device": LaunchConfiguration("capturer_device"),
     }
 
     audio_inc = IncludeLaunchDescription(
@@ -138,6 +139,11 @@ def generate_launch_description():
                 "capturer_channels",
                 default_value="1",
                 description="Проброс в audio.launch и vosk default_channels",
+            ),
+            DeclareLaunchArgument(
+                "capturer_device",
+                default_value="-1",
+                description="Индекс PortAudio микрофона (−1 = default input; список: python3 -m sounddevice)",
             ),
             DeclareLaunchArgument(
                 "vosk_audio_topic",

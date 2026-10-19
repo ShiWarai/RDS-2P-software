@@ -48,6 +48,11 @@ class LlmCommands:
         self._rkllm_max_new_tokens = (
             node.get_parameter('rkllm_max_new_tokens').get_parameter_value().integer_value
         )
+        self._system_prompt = ''
+        if node.has_parameter('llm_system_prompt'):
+            self._system_prompt = (
+                node.get_parameter('llm_system_prompt').get_parameter_value().string_value or ''
+            ).strip()
         self._llm_stream_tts_enabled = (
             node.get_parameter('llm_stream_tts_by_punctuation').get_parameter_value().bool_value
         )
@@ -319,7 +324,7 @@ class LlmCommands:
         acc = getattr(msg.feedback, 'text', None) or ''
         self._process_llm_stream_accum(acc)
 
-    def dispatch(self, user_text: str) -> None:
+    def dispatch(self, user_text: str, image=None) -> None:
         self._abort_dialog = False
         self._panda_dialog_busy = True
         self._reset_stream_for_new_dialog()
@@ -329,7 +334,7 @@ class LlmCommands:
         if self._rkllm_clear_kv_before and self._clear_kv_client is not None:
             if not self._clear_kv_client.wait_for_service(timeout_sec=min(2.0, self._rkllm_wait_sec)):
                 self._node.get_logger().warn('clear_kv_cache недоступен, отправляю goal без сброса KV')
-                self._send_rkllm_goal(user_text)
+                self._send_rkllm_goal(user_text, image)
                 return
             clear_future = self._clear_kv_client.call_async(Trigger.Request())
 
@@ -341,13 +346,13 @@ class LlmCommands:
                 if self._abort_dialog:
                     self._release_busy()
                     return
-                self._send_rkllm_goal(user_text)
+                self._send_rkllm_goal(user_text, image)
 
             clear_future.add_done_callback(_on_clear_done)
         else:
-            self._send_rkllm_goal(user_text)
+            self._send_rkllm_goal(user_text, image)
 
-    def _send_rkllm_goal(self, user_text: str) -> None:
+    def _send_rkllm_goal(self, user_text: str, image=None) -> None:
         if self._abort_dialog:
             self._release_busy()
             return
@@ -374,6 +379,11 @@ class LlmCommands:
             goal.user_message = raw_msg or ' '
         goal.keep_history = bool(self._rkllm_keep_history)
         goal.max_new_tokens = int(self._rkllm_max_new_tokens)
+        if self._system_prompt:
+            goal.user_message = f'{self._system_prompt}\n\n{goal.user_message}'
+        if image is not None:
+            goal.image = image
+            self._node.get_logger().info('rkllm: goal с изображением (мультимодальный запрос)')
 
         send_future = cli.send_goal_async(goal, feedback_callback=self._rkllm_feedback_callback)
 

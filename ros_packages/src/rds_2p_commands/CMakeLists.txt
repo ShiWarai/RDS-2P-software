@@ -72,6 +72,12 @@ install(PROGRAMS
   RENAME set_face
 )
 
+install(PROGRAMS
+  rds_2p_commands/llm_layer_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME llm_layer
+)
+
 # Install launch files
 install(DIRECTORY
   launch/

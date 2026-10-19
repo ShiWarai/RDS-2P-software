@@ -21,6 +21,22 @@
 - **`controllers.launch.py`** - Контроллеры суставов
 - **`gazebo_sim.launch.py`** - Симуляция в Gazebo
 
+### 🗣️ Голос + LLM
+- **`llm_layer.launch.py`** - LLM-прослойка: транскрипции vosk → классификатор system-one (kev-0.8b)
+  → команда в `/audio/command_transcription` (её принимает `commands_system` при
+  `transcription_topics:=['/audio/command_transcription']`) либо разговор через rkllm+Paroli.
+  Поднимает `voice_system` (audio+vosk+Paroli+lip_sync), `rkllm_ros2` (по умолчанию Qwen3.5-2B),
+  `system_one` и ноду `llm_layer` («посмотри …» → кадр камеры + текст в LLM;
+  `llm_system_prompt` — персона робота-панды). VAD-шлюз (`vosk_ros2/vad_node`) есть, но
+  **по умолчанию выключен** — `vad_enabled:=false`, vosk слушает микрофон напрямую (у ES8388
+  низкий SNR); включение: `vad_enabled:=true vosk_audio_topic:=/audio/vad`.
+  `include_voice:=false` — отладка без микрофона/динамика.
+  Контейнер system-one-rknn поднять заранее: `ros2 run rkllm_ros2 system_one_docker.sh run`.
+  ```bash
+  ros2 launch rds_2p llm_layer.launch.py
+  ```
+  Подробности — README `rds_2p_commands` (п.7), `vosk_ros2` (VAD-шлюз) и `rkllm_ros2` (System One).
+
 ## Схема использования
 
 ### Для работы с реальными моторами:
