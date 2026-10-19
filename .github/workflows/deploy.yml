@@ -144,6 +144,16 @@ jobs:
           curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:18080/node_modules/blockly/blockly.min.js | grep -qx 200
           curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:18080/assets/scenes/meshes/base.obj | grep -qx 200
           curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:18080/models/policy/rds2p_policy.onnx | grep -qx 200
+          # файлы, возвращённые после прунинга node_modules
+          curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:18080/node_modules/blockly/msg/ru.js | grep -qx 200
+          curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:18080/node_modules/three/examples/jsm/controls/OrbitControls.js | grep -qx 200
+          # COOP/COEP ко всем ответам (нужны для потоков WASM)
+          curl -fsSI http://127.0.0.1:18080/ | grep -qi 'cross-origin-opener-policy: same-origin'
+          curl -fsSI http://127.0.0.1:18080/ | grep -qi 'cross-origin-embedder-policy: require-corp'
+          # предсжатие: blockly.min.js отдаётся gzip-копией
+          curl -fsS -H 'Accept-Encoding: gzip' -D - -o /dev/null http://127.0.0.1:18080/node_modules/blockly/blockly.min.js | grep -qi 'content-encoding: gzip'
+          # Range-докачка (важно для Laya 646 МБ)
+          curl -fsS -r 0-99 -o /dev/null -w '%{http_code}\n' http://127.0.0.1:18080/models/policy/rds2p_policy.onnx | grep -qx 206
           echo "smoke OK"
 
   prerelease-desktop:

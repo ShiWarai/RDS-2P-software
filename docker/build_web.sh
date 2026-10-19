@@ -55,6 +55,11 @@ mkdir -p "$STAGE/experiments" \
          "$STAGE/urdf_src/export/rds-2p/meshes/obj" \
          "$STAGE/ros_packages/src/rds_2p_inference"
 
+# Прунинг node_modules: браузер грузит только то, что реально прописано в
+# index.html/importmap и в src/ (проверено по графу ссылок). Всё остальное —
+# мёртвый вес контекста и образа (~180 МБ): карты исходников, неиспользуемые
+# ORT-варианты, three/src+examples, blockly-генераторы/языки, jsdom/undici.
+NM="rds-2p_mujoco_wasm/node_modules"
 tar -C "$ROOT_DIR/experiments" \
     --exclude='rds-2p_mujoco_wasm/models' \
     --exclude='rds-2p_mujoco_wasm/.test' \
@@ -62,10 +67,40 @@ tar -C "$ROOT_DIR/experiments" \
     --exclude='rds-2p_mujoco_wasm/tools/.venv' \
     --exclude='rds-2p_mujoco_wasm/tools/__pycache__' \
     --exclude='.playwright-mcp' \
+    --exclude='*.map' \
+    --exclude="$NM/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep*" \
+    --exclude="$NM/onnxruntime-web/dist/ort-wasm-simd-threaded.jspi*" \
+    --exclude="$NM/onnxruntime-web/dist/ort.all*" \
+    --exclude="$NM/onnxruntime-web/dist/ort.webgl*" \
+    --exclude="$NM/onnxruntime-web/dist/ort.jspi*" \
+    --exclude="$NM/onnxruntime-web/dist/ort.min.*" \
+    --exclude="$NM/three" \
+    --exclude="$NM/blockly" \
+    --exclude="$NM/jsdom" \
+    --exclude="$NM/undici" \
+    --exclude="$NM/@types" \
     -cf - rds-2p_mujoco_wasm | tar -C "$STAGE/experiments" -xf -
+
+# Возвращаем из вырезанного то, что приложение действительно использует:
+#   three: importmap `three` → build/three.module.js (+ его импорт three.core.js),
+#          `three/addons/controls/OrbitControls.js` (импортирует только 'three');
+#   blockly: blockly.min.js + русская локаль + media (иконки/звуки полей).
+mkdir -p "$STAGE/experiments/$NM/three/build" \
+         "$STAGE/experiments/$NM/three/examples/jsm/controls" \
+         "$STAGE/experiments/$NM/blockly/msg"
+cp "$APP_DIR/node_modules/three/build/three.module.js" \
+   "$APP_DIR/node_modules/three/build/three.core.js" \
+   "$STAGE/experiments/$NM/three/build/"
+cp "$APP_DIR/node_modules/three/examples/jsm/controls/OrbitControls.js" \
+   "$STAGE/experiments/$NM/three/examples/jsm/controls/"
+cp "$APP_DIR/node_modules/blockly/blockly.min.js" "$STAGE/experiments/$NM/blockly/"
+cp "$APP_DIR/node_modules/blockly/msg/ru.js" "$STAGE/experiments/$NM/blockly/msg/"
+cp -a "$APP_DIR/node_modules/blockly/media" "$STAGE/experiments/$NM/blockly/media"
 
 cp -a "$ROOT_DIR/urdf_src/export/rds-2p/meshes/obj/." "$STAGE/urdf_src/export/rds-2p/meshes/obj/"
 cp -a "$ROOT_DIR/ros_packages/src/rds_2p_inference/models/." "$STAGE/ros_packages/src/rds_2p_inference/models/"
+
+echo "==> контекст: $(du -sh "$STAGE" | cut -f1)"
 
 if [ "$MODE" = "prepare" ]; then
     echo "✅ Контекст web-сборки подготовлен (--prepare-only/PREPARE_ONLY=1) — docker build пропущен"

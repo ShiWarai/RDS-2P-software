@@ -52,6 +52,9 @@ LONG_CACHE_PREFIXES = ("/node_modules/", "/models/", "/assets/scenes/meshes/")
 class Handler(SimpleHTTPRequestHandler):
     nlu_upstream: str | None = None
     nlu_headers: dict = {}
+    # HTTP/1.1 — keep-alive: без него каждый файл (а их в node_modules сотни)
+    # открывает новое TCP-соединение, что заметно замедляет первую загрузку.
+    protocol_version = "HTTP/1.1"
 
     def guess_cache(self, path: str) -> str:
         if any(path.startswith(p) for p in LONG_CACHE_PREFIXES):
@@ -92,16 +95,88 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_error(404, f"Not found: {path}")
             return
         try:
-            with open(fs_path, "rb") as f:
-                ctype = self.guess_type(fs_path)
-                self.send_response(200)
-                self.send_header("Content-Type", ctype)
-                self.send_header("Content-Length", str(os.fstat(f.fileno()).st_size))
-                self.send_header("Cache-Control", self.guess_cache(path))
-                self.end_headers()
-                self.copyfile(f, self.wfile)
+            ctype = self.guess_type(fs_path)
+            # Предсжатый сиблинг file.gz (готовится на сборке образа,
+            # tools/precompress_assets.py) — отдаём его, когда клиент умеет gzip.
+            # Range всегда обслуживаем по identity-файлу: так докачка (важно для
+            # Laya 646 МБ) простая и предсказуемая, без диапазонов поверх gzip.
+            accept = (self.headers.get("Accept-Encoding") or "").lower()
+            range_hdr = self.headers.get("Range")
+            gz_path = fs_path + ".gz"
+            send_gz = "gzip" in accept and not range_hdr and os.path.isfile(gz_path)
+            body_path = gz_path if send_gz else fs_path
+            body_size = os.path.getsize(body_path)
+
+            status = 200
+            start, end = 0, body_size - 1
+            if range_hdr:
+                parsed = self._parse_range(range_hdr, body_size)
+                if parsed is None:  # неудовлетворимый диапазон
+                    self.send_response(416)
+                    self.send_header("Content-Range", f"bytes */{body_size}")
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
+                if parsed != (-1, -1):
+                    start, end = parsed
+                    status = 206
+
+            self.send_response(status)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(end - start + 1))
+            if send_gz:
+                self.send_header("Content-Encoding", "gzip")
+            if status == 206:
+                self.send_header("Content-Range", f"bytes {start}-{end}/{body_size}")
+            self.send_header("Accept-Ranges", "bytes")
+            self.send_header("Vary", "Accept-Encoding")
+            self.send_header("Cache-Control", self.guess_cache(path))
+            self.end_headers()
+            if self.command == "HEAD":
+                return
+            with open(body_path, "rb") as f:
+                f.seek(start)
+                remaining = end - start + 1
+                while remaining > 0:
+                    chunk = f.read(min(256 * 1024, remaining))
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+                    remaining -= len(chunk)
         except (BrokenPipeError, ConnectionResetError):
             pass
+
+    @staticmethod
+    def _parse_range(header: str, size: int):
+        """Один диапазон bytes=start-end.
+
+        Возвращает (start, end) включительно, (-1, -1) — «игнорировать Range»
+        (несколько диапазонов/мусор), None — 416 (диапазон неудовлетворим).
+        """
+        if not header.startswith("bytes=") or size <= 0:
+            return (-1, -1)
+        spec = header[len("bytes="):].strip()
+        if "," in spec:
+            return (-1, -1)
+        first, _, last = spec.partition("-")
+        try:
+            if first == "":
+                suffix = int(last)
+                if suffix <= 0:
+                    return None
+                return (max(0, size - suffix), size - 1)
+            start = int(first)
+            explicit_end = last != ""
+            end = int(last) if explicit_end else size - 1
+        except ValueError:
+            return (-1, -1)
+        # last < first — синтаксически невалидный диапазон → игнорируем весь Range
+        # (RFC 9110); «start за концом файла» — валидный, но неудовлетворимый → 416.
+        if start < 0 or (explicit_end and end < start):
+            return (-1, -1)
+        if start >= size:
+            return None
+        return (start, min(end, size - 1))
 
     # ── прокси NLU ──────────────────────────────────
 

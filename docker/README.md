@@ -26,6 +26,26 @@ NLU_UPSTREAM_URL=http://192.168.1.40:8000/v1/systemone docker/run_web.sh   # в�
 Микрофон в браузере требует защищённого контекста: на `localhost` он есть; при
 доступе по сети — TLS (`serve.py --https` внутри образа или reverse-proxy).
 
+Устройство образа (оптимизации):
+
+- **Стейдж `models`** — Laya/Vosk качаются отдельной стадией, входы которой — только
+  URL-ы и `tools/download_vosk_model.sh`: правки кода приложения не сбрасывают
+  кэш 692 МБ моделей (`curl`/`unzip` в рантайм-образ не попадают).
+- **Прунинг node_modules** в `build_web.sh`: браузер грузит только файлы из
+  `index.html`/importmap/`src` (проверено по графу ссылок) — вырезаются карты
+  исходников, неиспользуемые ORT-варианты wasm (jsep/jspi), `three/src+examples`,
+  blockly-генераторы/языки, jsdom/undici. Контекст: ~287 → ~124 МБ.
+- **Предсжатие** (`tools/precompress_assets.py`, запускается на сборке): рядом с
+  текстовой статикой появляются `.gz` (704 файла: 112.6 → 27.5 МБ на передаче;
+  mujoco_wasm.js 11 → 2.9 МБ). `serve.py` отдаёт `.gz` при `Accept-Encoding: gzip`,
+  иначе — исходник (dev без `.gz` работает как раньше).
+- **serve.py**: HTTP/1.1 keep-alive (сотни файлов node_modules — без пересоздания
+  соединений), `Range`-докачка (важно для Laya 646 МБ), HEAD без тела,
+  `Vary: Accept-Encoding`.
+- Контейнер работает non-root (`USER panda`) и умеет `HEALTHCHECK`.
+- Smoke CI проверяет не только маршруты, но и restore-файлы после прунинга
+  (OrbitControls, msg/ru.js), COOP/COEP, gzip-отдачу и 206 на Range.
+
 CI: `test-web` в Deploy (amd64+arm64; собирается **без моделей** — быстрый тест
 сборки + smoke-проверка раздачи приложения и маршрутов), `:prerelease` — как у
 остальных образов (dev + `[prerelease]` в коммите или dispatch с флажком; здесь
