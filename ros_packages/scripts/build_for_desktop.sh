@@ -145,8 +145,12 @@ fi
 # Модель Vosk — runtime-актив: native качает всегда, docker/prepare — только с --models.
 # Зеркало на HF: alphacephei.com подвешивает тело ответа — соединение открывается,
 # но байты не идут; размер файла сверен с официальным ETag: 46236750 байт.
+# ВАЖНО: свежий клон vosk_ros2 не содержит каталога models (он в .gitignore пакета),
+# а CMake install(DIRECTORY models) без него падает — гарантируем пустой каталог.
+# Сама модель — runtime-актив (в контейнере монтируется в /models).
 VOSK_MODEL_PATH="src/vosk_ros2/models/vosk-model-small-ru-0.22"
 VOSK_MODEL_DIR="src/vosk_ros2/models"
+mkdir -p "$VOSK_MODEL_DIR"
 if [ -d "$VOSK_MODEL_PATH" ]; then
     echo "ℹ️ Модель Vosk уже установлена: $VOSK_MODEL_PATH"
 elif [ "$MODE" = native ] || [ "$MODELS" = true ]; then
