@@ -6,8 +6,33 @@
 |---|---|---|---|---|
 | `rds2p/robot:humble` | arm64 | `docker/build_robot.sh` **на роботе** | `docker/run_robot.sh` | всё железо робота |
 | `rds2p/desktop:humble` | amd64 | `docker/build_desktop.sh` (WSL) | `docker/run_desktop.sh` | twin-симуляция MuJoCo GUI |
+| `rds2p/web:latest` | amd64/arm64 | `docker/build_web.sh` | `docker/run_web.sh` | веб-мастер-класс «Панда» (симулятор в браузере, без ROS) |
 
 Контекст сборки — корень репозитория. `.dockerignore` лежит в `docker/` (build-скрипты копируют его в корень на время сборки).
+
+## Web (мастер-класс в браузере)
+
+Самодостаточный образ без ROS: MuJoCo-WASM, ONNX-политика ходьбы, классификатор
+фраз Laya (646 МБ) и офлайн-голос Vosk качаются на этапе сборки; `serve.py`
+раздаёт статику с COOP/COEP (потоки WASM). Работает на любой машине с Docker —
+клиенту нужен только браузер (Chrome/Edge).
+
+```bash
+docker/build_web.sh            # готовит контекст build/web-context и собирает; WITH_MODELS=0 — без моделей
+docker/run_web.sh              # http://localhost:8080  (PORT=9000 — другой порт)
+NLU_UPSTREAM_URL=http://192.168.1.40:8000/v1/systemone docker/run_web.sh   # внешний NLU-прокси
+```
+
+Микрофон в браузере требует защищённого контекста: на `localhost` он есть; при
+доступе по сети — TLS (`serve.py --https` внутри образа или reverse-proxy).
+
+CI: `test-web` в Deploy (amd64+arm64; собирается **без моделей** — быстрый тест
+сборки + smoke-проверка раздачи приложения и маршрутов), `:prerelease` — как у
+остальных образов (dev + `[prerelease]` в коммите или dispatch с флажком; здесь
+модели уже качаются в образ), `:main` — через publish.yml после зелёного Deploy
+на main. Тег: `ghcr.io/<owner>/rds-2p-software-web`.
+Контекст для CI готовится так же: `PREPARE_ONLY=1 ./docker/build_web.sh`
+(ставит node_modules через npm ci и стейджит build/web-context).
 
 ## Desktop (WSL2 + WSLg)
 

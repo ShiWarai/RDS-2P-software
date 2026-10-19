@@ -87,6 +87,65 @@ jobs:
           cache-from: type=gha,scope=robot-arm64
           cache-to: type=gha,mode=max,scope=robot-arm64
 
+  test-web:
+    name: web tests (${{ matrix.arch }})
+    # Без моделей (WITH_MODELS=0): тест проверяет, что контекст и образ собираются,
+    # а сервер раздаёт приложение и маршруты. Laya/Vosk (647+46 МБ) качают только
+    # prerelease/publish — и падение внешнего HF не должно ронять Deploy на main.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Prepare build context
+        run: |
+          chmod +x docker/build_web.sh
+          PREPARE_ONLY=1 ./docker/build_web.sh
+
+      - name: Build (load, no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: build/web-context
+          file: docker/web.Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          build-args: |
+            WITH_MODELS=0
+          tags: rds2p/web:test
+          load: true
+          push: false
+          provenance: false
+          cache-from: type=gha,scope=web-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=web-${{ matrix.arch }}
+
+      - name: Smoke run (serve + routes)
+        run: |
+          set -euo pipefail
+          docker run -d --name web-smoke -p 18080:8080 rds2p/web:test
+          trap 'docker rm -f web-smoke >/dev/null 2>&1 || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18080/ >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:18080/ | grep -q 'Панда'
+          curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:18080/node_modules/blockly/blockly.min.js | grep -qx 200
+          curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:18080/assets/scenes/meshes/base.obj | grep -qx 200
+          curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:18080/models/policy/rds2p_policy.onnx | grep -qx 200
+          echo "smoke OK"
+
   prerelease-desktop:
     name: prerelease desktop (${{ matrix.arch }})
     needs: [test-desktop, test-robot]
@@ -188,6 +247,89 @@ jobs:
             ${{ env.IMG }}:${{ github.sha }}
           cache-from: type=gha,scope=robot-arm64
           cache-to: type=gha,mode=max,scope=robot-arm64
+
+  prerelease-web:
+    name: prerelease web (${{ matrix.arch }})
+    needs: [test-desktop, test-robot, test-web]
+    if: |
+      needs.test-desktop.result == 'success' && needs.test-robot.result == 'success' && needs.test-web.result == 'success' && (
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_prerelease == 'true') ||
+        (github.event_name == 'push' && github.ref == 'refs/heads/dev' && contains(github.event.head_commit.message, '[prerelease]'))
+      )
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set image name
+        run: |
+          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "IMG=ghcr.io/${OWNER}/rds-2p-software-web" >> $GITHUB_ENV
+
+      - name: Prepare build context
+        run: |
+          chmod +x docker/build_web.sh
+          PREPARE_ONLY=1 ./docker/build_web.sh
+
+      - name: Build and push per-arch (prerelease)
+        uses: docker/build-push-action@v6
+        with:
+          context: build/web-context
+          file: docker/web.Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          build-args: |
+            WITH_MODELS=1
+          push: true
+          provenance: false
+          tags: |
+            ${{ env.IMG }}:${{ matrix.arch }}-prerelease
+            ${{ env.IMG }}:${{ matrix.arch }}-${{ github.sha }}
+          cache-from: type=gha,scope=web-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=web-${{ matrix.arch }}
+
+  prerelease-web-manifest:
+    name: web prerelease manifest
+    needs: [prerelease-web]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Merge arch tags into multiarch :prerelease
+        run: |
+          set -euo pipefail
+          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          IMG="ghcr.io/${OWNER}/rds-2p-software-web"
+          docker buildx imagetools create \
+            -t "${IMG}:prerelease" \
+            -t "${IMG}:${GITHUB_SHA}" \
+            "${IMG}:amd64-prerelease" "${IMG}:arm64-prerelease"
 
   prerelease-desktop-manifest:
     name: desktop prerelease manifest

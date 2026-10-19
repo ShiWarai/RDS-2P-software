@@ -49,3 +49,12 @@ ros_packages/src/mpu6500_ros/library/mpu6500/
 # Env
 .venv
 .vscode
+
+# Playwright/MCP: скриншоты и прочие артефакты UI-тестов
+.playwright-mcp
+
+# Локальные кэши Python-инструментов
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
