@@ -451,10 +451,11 @@ class TtsNode(Node):
                 time.sleep(delay)
 
     def _effective_tts_gain(self, service_volume: Optional[float]) -> float:
-        """Топик speak_text (None) — параметр ноды tts_volume; сервис /speak — поле volume запроса."""
-        if service_volume is None:
+        """Топик speak_text (None) — параметр ноды tts_volume; сервис /speak — поле volume запроса.
+        volume<=0 (дефолт поля запроса) = не задавать явно, взять tts_volume ноды."""
+        if service_volume is None or service_volume <= 0.0:
             return float(self.get_parameter("tts_volume").get_parameter_value().double_value)
-        return max(0.0, float(service_volume))
+        return float(service_volume)
 
     def _speak(self, text: str, service_volume: Optional[float] = None) -> Tuple[bool, str]:
         sr_target = int(self.get_parameter("output_sample_rate").value)

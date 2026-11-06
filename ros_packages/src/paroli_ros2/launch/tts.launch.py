@@ -56,6 +56,11 @@ def generate_launch_description():
             default_value='-1.0',
             description='-1 = не задавать; иначе --noise-w',
         ),
+        DeclareLaunchArgument(
+            'tts_volume',
+            default_value='1.8',
+            description='Усиление голоса: 1.0 без изменений, >1 громче (клип int16), <1 тише',
+        ),
         Node(
             package='paroli_ros2',
             executable='tts_node.py',
@@ -78,6 +83,8 @@ def generate_launch_description():
                     LaunchConfiguration('noise_scale'), value_type=float),
                 'noise_w': ParameterValue(
                     LaunchConfiguration('noise_w'), value_type=float),
+                'tts_volume': ParameterValue(
+                    LaunchConfiguration('tts_volume'), value_type=float),
             }],
         ),
     ])

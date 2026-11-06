@@ -2,6 +2,7 @@
 *.blend1
 *.log
 *.log.txt
+Log/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

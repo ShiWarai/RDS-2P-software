@@ -19,6 +19,8 @@
   <depend>teleop_twist_keyboard</depend>
   <depend>compressed_image_transport</depend>
   <depend>compressed_depth_image_transport</depend>
+  <depend>cv_bridge</depend>
+  <depend>image_transport</depend>
 
   <!-- Мета-launch: voice_system.launch.py (аудио — IncludeLaunchDescription в rds_2p_audio) -->
   <exec_depend>launch</exec_depend>

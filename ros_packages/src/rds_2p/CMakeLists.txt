@@ -12,6 +12,9 @@ find_package(geometry_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(yaml-cpp REQUIRED)
+find_package(cv_bridge REQUIRED)
+find_package(image_transport REQUIRED)
+find_package(OpenCV REQUIRED)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -66,6 +69,24 @@ add_executable(fake_imu_publisher
 # Создание ноды мониторинга батареи
 add_executable(battery_monitor
   src/battery_monitor.cpp
+)
+
+# Конвертер IR mono16 -> mono8 (быстрый, copy-free)
+add_executable(ir_mono8_converter
+  src/ir_mono8_converter.cpp
+)
+
+target_include_directories(ir_mono8_converter PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  /usr/include/opencv4
+)
+
+ament_target_dependencies(ir_mono8_converter
+  rclcpp
+  sensor_msgs
+  std_msgs
+  cv_bridge
+  image_transport
 )
 
 
@@ -135,6 +156,7 @@ install(TARGETS
   fake_imu_publisher
   battery_monitor
   leg_kinematics
+  ir_mono8_converter
   DESTINATION lib/${PROJECT_NAME}
 )
 
