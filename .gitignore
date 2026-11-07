@@ -46,6 +46,8 @@ ros_packages/deps/rnnoise_data-*.tar.gz
 /.dockerignore
 # gitignored клон-зависимости, подтягиваются билд-скриптами
 ros_packages/src/mpu6500_ros/library/mpu6500/
+# Варианты после собеседования в лабораторию
+experiments/variants/*
 
 # Env
 .venv

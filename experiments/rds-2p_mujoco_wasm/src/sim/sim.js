@@ -106,16 +106,6 @@ export class Simulator {
     this.headBody = Object.values(this.bodies).find((b) => b.name === "panda_visual_link")
       || this.bodies[1] || null;
 
-    // Заводские kp/kv модели (kp=4.16 Н·м/рад) слишком мягкие: стойки на трёх
-    // лапах (дай лапу, служить) заваливаются. Для мастер-класса усиливаем PD×3,
-    // чтобы панда уверенно держала позы. Настоящий робот использует свой контроллер.
-    const STIFFNESS = 3.0;
-    for (let i = 0; i < this.model.nu; i++) {
-      this.model.actuator_gainprm[3 * i] *= STIFFNESS;
-      this.model.actuator_biasprm[3 * i + 1] *= STIFFNESS;
-      this.model.actuator_biasprm[3 * i + 2] *= STIFFNESS;
-    }
-
     this.resetToHome();
 
     this.poseManager = new PoseManager(this.model);
@@ -378,6 +368,74 @@ export class Simulator {
     return this.poseManager.ctrlToNorm(this.data.ctrl);
   }
 
+  static FRAME_JOINTS = [
+    "leg_block_fl_joint", "hip_fl_joint", "shin_fl_joint",
+    "leg_block_fr_joint", "hip_fr_joint", "shin_fr_joint",
+    "leg_block_bl_joint", "hip_bl_joint", "shin_bl_joint",
+    "leg_block_br_joint", "hip_br_joint", "shin_br_joint",
+  ];
+  static FRAME_LABELS = [
+    "fl бедро-развод", "fl бедро", "fl голень",
+    "fr бедро-развод", "fr бедро", "fr голень",
+    "bl бедро-развод", "bl бедро", "bl голень",
+    "br бедро-развод", "br бедро", "br голень",
+  ];
+
+  resolveFrameAddrs() {
+    if (this._frameAddrs) { return this._frameAddrs; }
+    const m = this.model;
+    const addrs = new Int32Array(Simulator.FRAME_JOINTS.length).fill(-1);
+    const trnid = m.actuator_trnid;
+    for (let i = 0; i < addrs.length; i++) {
+      const jid = trnid ? trnid[i * 2] : -1;
+      addrs[i] = jid >= 0 ? m.jnt_qposadr[jid] : -1;
+    }
+    this._frameAddrs = addrs;
+    return addrs;
+  }
+
+  /** Фактические углы суставов (рад), порядок = FRAME_JOINTS; при недоступности qpos → ctrl. */
+  currentJointAngles() {
+    const d = this.data;
+    const addrs = this.resolveFrameAddrs();
+    const out = new Array(addrs.length);
+    for (let i = 0; i < addrs.length; i++) {
+      out[i] = addrs[i] >= 0 ? d.qpos[addrs[i]] : d.ctrl[i];
+    }
+    return out;
+  }
+
+  updateFrameReadout() {
+    const el = document.getElementById("frame-readout");
+    if (!el) { return; }
+    if (!this.frameReadoutOn || !this.model) { el.classList.add("hidden"); return; }
+    const a = this.currentJointAngles();
+    const R2D = 180 / Math.PI;
+    let html = this.frameHeaderHtml();
+    for (let i = 0; i < a.length; i++) {
+      const deg = (a[i] * R2D);
+      html += `<div class="fr-row"><span class="fr-name">${Simulator.FRAME_LABELS[i]}</span><span class="fr-val">${deg.toFixed(1)}°</span></div>`;
+    }
+    el.innerHTML = html;
+  }
+
+  /** Подпись текущего кадра программы: кадр/шаг, имя позы, label. */
+  frameHeaderHtml() {
+    const p = this.player;
+    if (!p || !p.running || p.cursor < 0 || p.cursor >= p.steps.length) {
+      return `<div class="fr-head">кадр: <b>—</b> <span class="fr-dim">(ожидание / пауза вне программы)</span></div>`;
+    }
+    const step = p.steps[p.cursor] || {};
+    const idx = p.cursor + 1;
+    const total = p.steps.length;
+    const pose = typeof step.pose === "string" ? step.pose : null;
+    const kind = step.kind || "pose";
+    const tag = pose ? pose.replace(/^position_/, "") : kind;
+    const label = step.label ? ` · ${step.label}` : "";
+    const blend = p.simTime < p.blendStart + p.blendDur ? ' <span class="fr-dim">(бленд)</span>' : ' <span class="fr-dim">(удержание)</span>';
+    return `<div class="fr-head">кадр <b>${idx}/${total}</b> · <b class="fr-pose">${tag}</b>${label}${blend}</div>`;
+  }
+
   applyDragForce() {
     const dragged = this.drag?.physicsObject;
     if (!dragged || dragged.bodyID !== 1) { return; }
@@ -475,6 +533,7 @@ export class Simulator {
       else { this.placeBubble(); }
     }
     drawTendonsAndFlex(this.mujocoRoot, this.model, this.data);
+    this.updateFrameReadout();
     this.renderer.render(this.scene, this.camera);
   }
 }

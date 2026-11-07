@@ -26,6 +26,7 @@ export async function downloadSceneFolder(mujoco, urlBase = "./assets/scenes/") 
     "meshes/shin_br.obj",
     "meshes/shin_fl.obj",
     "meshes/shin_fr.obj",
+    ...Array.from({ length: 16 }, (_, i) => `meshes/shin_collision_${String(i).padStart(2, "0")}.obj`),
   ];
 
   const responses = await Promise.all(allFiles.map((f) => fetch(urlBase + f)));

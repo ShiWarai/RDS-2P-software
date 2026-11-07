@@ -82,12 +82,10 @@ if (!zeroUnits) {
 /* ── 2. таблица точных углов робота (assets/pose_angles.json) ── */
 
 const anglesDoc = JSON.parse(fs.readFileSync(new URL("../assets/pose_angles.json", import.meta.url), "utf8"));
-const CTRL_RANGES = [ // ctrlrange из MJCF (порядок актуаторов): [lo, hi]
-  [-0.959931, 1.745329], [-1.047198, 1.047198], [-1.134464, 0.523599],
-  [-1.745329, 0.959931], [-1.047198, 1.047198], [-1.134464, 0.523599],
-  [-0.959931, 1.745329], [-1.047198, 1.047198], [-1.134464, 0.523599],
-  [-1.745329, 0.959931], [-1.047198, 1.047198], [-1.134464, 0.523599],
-];
+const modelXML = fs.readFileSync(new URL("../assets/scenes/rds-2p_feetonly.mjcf", import.meta.url), "utf8");
+const CTRL_RANGES = [...modelXML.matchAll(/<position name="[^"]+"[^>]*ctrlrange="([^"]+)"/g)]
+  .map((match) => match[1].trim().split(/\s+/).map(Number));
+if (CTRL_RANGES.length !== 12) { throw new Error("Expected 12 actuator control ranges in MJCF"); }
 console.log("■ таблица углов (assets/pose_angles.json):");
 let badRows = 0;
 for (const [name, row] of Object.entries(anglesDoc.poses)) {

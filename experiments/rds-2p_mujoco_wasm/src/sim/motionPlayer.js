@@ -1,3 +1,4 @@
+import { mirrorJointAngles } from "./mirrorPose.js";
 import { PoseManager } from "./poseManager.js";
 import { buildObs } from "./policyRunner.js";
 
@@ -45,12 +46,24 @@ export class MotionPlayer {
     this.to = Float64Array.from(this.from);
     this.blendStart = 0;
     this.blendDur = 0;
+    this.smoothBlend = false;
     this.holdEnd = 0;
     this.simTime = 0;
     this.stepDoneAt = 0;
 
     // no_limit: сохраняем исходные ctrllimited, включаем на время шага.
     this.origLimited = Uint8Array.from(model.actuator_ctrllimited);
+    // Позиционные приводы тянут сустав; MuJoCo жёстко клампит qpos по jnt_limited,
+    // поэтому для no_limit-поз (кувырок) снимаем и пределы суставов, не только ctrl.
+    this.actJoint = new Int32Array(model.nu);
+    for (let i = 0; i < model.nu; i++) {
+      const trnId = model.actuator_trnid[2 * i]; // trntype=position → trnid = id сустава
+      this.actJoint[i] = (trnId >= 0 && trnId < model.njnt) ? trnId : -1;
+    }
+    this.origJntLimited = new Uint8Array(model.njnt);
+    for (let i = 0; i < model.njnt; i++) {
+      this.origJntLimited[i] = model.jnt_limited[i];
+    }
     this.limitRelaxed = false;
 
     // Procedural trot.
@@ -64,6 +77,26 @@ export class MotionPlayer {
     this.policyTarget = null;
     this.policyCmd = [0, 0, 0];
 
+    this.passiveFoldTendons = [];
+    const decoder = new TextDecoder();
+    for (let i = 0; i < model.ntendon; i++) {
+      const start = model.name_tendonadr[i];
+      const name = decoder.decode(model.names.subarray(start, model.names.indexOf(0, start)));
+      if (name.startsWith("passive_fold_")) this.passiveFoldTendons.push(i);
+    }
+    this.floorGeom = -1;
+    this.torsoGeom = -1;
+    this.footGeoms = [];
+    for (let i = 0; i < model.ngeom; i++) {
+      const start = model.name_geomadr[i];
+      const name = decoder.decode(model.names.subarray(start, model.names.indexOf(0, start)));
+      if (name === "floor") this.floorGeom = i;
+      if (name === "base_link_collision") this.torsoGeom = i;
+      if (/^foot_(fl|fr|bl|br)_link_collision$/.test(name)) this.footGeoms.push(i);
+    }
+    this.waitingForRest = false;
+    this.lyingContactBackup = null;
+    this.restDuration = 0;
     this.torqueOff = false;
     this.gainBackup = null;
     this.biasBackup = null;
@@ -93,6 +126,8 @@ export class MotionPlayer {
   }
 
   stop() {
+    this.waitingForRest = false;
+    this.smoothBlend = false;
     this.running = false;
     this.steps = [];
     this.cursor = -1;
@@ -120,6 +155,7 @@ export class MotionPlayer {
       this.running = false;
       return;
     }
+    this.waitingForRest = false;
     this.onStep(step.label || "", step);
     this.notifyActive();
 
@@ -127,7 +163,8 @@ export class MotionPlayer {
       case "pose": {
         // Приоритет — точные углы из таблицы робота (assets/pose_angles.json);
         // норм-цепочка остаётся для пользовательских поз и слайдеров.
-        const angles = typeof step.pose === "string" ? this.resolvePoseAngles(step.pose) : null;
+        const resolvedAngles = typeof step.pose === "string" ? this.resolvePoseAngles(step.pose) : null;
+        const angles = resolvedAngles && step.mirror ? mirrorJointAngles(resolvedAngles) : resolvedAngles;
         let target = null;
         let noLimit = false;
         if (angles) {
@@ -148,6 +185,7 @@ export class MotionPlayer {
         this.enableTorque();
         this.from = Float64Array.from(this.data.ctrl.subarray(0, this.model.nu));
         this.to = target;
+        this.smoothBlend = !!step.smooth;
         this.blendDur = Math.max(1, step.blend ?? 400) / 1000.0;
         this.blendStart = this.simTime;
         this.stepDoneAt = this.simTime + this.blendDur + Math.max(0, (step.hold ?? 300) / 1000.0);
@@ -157,7 +195,11 @@ export class MotionPlayer {
         this.stepDoneAt = this.simTime + Math.max(0, (step.ms ?? 300) / 1000.0);
         break;
       case "release":
+        this.waitingForRest = !!step.waitForRest;
+        this.restDuration = 0;
+        this.restDeadline = this.simTime + (step.restTimeoutMs ?? 15000) / 1000;
         this.disableTorque();
+        if (this.waitingForRest) this.beginLyingContact();
         this.stepDoneAt = this.simTime + Math.max(0, (step.ms ?? 600) / 1000.0);
         break;
       case "gait":
@@ -220,6 +262,7 @@ export class MotionPlayer {
   /** Вызывается из цикла симуляции с приращением модельного времени (сек). */
   tick(dt) {
     this.simTime += dt;
+    this.updateLyingContact();
     if (this.policyOn) {
       this.tickPolicy(dt);
       // Дедлайн шага надо проверять и при активной политике: длительность
@@ -241,19 +284,93 @@ export class MotionPlayer {
     }
 
     // Линейный бленд from → to за blendDur.
-    const span = this.blendDur > 0 ? Math.min(1, (this.simTime - this.blendStart) / this.blendDur) : 1;
+    let span = this.blendDur > 0 ? Math.min(1, (this.simTime - this.blendStart) / this.blendDur) : 1;
+    if (this.smoothBlend) span = span * span * span * (10 + span * (-15 + 6 * span));
     const ctrl = this.data.ctrl;
     for (let i = 0; i < this.model.nu; i++) {
       ctrl[i] = this.from[i] + (this.to[i] - this.from[i]) * span;
     }
 
     if (this.simTime >= this.stepDoneAt) {
+      if (this.waitingForRest) {
+        this.restDuration = this.isSupportedAndStill() ? this.restDuration + dt : 0;
+        if (this.restDuration < 0.25) {
+          if (this.simTime >= this.restDeadline) {
+            this.stop();
+            this.onStep("Не удалось закончить укладку: робот ещё движется или лапы не опущены", { kind: "settle_timeout" });
+          }
+          return;
+        }
+        this.waitingForRest = false;
+        this.onStep("лежит: корпус и лапы опущены", { kind: "settled" });
+      }
       const finished = this.steps[this.cursor];
       this.advance(0);
       if (finished && this.running) {
         // «release» держит приводы обесточенными, пока следующая поза сама их не включит.
       }
     }
+  }
+
+  /** A contact shell covers the CAD bottom protruding 2 mm below the box.
+   * Only the passive lie-down uses it; powered commands retain the model settings.
+   */
+  beginLyingContact() {
+    if (this.lyingContactBackup || this.floorGeom < 0 || this.torsoGeom < 0) return;
+    const m = this.model;
+    this.lyingContactBackup = {
+      margin: m.geom_margin[this.torsoGeom],
+      noslip: m.opt.noslip_iterations,
+    };
+    m.geom_margin[this.torsoGeom] = Math.max(this.lyingContactBackup.margin, 0.0025);
+  }
+
+  torsoSupportCount() {
+    if (this.floorGeom < 0 || this.torsoGeom < 0) return 0;
+    const m = this.model, d = this.data;
+    const margin = Math.max(m.geom_margin[this.floorGeom], m.geom_margin[this.torsoGeom]);
+    let supports = 0;
+    for (let i = 0; i < d.ncon; i++) {
+      const c = d.contact.get(i);
+      // With a margin, a supporting constraint starts before geometric overlap.
+      if (c.dist < margin && ((c.geom1 === this.floorGeom && c.geom2 === this.torsoGeom) ||
+          (c.geom2 === this.floorGeom && c.geom1 === this.torsoGeom))) supports++;
+    }
+    return supports;
+  }
+
+  updateLyingContact() {
+    if (!this.lyingContactBackup) return;
+    // Apply the friction refinement after the body has landed, not while the
+    // feet are folding. Early refinement can hinder the passive descent.
+    this.model.opt.noslip_iterations = this.torsoSupportCount() >= 3
+      ? Math.max(5, this.lyingContactBackup.noslip) : this.lyingContactBackup.noslip;
+  }
+
+  restoreLyingContact() {
+    if (!this.lyingContactBackup) return;
+    this.model.geom_margin[this.torsoGeom] = this.lyingContactBackup.margin;
+    this.model.opt.noslip_iterations = this.lyingContactBackup.noslip;
+    this.lyingContactBackup = null;
+  }
+
+  /** Physical completion, not a fixed delay or a forced final pose. */
+  isSupportedAndStill() {
+    const m = this.model, d = this.data;
+    if (this.floorGeom < 0 || this.torsoGeom < 0 || this.footGeoms.length !== 4) return false;
+    const v = d.qvel;
+    if (Math.hypot(v[0], v[1], v[2]) > 0.0002 || Math.hypot(v[3], v[4], v[5]) > 0.01) return false;
+    for (let i = 6; i < v.length; i++) if (Math.abs(v[i]) > 0.015) return false;
+    if (this.torsoSupportCount() < 3) return false;
+    // Foot colliders in this model are cylinders. Compute their lowest point
+    // using their current orientation; foot-center height alone is misleading.
+    const positions = d.geom_xpos, rotations = d.geom_xmat, sizes = m.geom_size;
+    for (const g of this.footGeoms) {
+      const extent = sizes[3*g] * Math.hypot(rotations[9*g+6], rotations[9*g+7]) +
+        sizes[3*g+1] * Math.abs(rotations[9*g+8]);
+      if (positions[3*g+2] - extent > 0.001) return false;
+    }
+    return true;
   }
 
   writeGaitCtrl() {
@@ -322,7 +439,7 @@ export class MotionPlayer {
     this.stepDoneAt = this.simTime + 0.4;
   }
 
-  /** Обновить команду скорости (для ручного вождения WASD). */
+  /** Обновить команду скорости (ручное вождение стрелками + Shift). */
   setPolicyCmd(cmd) {
     if (!cmd) { return; }
     this.policyCmd = [cmd[0] ?? 0, cmd[1] ?? 0, cmd[2] ?? 0];
@@ -358,6 +475,12 @@ export class MotionPlayer {
     for (let i = 0; i < lim.length; i++) {
       lim[i] = on ? 0 : this.origLimited[i];
     }
+    const jl = this.model.jnt_limited;
+    for (let i = 0; i < this.actJoint.length; i++) {
+      const jid = this.actJoint[i];
+      if (jid < 0) { continue; }
+      jl[jid] = on ? 0 : this.origJntLimited[jid];
+    }
     this.limitRelaxed = on;
   }
 
@@ -366,14 +489,32 @@ export class MotionPlayer {
     const m = this.model;
     this.gainBackup = Float64Array.from(m.actuator_gainprm);
     this.biasBackup = Float64Array.from(m.actuator_biasprm);
+    if (this.passiveFoldTendons.length) {
+      this.foldDampingBackup = Float64Array.from(m.tendon_damping);
+      this.integratorBackup = m.opt.integrator;
+      // Implicit integration is needed for the coupled viscous dampers.
+      m.opt.integrator = this.mujoco.mjtIntegrator.mjINT_IMPLICITFAST.value;
+      for (const i of this.passiveFoldTendons) m.tendon_damping[i] = 10;
+    }
     m.actuator_gainprm.fill(0);
     m.actuator_biasprm.fill(0);
     this.torqueOff = true;
   }
 
   enableTorque() {
+    this.restoreLyingContact();
     if (!this.torqueOff) { return; }
     const m = this.model;
+    if (this.foldDampingBackup) {
+      m.tendon_damping.set(this.foldDampingBackup);
+      m.opt.integrator = this.integratorBackup;
+      this.foldDampingBackup = null;
+    }
+    // Torque-off lets the legs move independently of the previous ctrl target.
+    // Recompute transmission positions before restoring gains, then start the
+    // next blend from the actual pose. mj_forward does not advance time.
+    this.mujoco.mj_forward(m, this.data);
+    this.data.ctrl.set(this.data.actuator_length.subarray(0, m.nu));
     m.actuator_gainprm.set(this.gainBackup);
     m.actuator_biasprm.set(this.biasBackup);
     this.torqueOff = false;
@@ -383,3 +524,4 @@ export class MotionPlayer {
 }
 
 function clampR(x, lo, hi) { return Math.min(hi, Math.max(lo, x)); }
+

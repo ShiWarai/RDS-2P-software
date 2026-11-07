@@ -20,8 +20,14 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
-APP_DIR="$ROOT_DIR/experiments/rds-2p_mujoco_wasm"
+# APP_DIR — каталог приложения-источника. По умолчанию — основной; для
+# вариантов-песочниц (experiments/variants/<имя>/) передаётся APP_DIR=<папка>,
+# тогда из этой папки собирается собственный образ (см. TASKS.md).
+APP_DIR="${APP_DIR:-$ROOT_DIR/experiments/rds-2p_mujoco_wasm}"
 STAGE="$ROOT_DIR/build/web-context"
+# Контекст сборки всегда кладётся под именем rds-2p_mujoco_wasm/ (Dockerfile
+# ссылается на этот путь), независимо от имени исходной папки.
+CTX_APP="rds-2p_mujoco_wasm"
 IMAGE="${IMAGE:-rds2p/web:latest}"
 
 MODE=build
@@ -51,7 +57,7 @@ fi
 # 2) стейджинг контекста
 echo "==> готовлю контекст: $STAGE"
 rm -rf "$STAGE"
-mkdir -p "$STAGE/experiments" \
+mkdir -p "$STAGE/experiments/$CTX_APP" \
          "$STAGE/urdf_src/export/rds-2p/meshes/obj" \
          "$STAGE/ros_packages/src/rds_2p_inference"
 
@@ -59,27 +65,31 @@ mkdir -p "$STAGE/experiments" \
 # index.html/importmap и в src/ (проверено по графу ссылок). Всё остальное —
 # мёртвый вес контекста и образа (~180 МБ): карты исходников, неиспользуемые
 # ORT-варианты, three/src+examples, blockly-генераторы/языки, jsdom/undici.
-NM="rds-2p_mujoco_wasm/node_modules"
-tar -C "$ROOT_DIR/experiments" \
-    --exclude='rds-2p_mujoco_wasm/models' \
-    --exclude='rds-2p_mujoco_wasm/.test' \
-    --exclude='rds-2p_mujoco_wasm/.certs' \
-    --exclude='rds-2p_mujoco_wasm/tools/.venv' \
-    --exclude='rds-2p_mujoco_wasm/tools/__pycache__' \
-    --exclude='.playwright-mcp' \
+NM="$CTX_APP/node_modules"
+# Стейджим ИМЕННО содержимое APP_DIR (относительные пути ./...) в фиксированный
+# контекстный путь experiments/$CTX_APP — поэтому любой вариант-папка собирается
+# в тот же Dockerfile без правок.
+tar -C "$APP_DIR" \
+    --exclude='./models/laya' \
+    --exclude='./models/stt' \
+    --exclude='./.test' \
+    --exclude='./.certs' \
+    --exclude='./tools/.venv' \
+    --exclude='./tools/__pycache__' \
+    --exclude='./.playwright-mcp' \
     --exclude='*.map' \
-    --exclude="$NM/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep*" \
-    --exclude="$NM/onnxruntime-web/dist/ort-wasm-simd-threaded.jspi*" \
-    --exclude="$NM/onnxruntime-web/dist/ort.all*" \
-    --exclude="$NM/onnxruntime-web/dist/ort.webgl*" \
-    --exclude="$NM/onnxruntime-web/dist/ort.jspi*" \
-    --exclude="$NM/onnxruntime-web/dist/ort.min.*" \
-    --exclude="$NM/three" \
-    --exclude="$NM/blockly" \
-    --exclude="$NM/jsdom" \
-    --exclude="$NM/undici" \
-    --exclude="$NM/@types" \
-    -cf - rds-2p_mujoco_wasm | tar -C "$STAGE/experiments" -xf -
+    --exclude='./node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep*' \
+    --exclude='./node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jspi*' \
+    --exclude='./node_modules/onnxruntime-web/dist/ort.all*' \
+    --exclude='./node_modules/onnxruntime-web/dist/ort.webgl*' \
+    --exclude='./node_modules/onnxruntime-web/dist/ort.jspi*' \
+    --exclude='./node_modules/onnxruntime-web/dist/ort.min.*' \
+    --exclude='./node_modules/three' \
+    --exclude='./node_modules/blockly' \
+    --exclude='./node_modules/jsdom' \
+    --exclude='./node_modules/undici' \
+    --exclude='./node_modules/@types' \
+    -cf - . | tar -C "$STAGE/experiments/$CTX_APP" -xf -
 
 # Возвращаем из вырезанного то, что приложение действительно использует:
 #   three: importmap `three` → build/three.module.js (+ его импорт three.core.js),

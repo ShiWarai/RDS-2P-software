@@ -48,6 +48,33 @@ mimetypes.add_type("text/plain", ".obj")
 
 LONG_CACHE_PREFIXES = ("/node_modules/", "/models/", "/assets/scenes/meshes/")
 
+# Варианты-песочницы (см. TASKS.md): один образ, три контейнера; вариант
+# выбирается env `VARIANT`. Плашка подставляется фронтендом из /variant.js —
+# без неё (VARIANT не задан) приложение работает как раньше.
+VARIANTS = {
+    "cartwheel": {
+        "id": "cartwheel",
+        "owner": "Фёдор",
+        "title": "Кувырок Панды",
+        "color": "#ff8f3c",
+        "summary": "сделать кувырок робота в MuJoCo — точка входа: src/robot/motions.js → rotate",
+    },
+    "cv_camera": {
+        "id": "cv_camera",
+        "owner": "Глеб",
+        "title": "CV с камеры Панды",
+        "color": "#2ec4b6",
+        "summary": "компьютерное зрение прямо с камеры Панды в браузере — новый модуль (видео-поток + детекция)",
+    },
+    "ros_topics": {
+        "id": "ros_topics",
+        "owner": "Саша",
+        "title": "ROS2-топики в браузер",
+        "color": "#b388ff",
+        "summary": "передача ROS2-топиков прямо в mujoco_web — WebSocket-мост (rosbridge) + клиент-подписчик",
+    },
+}
+
 
 class Handler(SimpleHTTPRequestHandler):
     nlu_upstream: str | None = None
@@ -68,6 +95,9 @@ class Handler(SimpleHTTPRequestHandler):
         return "public, max-age=3600"
 
     def do_GET(self):  # noqa: N802
+        if self.path.split("?", 1)[0] == "/variant.js":
+            self._variant_js()
+            return
         if self.path.startswith("/api/nlu"):
             self._nlu_probe()
             return
@@ -210,6 +240,17 @@ class Handler(SimpleHTTPRequestHandler):
         else:
             manifest = None
         self._json(200, {"available": bool(available), "files": files, "manifest": manifest})
+
+    def _variant_js(self):
+        """Плашка-вариант (TASKS.md): window.RDS2P_VARIANT по env `VARIANT` (или null)."""
+        cfg = VARIANTS.get(os.environ.get("VARIANT", ""))
+        body = ("window.RDS2P_VARIANT = " + json.dumps(cfg, ensure_ascii=False) + ";\n").encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/javascript; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def do_POST(self):  # noqa: N802
         if not self.path.startswith("/api/nlu"):

@@ -530,7 +530,7 @@ function initSpeech() {
   };
 }
 
-/* ── управление политикой: клик по симулятору + WASD/стрелки ── */
+/* ── управление политикой: клик по симулятору + стрелки (Shift — вбок) ── */
 
 let driving = false;
 const drivingKeys = new Set();
@@ -538,11 +538,12 @@ const drivingKeys = new Set();
 function keyCmd(code) {
   // Управление — ТОЛЬКО стрелками: WASD больше не перехватываем, чтобы буквы
   // свободно печатались в полях и работали как обычные горячие клавиши.
+  // idx: [вперёд, вбок, поворот]. Вбок (idx1) действует, пока зажат Shift.
   switch (code) {
     case "ArrowUp": return [1, 0, 0];
     case "ArrowDown": return [-0.5, 0, 0];
-    case "ArrowLeft": return [0, 0, 0.8];
-    case "ArrowRight": return [0, 0, -0.8];
+    case "ArrowLeft": return [0, 0.8, 0.8];
+    case "ArrowRight": return [0, -0.8, -0.8];
     default: return null;
   }
 }
@@ -550,15 +551,18 @@ function keyCmd(code) {
 function currentCmd() {
   let fwd = 0;
   let turn = 0;
+  let strafe = 0;
+  const lateral = drivingKeys.has("ShiftLeft") || drivingKeys.has("ShiftRight");
   for (const code of drivingKeys) {
     const c = keyCmd(code);
     if (!c) { continue; }
     fwd += c[0];
-    turn += c[2];
+    if (lateral) { strafe += c[1]; } else { turn += c[2]; }
   }
   fwd = Math.max(-0.5, Math.min(1, fwd));
   turn = Math.max(-0.8, Math.min(0.8, turn));
-  return [fwd, 0, turn];
+  strafe = Math.max(-0.8, Math.min(0.8, strafe));
+  return [fwd, strafe, turn];
 }
 
 /** Подсказка про стрелки — только пока активен режим «Ходьба». */
@@ -628,6 +632,11 @@ function initDriving() {
     const t = e.target;
     if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) { return; }
     if (e.code === "Escape") { disableDriving(true); return; }
+    if (e.code === "ShiftLeft" || e.code === "ShiftRight") {
+      drivingKeys.add(e.code);
+      applyDriving();
+      return;
+    }
     const c = keyCmd(e.code);
     if (!c) { return; }
     e.preventDefault();
@@ -949,6 +958,12 @@ async function boot() {
   $("btn-reset").onclick = () => {
     app.sim.resetToHome();
     $("hud-status").textContent = "🏠 Панда дома";
+  };
+  $("btn-frame").onclick = (e) => {
+    app.sim.frameReadoutOn = !app.sim.frameReadoutOn;
+    e.currentTarget.classList.toggle("accent", app.sim.frameReadoutOn);
+    const panel = $("frame-readout");
+    if (panel) { panel.classList.toggle("hidden", !app.sim.frameReadoutOn); }
   };
 
   // Проверить фразу (поле + ▶)

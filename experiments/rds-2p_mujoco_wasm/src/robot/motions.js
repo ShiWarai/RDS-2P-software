@@ -33,7 +33,7 @@ export const PROGRAMS = {
   ],
   lie_down: [
     pose("position_0", 1000, "ложится"),
-    { kind: "release", label: "лапки расслаблены (torque выключен)" },
+    { kind: "release", waitForRest: true, label: "плавно опускает корпус и лапы" },
   ],
   pray: [
     pose("position_0", 900, "исходная стойка"),
@@ -57,10 +57,9 @@ export const PROGRAMS = {
     pose("position_3_4", 1000, "кувырок (данные робота)"),
     pose("position_3_0", 700, "выравнивание"),
     pose("position_3_5", 800, "после кувырка"),
-    pose("position_0", 900, "встала"),
   ],
   run: [
-    { kind: "policy", vx: 0, vy: 0, wz: 0, label: "режим «Ходьба» (WASD рулит)" },
+    { kind: "policy", vx: 0, vy: 0, wz: 0, label: "режим «Ходьба» (стрелки + Shift)" },
   ],
   // Шаги‑команды: короткая нейросетевая походка в сторону + возврат в стойку.
   // Замеры в симуляторе (1.8 с): вперёд ~12 см (vx +1.0), назад ~14 см (vx −1.0),
@@ -95,6 +94,12 @@ export const PROGRAMS = {
   ],
 };
 
+// Mirror the original joint targets and initial support-transfer timing.
+// Smooth only the later recovery phases; original left timings stay intact.
+PROGRAMS.rotate_right = PROGRAMS.rotate.map((step, index) => ({
+  ...step, mirror: true, smooth: index >= 4, blend: index < 4 ? step.blend : index === 5 ? 600 : 800,
+  label: (step.label || "").replaceAll("кувырок", "кувырок вправо") }));
+
 function pose(name, hold, label) {
   return { kind: "pose", pose: name, blend: B, hold, label };
 }
@@ -122,7 +127,8 @@ export const MANUAL_BUTTONS = [
   { id: "dismiss", text: "🙌 отставить" },
   { id: "lie_down", text: "🛏️ лежать" },
   { id: "pray", text: "🙏 служить" },
-  { id: "rotate", text: "🤸 кувырок" },
+  { id: "rotate", text: "🤸 Кувырок влево" },
+  { id: "rotate_right", text: "🤸 Кувырок вправо" },
   { id: "run", text: "🚶 ходьба" },
   { id: "step_forward", text: "⬆️ шаг вперёд" },
   { id: "step_back", text: "⬇️ шаг назад" },
@@ -130,3 +136,5 @@ export const MANUAL_BUTTONS = [
   { id: "step_right", text: "➡️ шаг вправо" },
   { id: "stop_running", text: "🛑 стой" },
 ];
+
+

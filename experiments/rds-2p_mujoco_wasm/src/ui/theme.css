@@ -272,6 +272,26 @@ html, body {
 
 #hud-row { display: flex; align-items: center; gap: 10px; }
 
+#frame-readout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(150px, 1fr));
+  gap: 2px 18px;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  max-height: 34vh;
+  overflow: auto;
+}
+#frame-readout.hidden { display: none; }
+#frame-readout .fr-head { grid-column: 1 / -1; font-size: 0.9rem; padding-bottom: 4px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
+#frame-readout .fr-pose { color: var(--green-dark); }
+#frame-readout .fr-dim { opacity: 0.55; font-weight: 400; font-size: 0.82rem; }
+#frame-readout .fr-row { display: flex; justify-content: space-between; gap: 10px; }
+#frame-readout .fr-name { opacity: 0.75; }
+#frame-readout .fr-val { font-variant-numeric: tabular-nums; font-weight: 800; }
+
 /* ── drawer поз ─────────────────────────────────── */
 
 .drawer {

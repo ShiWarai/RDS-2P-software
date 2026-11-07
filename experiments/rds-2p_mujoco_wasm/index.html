@@ -7,6 +7,25 @@
   <meta name="description" content="Мастер-класс: собери правило из блоков и скажи фразу роботу-панде Панде">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='10' r='4' fill='%23ff8f3c'/%3E%3Ccircle cx='4' cy='5' r='2' fill='%234cc9f0'/%3E%3Ccircle cx='12' cy='5' r='2' fill='%23ffd166'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="./src/ui/theme.css">
+  <script src="/variant.js"></script>
+  <style>
+    #variant-banner{
+      display:flex;align-items:center;gap:.5em;flex-wrap:wrap;
+      padding:.45em .9em;font-size:.9em;line-height:1.35;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+      border-bottom:2px solid rgba(0,0,0,.25);
+    }
+    #variant-banner .vb-badge{
+      font-weight:800;letter-spacing:.06em;font-size:.72em;
+      background:rgba(0,0,0,.28);color:#fff;
+      padding:.18em .55em;border-radius:999px;text-transform:uppercase;
+    }
+    #variant-banner .vb-owner{
+      background:rgba(255,255,255,.32);color:#10131a;
+      padding:.12em .5em;border-radius:6px;font-weight:700;
+    }
+    #variant-banner .vb-hint{opacity:.85;font-size:.92em}
+  </style>
   <script src="./node_modules/blockly/blockly.min.js"></script>
   <script src="./node_modules/blockly/msg/ru.js"></script>
   <script type="importmap">
@@ -63,7 +82,7 @@
       <section id="panel-right" aria-label="Симулятор">
         <div id="sim">
           <div id="say-bubble" class="hidden" aria-live="polite"></div>
-          <div id="drive-hint" class="hidden">🚶 ⬆️⬇️ — вперёд/назад · ⬅️➡️ — поворот · 🛑/Esc — стоп</div>
+          <div id="drive-hint" class="hidden">🚶 ⬆️⬇️ — вперёд/назад · ⬅️➡️ — поворот · ⇧+⬅️➡️ — вбок · 🛑/Esc — стоп</div>
         </div>
 
         <aside id="pose-drawer" class="drawer hidden" aria-label="Редактор поз">
@@ -87,8 +106,10 @@
           <div id="hud-row">
             <button id="btn-pause" class="btn icon-btn" title="Пауза/продолжить">⏸︎</button>
             <button id="btn-reset" class="btn icon-btn" title="Поставить панду на место (базовая стойка)">↺</button>
+            <button id="btn-frame" class="btn icon-btn" title="Показать фактические углы суставов (для снятия кадра на паузе)">📐</button>
             <span class="grow"></span>
           </div>
+          <div id="frame-readout" class="hidden"></div>
         </div>
       </section>
     </main>
@@ -96,6 +117,24 @@
     <div id="toasts"></div>
   </div>
 
+  <script>
+    // Плашка варианта-песочницы: window.RDS2P_VARIANT из /variant.js
+    (function () {
+      const v = window.RDS2P_VARIANT;
+      if (!v) return;
+      const bar = document.createElement("div");
+      bar.id = "variant-banner";
+      bar.style.background = v.color;
+      bar.style.color = "#10131a";
+      bar.innerHTML =
+        '<span class="vb-badge">Вариант</span>' +
+        '<strong>' + v.title + '</strong>' +
+        '<span class="vb-owner">' + v.owner + '</span>' +
+        '<span class="vb-hint">' + v.summary + '</span>';
+      const app = document.getElementById("app");
+      if (app) app.insertBefore(bar, app.firstChild);
+    })();
+  </script>
   <script type="module" src="./src/main.js"></script>
 </body>
 </html>

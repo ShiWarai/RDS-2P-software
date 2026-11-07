@@ -1,3 +1,4 @@
+import { prepareVoskBundle } from "./vosk_bundle.js";
 /* Локальное распознавание русской речи в браузере — vosk-browser@0.0.8 (WASM).
    Реальный API библиотеки:
      const model = await Vosk.createModel(url)      — грузит tar.gz сам (в воркере);
@@ -8,8 +9,8 @@
    а воркер читает blob мгновенно. Бандл window.Vosk подгружается из node_modules.
    Стриминг (AudioContext) — частичные результаты летят в UI живьём; если контекст не
    стартовал — запасной путь MediaRecorder → decodeAudioData → пачка. */
-const MODEL_URL = "models/stt/vosk-ru-small.tar.gz";
-const CACHE_NAME = "panda-vosk-v1";
+const MODEL_URL = "models/stt/vosk-ru-small.tar.gz?v=2";
+const CACHE_NAME = "panda-vosk-v2";
 const MAX_SECONDS = 8;
 
 let modelPromise = null;
@@ -40,13 +41,14 @@ function ensureVoskGlobal() {
   if (typeof window.Vosk !== "undefined") { return Promise.resolve(window.Vosk); }
   if (!voskJsPromise) {
     const url = new URL("node_modules/vosk-browser/dist/vosk.js?v=0.0.8", document.baseURI).href;
-    voskJsPromise = new Promise((resolve, reject) => {
+    voskJsPromise = fetch(url).then(r => { if (!r.ok) throw new Error(`vosk.js: HTTP ${r.status}`); return r.text(); }).then(source => new Promise((resolve, reject) => {
       const s = document.createElement("script");
-      s.src = url;
-      s.onload = () => { window.Vosk ? resolve(window.Vosk) : reject(new Error("vosk.js загрузился, но window.Vosk пуст")); };
+      const bundleUrl = URL.createObjectURL(new Blob([prepareVoskBundle(source)], { type: "text/javascript" }));
+      s.src = bundleUrl;
+      s.onload = () => { URL.revokeObjectURL(bundleUrl); window.Vosk ? resolve(window.Vosk) : reject(new Error("vosk.js загрузился, но window.Vosk пуст")); };
       s.onerror = () => { voskJsPromise = null; reject(new Error(`vosk библиотека не загрузилась: ${url}`)); };
       document.head.appendChild(s);
-    });
+    })).catch(error => { voskJsPromise = null; throw error; });
   }
   return voskJsPromise;
 }
@@ -97,7 +99,8 @@ async function loadModel() {
     await storeCache(url, blob);
   }
   report(0.92, "📦 распаковываю");
-  const blobUrl = URL.createObjectURL(blob);
+  // Stable URL reuses Vosk's filesystem cache instead of a new blob UUID.
+  const blobUrl = url;
   try {
     model = await withTimeout(
       Vosk.createModel(blobUrl),
@@ -106,7 +109,7 @@ async function loadModel() {
     );
     try { model.setLogLevel(-3); } catch { /* не критично */ }
   } finally {
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+    // HTTP model URL is stable and must not be revoked.
   }
   modelReady = true;
   report(1, "готово");

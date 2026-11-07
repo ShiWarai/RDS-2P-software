@@ -51,16 +51,17 @@ export class PoseManager {
 
   /**
    * Точные углы суставов (таблицы робота, assets/pose_angles.json) → ctrl.
-   * Рамки те же, что у normToCtrl: жёстко в ctrlrange, для no_limit-поз мягкий
-   * предохранитель ±20% (часть поз кувырка/«служить» намеренно вне диапазона).
+   * Стандартные позы жёстко клампятся в ctrlrange. Для no_limit-поз (position_3_*)
+   * углы проходят без клампа: предел снимаются на время шага (relaxLimits),
+   * поэтому поза встаёт ровно в заданные углы, даже если они вне диапазона.
    */
   clampToCtrl(angles, { noLimit = false } = {}) {
     const out = new Float64Array(this.nu);
     for (let i = 0; i < this.nu; i++) {
       let v = Number(angles[i]);
       if (!Number.isFinite(v)) { v = 0; }
-      const pad = noLimit ? SOFT_FUSE * this.span[i] : 0;
-      out[i] = Math.min(this.hi[i] + pad, Math.max(this.lo[i] - pad, v));
+      if (noLimit) { out[i] = v; continue; }
+      out[i] = Math.min(this.hi[i], Math.max(this.lo[i], v));
     }
     return out;
   }
