@@ -15,8 +15,10 @@ from pathlib import Path
 from ament_index_python.packages import get_package_share_directory
 from std_msgs.msg import String
 
-# Импортируем обработчики действий
-from rds_2p_commands.action_handlers.say_handler import SayHandler
+from rds_2p_commands.action_handlers.robot_routine_handler import RobotRoutineHandler
+
+# Имя «слота» для единственного PandaCommand (совпадает с command_parser_node.PANDA_GOAL_CLASS).
+PANDA_ACTION_SLOT = 'motors'
 
 
 class UnifiedActionServer(Node):
@@ -25,23 +27,17 @@ class UnifiedActionServer(Node):
     def __init__(self):
         super().__init__('unified_action_server')
         
+        self.declare_parameter('commands_config', 'commands.yaml')
+
         self._action_servers: Dict[str, ActionServer] = {}
-        
+
         # Отслеживание активных действий по классам
-        # {class_name: [goal_handle1, goal_handle2, ...]}
         self._active_goals_by_class: Dict[str, list] = {}
-        
-        # Маппинг action_name -> class (загружается из command_mappings.yaml)
-        self._action_classes: Dict[str, str] = {}
-        
-        # Свойства классов (приоритет, таймаут, поведение)
-        self._class_properties: Dict[str, Dict[str, Any]] = {}
-        
-        # Загрузка конфигурации
-        self._load_command_mappings_config()  # Загружаем классы из command_mappings.yaml
-        self._load_class_properties_config()  # Загружаем свойства классов
-        
-        # Параметр: разрешить ли параллельное выполнение действий одного класса
+
+        # Один PandaCommand-сервер → один слот активных целей
+        self._action_classes: Dict[str, str] = {'/robot/panda_command': PANDA_ACTION_SLOT}
+
+        # Параметр: разрешить ли параллельное выполнение команд одного слота
         self.declare_parameter('allow_parallel_same_class', False)
         self.allow_parallel_same_class = self.get_parameter('allow_parallel_same_class').get_parameter_value().bool_value
         
@@ -73,82 +69,24 @@ class UnifiedActionServer(Node):
         # Публикуем начальный список команд
         self._publish_command_list()
     
-    def _load_command_mappings_config(self):
-        """Загрузка классов действий из command_mappings.yaml."""
-        try:
-            package_share_dir = get_package_share_directory('rds_2p_commands')
-            config_path = Path(package_share_dir) / 'config' / 'command_mappings.yaml'
-            
-            if not config_path.exists():
-                self.get_logger().warn(f'Конфигурация команд не найдена: {config_path}')
-                return
-            
-            with open(config_path, 'r', encoding='utf-8') as f:
-                config = yaml.safe_load(f)
-            
-            commands_config = config.get('commands', {})
-            for command_name, command_config in commands_config.items():
-                action_name = command_config.get('action_name')
-                command_class = command_config.get('class', 'default')
-                
-                if action_name:
-                    self._action_classes[action_name] = command_class
-            
-            self.get_logger().info(f'Загружены классы для {len(self._action_classes)} действий из command_mappings.yaml')
-            
-        except Exception as e:
-            self.get_logger().error(f'Ошибка при загрузке конфигурации команд: {e}')
-    
-    def _load_class_properties_config(self):
-        """Загрузка свойств классов из action_classes.yaml."""
-        try:
-            package_share_dir = get_package_share_directory('rds_2p_commands')
-            config_path = Path(package_share_dir) / 'config' / 'action_classes.yaml'
-            
-            if not config_path.exists():
-                self.get_logger().warn(f'Конфигурация свойств классов не найдена: {config_path}')
-                return
-            
-            with open(config_path, 'r', encoding='utf-8') as f:
-                config = yaml.safe_load(f)
-            
-            classes_config = config.get('classes', {})
-            for class_name, class_props in classes_config.items():
-                self._class_properties[class_name] = {
-                    'priority': class_props.get('priority', 0),
-                    'cancel_timeout': class_props.get('cancel_timeout', 0.0),
-                    'conflict_behavior': class_props.get('conflict_behavior', 'reject')
-                }
-            
-            self.get_logger().info(f'Загружены свойства для {len(self._class_properties)} классов')
-            
-        except Exception as e:
-            self.get_logger().error(f'Ошибка при загрузке свойств классов: {e}')
-    
     def _register_actions(self):
         """Регистрация всех действий. Добавьте сюда свои действия!"""
         
-        # ============================================
-        # ДЕЙСТВИЕ 1: Say (пример кастомного действия)
-        # ============================================
+        rr = RobotRoutineHandler(self)
         self.register_action(
-            action_type='rds_2p_commands/action/Say',
-            action_name='/say',
-            handler=SayHandler(self),
+            action_type='rds_2p_commands/action/PandaCommand',
+            action_name='/robot/panda_command',
+            handler=rr,
             command_info={
-                'name': 'say',
-                'display_name': 'Сказать',
-                'parser': 'extract_text',
-                'class': 'audio_output',
-                'keywords': ['say', 'скажи', 'сказать', 'произнести'],
-                'parameters': {
-                    'type': 'string',
-                    'name': 'text',
-                    'description': 'Текст для вывода'
-                }
+                'name': 'panda_command',
+                'display_name': 'Команды Panda',
+                'parser': 'routine_id',
+                'class': 'motors',
+                'keywords': ['лапу', 'лежать', 'равняйсь', 'смирно', 'служить'],
+                'parameters': {'type': 'string', 'name': 'routine_id', 'description': 'give_paw, lie_down, ...'},
             }
         )
-        
+
         # ============================================
         # ДОБАВЬТЕ СВОИ ДЕЙСТВИЯ ЗДЕСЬ:
         # ============================================
@@ -228,79 +166,28 @@ class UnifiedActionServer(Node):
             else:
                 raise ValueError(f'Handler должен быть функцией или объектом с методом execute_callback')
             
-            # Обертываем callback для проверки классов команд
+            # Обертываем callback: без параллели — отменяем предыдущую цель того же слота
             def wrapped_callback(goal_handle):
-                # Определяем класс действия
-                action_class = self._action_classes.get(action_name, 'default')
-                class_props = self._class_properties.get(action_class, {
-                    'priority': 0,
-                    'cancel_timeout': 0.0,
-                    'conflict_behavior': 'reject'
-                })
-                
-                # Проверяем конфликты с активными действиями того же класса
+                slot = self._action_classes.get(action_name, 'default')
+
                 if not self.allow_parallel_same_class:
-                    active_goals = self._active_goals_by_class.get(action_class, [])
+                    active_goals = self._active_goals_by_class.get(slot, [])
                     if active_goals:
-                        conflict_behavior = class_props['conflict_behavior']
-                        new_priority = class_props['priority']
-                        
-                        if conflict_behavior == 'cancel_previous':
-                            # Отменяем предыдущие команды с меньшим или равным приоритетом
-                            cancel_timeout = class_props['cancel_timeout']
-                            for old_goal_handle in active_goals[:]:  # Копируем список для безопасной итерации
-                                # Получаем приоритет старой команды
-                                old_action_name = None
-                                for name, cls in self._action_classes.items():
-                                    if cls == action_class:
-                                        # Находим action_name для старого goal (упрощенно)
-                                        old_action_name = name
-                                        break
-                                
-                                old_class_props = self._class_properties.get(action_class, {'priority': 0})
-                                old_priority = old_class_props['priority']
-                                
-                                if new_priority >= old_priority:
-                                    self.get_logger().info(
-                                        f'Отменяю предыдущее действие класса "{action_class}" '
-                                        f'(приоритет: {old_priority} < {new_priority})'
-                                    )
-                                    # В ROS2 Action Server для прерывания выполнения цели используем abort()
-                                    # Обработчик должен проверять is_cancel_requested и корректно завершаться
-                                    try:
-                                        old_goal_handle.abort()
-                                    except Exception as e:
-                                        self.get_logger().warn(f'Ошибка при отмене предыдущей цели: {e}')
-                                    self._unregister_active_goal(action_class, old_goal_handle)
-                        
-                        elif conflict_behavior == 'reject':
-                            # Отклоняем новую команду
-                            self.get_logger().warn(
-                                f'Действие {action_name} (класс "{action_class}") отклонено: '
-                                f'уже выполняется {len(active_goals)} действие(й) того же класса'
+                        for old_gh in active_goals[:]:
+                            self.get_logger().info(
+                                f'Отмена предыдущей цели (слот "{slot}") перед новой'
                             )
-                            goal_handle.abort()
-                            return None
-                        
-                        elif conflict_behavior == 'queue':
-                            # Можно реализовать очередь в будущем
-                            self.get_logger().warn(
-                                f'Действие {action_name} (класс "{action_class}") поставлено в очередь'
-                            )
-                            # Пока просто отклоняем
-                            goal_handle.abort()
-                            return None
-                
-                # Регистрируем активное действие
-                self._register_active_goal(action_class, goal_handle)
-                
-                # Вызываем оригинальный callback
+                            try:
+                                old_gh.abort()
+                            except Exception as e:
+                                self.get_logger().warn(f'Ошибка при отмене предыдущей цели: {e}')
+                            self._unregister_active_goal(slot, old_gh)
+
+                self._register_active_goal(slot, goal_handle)
                 try:
-                    result = original_callback(goal_handle)
-                    return result
+                    return original_callback(goal_handle)
                 finally:
-                    # Удаляем из активных при завершении (в любом случае)
-                    self._unregister_active_goal(action_class, goal_handle)
+                    self._unregister_active_goal(slot, goal_handle)
             
             # Создаем Action сервер с обернутым callback
             action_server = ActionServer(
@@ -357,76 +244,64 @@ class UnifiedActionServer(Node):
     def _publish_command_list(self):
         """Публикует список доступных команд в JSON формате."""
         try:
-            # Загружаем конфигурацию команд для получения дополнительной информации
-            command_mappings = {}
+            cfg_name = (
+                self.get_parameter('commands_config').get_parameter_value().string_value
+            )
+            cmd_map: Dict[str, Any] = {}
             try:
                 package_share_dir = get_package_share_directory('rds_2p_commands')
-                config_path = Path(package_share_dir) / 'config' / 'command_mappings.yaml'
+                config_path = Path(package_share_dir) / 'config' / cfg_name
                 if config_path.exists():
                     with open(config_path, 'r', encoding='utf-8') as f:
-                        config = yaml.safe_load(f)
-                        command_mappings = config.get('commands', {})
+                        doc = yaml.safe_load(f) or {}
+                    cmd_map = doc.get('commands', {})
+                else:
+                    self.get_logger().warn(f'Файл команд не найден: {config_path}')
             except Exception as e:
-                self.get_logger().warn(f'Не удалось загрузить command_mappings.yaml: {e}')
-            
-            # Формируем список команд из зарегистрированных действий
-            commands = []
-            for action_name, action_server in self._action_servers.items():
-                # Ищем информацию о команде в конфиге
-                command_config = None
-                for cmd_name, cmd_cfg in command_mappings.items():
-                    if cmd_cfg.get('action_name') == action_name:
-                        command_config = cmd_cfg
-                        command_name = cmd_name
-                        break
-                
-                if not command_config:
-                    # Если команда не найдена в конфиге, используем базовую информацию
-                    command_name = action_name.split('/')[-1]  # Извлекаем имя из пути
-                    command_config = {}
-                
-                # Формируем информацию о команде
-                command_info = {
-                    'name': command_name,
-                    'display_name': command_config.get('display_name', command_name.capitalize()),
-                    'action_name': action_name,
-                    'action_type': command_config.get('action_type', 'unknown'),
-                    'parser': command_config.get('parser', 'none'),
-                    'class': command_config.get('class', 'default'),
-                    'keywords': command_config.get('keywords', []),
-                }
-                
-                # Добавляем информацию о параметрах, если есть
-                if command_config.get('parser') == 'extract_number':
-                    # Для команд с числовыми параметрами
-                    command_info['parameters'] = {
-                        'type': 'number',
-                        'name': f'{command_name}_number',
-                        'parser': 'extract_number'
-                    }
-                    # Если это команда dance, пытаемся определить доступные значения
-                    if command_name == 'dance':
-                        # Попробуем получить информацию о доступных танцах из rds_2p_dance
-                        # Пока используем значения по умолчанию
-                        command_info['parameters']['min'] = 1
-                        command_info['parameters']['max'] = 10
-                
-                commands.append(command_info)
-            
-            # Формируем JSON сообщение
+                self.get_logger().warn(f'Не удалось загрузить {cfg_name}: {e}')
+
+            commands_out = []
+            for action_name in self._action_servers:
+                if action_name != '/robot/panda_command':
+                    commands_out.append({
+                        'name': action_name.split('/')[-1],
+                        'action_name': action_name,
+                        'action_type': 'unknown',
+                        'keywords': [],
+                        'class': self._action_classes.get(action_name, 'default'),
+                    })
+                    continue
+                for cmd_name, cmd_cfg in cmd_map.items():
+                    commands_out.append({
+                        'name': cmd_name,
+                        'display_name': cmd_name,
+                        'action_name': action_name,
+                        'action_type': 'rds_2p_commands/action/PandaCommand',
+                        'routine_id': cmd_name,
+                        'parser': 'routine_id',
+                        'class': PANDA_ACTION_SLOT,
+                        'keywords': cmd_cfg.get('keywords', []),
+                        'parameters': {
+                            'type': 'string',
+                            'name': 'routine_id',
+                            'description': 'ключ команды из commands.yaml',
+                        },
+                    })
+
             message = {
                 'server_name': 'unified_action_server',
                 'server_namespace': '/',
-                'commands': commands
+                'commands': commands_out,
             }
-            
-            # Публикуем
+
             msg = String()
             msg.data = json.dumps(message, ensure_ascii=False)
             self._commands_publisher.publish(msg)
-            
-            self.get_logger().debug(f'Опубликован список из {len(commands)} команд в {self._commands_topic}')
-            
+
+            self.get_logger().debug(
+                f'Опубликован список из {len(commands_out)} команд в {self._commands_topic}'
+            )
+
         except Exception as e:
             self.get_logger().error(f'Ошибка при публикации списка команд: {e}')
             import traceback
@@ -435,11 +310,15 @@ class UnifiedActionServer(Node):
 
 def main(args=None):
     """Главная функция для запуска узла."""
+    from rclpy.executors import MultiThreadedExecutor
+
     rclpy.init(args=args)
-    
+
     try:
         unified_server = UnifiedActionServer()
-        rclpy.spin(unified_server)
+        executor = MultiThreadedExecutor(num_threads=6)
+        executor.add_node(unified_server)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     except Exception as e:

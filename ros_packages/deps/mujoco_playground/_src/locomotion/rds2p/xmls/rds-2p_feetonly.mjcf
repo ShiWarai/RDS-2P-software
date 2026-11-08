@@ -1,0 +1,191 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mujoco model="rds-2p">
+  <default>
+    <default class="robot">
+      <default class="scs40">
+        <joint armature="0.001" frictionloss="0.1" damping="1.0" actuatorfrcrange="-4.16 4.16" />
+        <position ctrlrange="-4.16 4.16" kp="8.14" kv="0.29" forcerange="-4.16 4.16" />
+      </default>
+      <default class="visual">
+        <geom material="visualgeom" contype="0" conaffinity="0" group="2" />
+      </default>
+      <default class="collision">
+        <geom material="collision_material" condim="1" contype="1" conaffinity="1" priority="1" group="4" solref="0.005 1" solimp="0.99 0.999 1e-05" friction="1.2 1.2 1.2" />
+      </default>
+    </default>
+  </default>
+  <compiler angle="radian" />
+  <asset>
+    <material name="App0.003" rgba="0.800000 0.800000 0.800000 1.000000" />
+    <material name="App0.010" rgba="0.282353 0.282353 0.282353 1.000000" />
+    <material name="default_material" rgba="0.7 0.7 0.7 1" />
+    <material name="collision_material" rgba="1.0 0.28 0.1 0.9" />
+    <mesh name="base.obj" file="meshes/base.obj" />
+    <mesh name="leg_block_bl.obj" file="meshes/leg_block_bl.obj" />
+    <mesh name="hip_bl.obj" file="meshes/hip_bl.obj" />
+    <mesh name="shin_bl.obj" file="meshes/shin_bl.obj" />
+    <mesh name="leg_block_fr.obj" file="meshes/leg_block_fr.obj" />
+    <mesh name="hip_fr.obj" file="meshes/hip_fr.obj" />
+    <mesh name="shin_fr.obj" file="meshes/shin_fr.obj" />
+    <mesh name="panda_visual.obj" file="meshes/panda_visual.obj" />
+    <mesh name="leg_block_br.obj" file="meshes/leg_block_br.obj" />
+    <mesh name="hip_br.obj" file="meshes/hip_br.obj" />
+    <mesh name="shin_br.obj" file="meshes/shin_br.obj" />
+    <mesh name="leg_block_fl.obj" file="meshes/leg_block_fl.obj" />
+    <mesh name="hip_fl.obj" file="meshes/hip_fl.obj" />
+    <mesh name="shin_fl.obj" file="meshes/shin_fl.obj" />
+  </asset>
+  <worldbody>
+    <body name="base_link" pos="0.00000000 0.00000000 0.16000000" quat="1 0 0 0" childclass="robot">
+      <freejoint name="floating_base" />
+      <inertial pos="-0.007317 -0.000191 -0.004098" mass="1.522000" fullinertia="0.002168 0.014482 0.015817 0.000055 -0.000034 -0.000006" />
+      <geom name="base_link_visual" pos="-0.017626 -0.000162 -0.007849" quat="0.7071065431725606 -0.0 0.0 -0.7071070192004544" material="App0.003" type="mesh" mesh="base.obj" class="visual" />
+      <site name="base_link_site" pos="0.0 0.0 0.0" quat="1 0 0 0" />
+      <camera name="track" mode="trackcom" fovy="45.0" quat="0.9238795325112867 0.3826834323650898 0.0 0.0" pos="0.0 -1.0 1.1" />
+      <camera name="camera" mode="fixed" fovy="90.0" quat="-0.500000 -0.500000 0.500000 0.500000" pos="0.152412 0.002539 0.004207" resolution="640 480" />
+      <body name="leg_block_fl_link" pos="0.098579 0.061964 0.002449" quat="0.7071068967259818 0.0 -0.7071066656470943 0.0">
+        <joint name="leg_block_fl_joint" type="hinge" ref="0.0" class="scs40" range="-0.959931 1.745329" axis="0.000000 0.000000 -1.000000" />
+        <inertial pos="-0.009629 0.002871 0.000273" quat="0.707107 0.000000 0.000000 0.707107" mass="0.193000" diaginertia="0.000094 0.000070 0.000061" />
+        <geom name="leg_block_fl_link_visual" pos="-0.009632 0.001547 0.000477" quat="0.7071068967259818 -0.7071066656470943 0.0 0.0" material="App0.010" type="mesh" mesh="leg_block_fl.obj" class="visual" />
+        <body name="hip_fl_link" pos="0.000001 0.030541 0.009353" quat="0.6532816112902237 -0.6532813978011619 0.27059804091585254 0.27059795248580815">
+          <joint name="hip_fl_joint" type="hinge" ref="0.0" class="scs40" range="-1.047200 1.047200" axis="0.000000 0.000000 1.000000" />
+          <inertial pos="-0.042963 -0.000022 0.004941" quat="0.500000 0.500000 0.500000 0.500000" mass="0.023000" diaginertia="0.000035 0.000035 0.000001" />
+          <geom name="hip_fl_link_visual" pos="0.000000 -0.000000 -0.000000" quat="1.0 0.0 -0.0 0.0" material="App0.010" type="mesh" mesh="hip_fl.obj" class="visual" />
+          <body name="shin_fl_link" pos="-0.099981 0.000046 0.005059" quat="0.38268365880441557 0.0 -0.0 0.9238794387170145">
+            <joint name="shin_fl_joint" type="hinge" ref="0.0" class="scs40" range="-1.134464 0.523599" axis="0.000000 0.000000 1.000000" />
+            <inertial pos="0.032975 -0.034987 -0.000398" quat="-0.270598 -0.270598 0.653281 0.653281" mass="0.049000" diaginertia="0.000094 0.000092 0.000005" />
+            <geom name="shin_fl_link_visual" pos="-0.000000 0.000000 0.000000" quat="-6.628276265815252e-08 -0.38268365880440985 -0.9238794387170006 -1.6002063362868754e-07" material="App0.010" type="mesh" mesh="shin_fl.obj" class="visual" />
+            <body name="foot_fl_link" pos="0.072618 -0.072439 0.002894" quat="1.0 -0.0 0.0 -0.0">
+              <geom name="foot_fl_link_collision" pos="0.000000 0.000000 -0.002895" quat="1.0 0.0 0.0 0.0" type="cylinder" size="0.012816 0.0098995" class="collision" />
+              <site name="foot_fl_site" pos="0.000000 0.000000 -0.002895" type="cylinder" size="0.012816 0.0098995" quat="1.0 0.0 0.0 0.0" group="5" />
+            </body>
+          </body>
+        </body>
+      </body>
+      <body name="leg_block_fr_link" pos="0.098667 -0.062261 0.002451" quat="0.5000001633974483 0.4999999999999733 0.49999983660255165 0.4999999999999733">
+        <joint name="leg_block_fr_joint" type="hinge" ref="0.0" class="scs40" range="-1.745329 0.959931" axis="0.000000 0.000000 1.000000" />
+        <inertial pos="-0.003258 -0.009610 -0.000275" quat="0.000000 0.000000 0.000000 1.000000" mass="0.193000" diaginertia="0.000095 0.000070 0.000061" />
+        <geom name="leg_block_fr_link_visual" pos="-0.001909 -0.009600 -0.000400" quat="2.3107892515697132e-07 -2.3107884964157019e-07 0.7071066656470566 -0.7071068967259441" material="App0.010" type="mesh" mesh="leg_block_fr.obj" class="visual" />
+        <body name="hip_fr_link" pos="-0.031718 0.000131 -0.009643" quat="0.5000001633974483 -0.4999999999999733 -0.49999983660255165 0.4999999999999733">
+          <joint name="hip_fr_joint" type="hinge" ref="0.0" class="scs40" range="-1.047198 1.047200" axis="0.000000 0.000000 -1.000000" />
+          <inertial pos="-0.030395 0.030364 0.004941" quat="-0.270598 -0.270598 0.653281 0.653281" mass="0.023000" diaginertia="0.000035 0.000035 0.000001" />
+          <geom name="hip_fr_link_visual" pos="-0.000000 0.000000 -0.000000" quat="0.9238795637760319 0.0 -0.0 -0.3826833568853094" material="App0.010" type="mesh" mesh="hip_fr.obj" class="visual" />
+          <body name="shin_fr_link" pos="-0.070737 0.070711 0.004477" quat="0.3826831968646483 0.0 0.0 -0.9238796300587284">
+            <joint name="shin_fr_joint" type="hinge" ref="0.0" class="scs40" range="-1.134464 0.523599" axis="0.000000 0.000000 -1.000000" />
+            <inertial pos="0.048057 0.001422 0.000398" quat="0.500000 0.500000 0.500000 0.500000" mass="0.049000" diaginertia="0.000094 0.000092 0.000005" />
+            <geom name="shin_fr_link_visual" pos="0.000000 0.000000 -0.000000" quat="3.2679489653813835e-07 0.0 -0.0 -0.9999999999999466" material="App0.010" type="mesh" mesh="shin_fr.obj" class="visual" />
+            <body name="foot_fr_link" pos="0.102834 -0.000040 0.000002" quat="0.9238797551175948 0.0 0.0 -0.3826828949454797">
+              <geom name="foot_fr_link_collision" pos="-0.000000 0.000000 -0.000000" quat="3.2679489653813835e-07 -0.9999999999999466 0.0 -0.0" type="cylinder" size="0.012816 0.0098995" class="collision" />
+              <site name="foot_fr_site" pos="-0.000000 0.000000 -0.000000" type="cylinder" size="0.012816 0.0098995" quat="3.2679489653813835e-07 -0.9999999999999466 0.0 -0.0" group="5" />
+            </body>
+          </body>
+        </body>
+      </body>
+      <body name="leg_block_bl_link" pos="-0.135944 0.061964 0.002448" quat="0.5000001633974483 0.4999999999999733 0.49999983660255165 0.4999999999999733">
+        <joint name="leg_block_bl_joint" type="hinge" ref="0.0" class="scs40" range="-0.959931 1.745329" axis="0.000000 0.000000 1.000000" />
+        <inertial pos="0.003043 -0.010057 0.002359" quat="0.000000 0.000000 0.000000 1.000000" mass="0.193000" diaginertia="0.000095 0.000070 0.000061" />
+        <geom name="leg_block_bl_link_visual" pos="0.001694 -0.010052 0.002505" quat="0.7071068967259818 0.7071066656470943 0.0 0.0" material="App0.010" type="mesh" mesh="leg_block_bl.obj" class="visual" />
+        <body name="hip_bl_link" pos="0.031501 -0.000292 -0.008541" quat="0.2705983169344085 0.6532814603306357 -0.2705978899563139 -0.6532814603306357">
+          <joint name="hip_bl_joint" type="hinge" ref="0.0" class="scs40" range="-1.047200 1.047200" axis="0.000000 0.000000 -1.000000" />
+          <inertial pos="0.042963 -0.000022 -0.004941" quat="0.500000 0.500000 0.500000 0.500000" mass="0.023000" diaginertia="0.000035 0.000035 0.000001" />
+          <geom name="hip_bl_link_visual" pos="0.000000 0.000000 0.000000" quat="-1.4320509548291024e-13 8.267948966079265e-07 0.9999999999996432 -1.7320510330964012e-07" material="App0.010" type="mesh" mesh="hip_bl.obj" class="visual" />
+          <body name="shin_bl_link" pos="0.100012 0.000035 0.004572" quat="1.0679490440337254e-13 3.267948965381209e-07 -0.9999999999998932 -3.267948965381209e-07">
+            <joint name="shin_bl_joint" type="hinge" ref="0.0" class="scs40" range="-1.134464 0.523599" axis="0.000000 0.000000 1.000000" />
+            <inertial pos="0.001418 0.048057 0.008256" quat="0.000000 0.000000 0.707107 0.707107" mass="0.049000" diaginertia="0.000094 0.000092 0.000005" />
+            <geom name="shin_bl_link_visual" pos="0.000000 0.000000 0.008671" quat="-1.224746455728464e-07 0.7071076038322833 -0.7071059585398335 1.2247436059979766e-07" material="App0.010" type="mesh" mesh="shin_bl.obj" class="visual" />
+            <body name="foot_bl_link" pos="0.000156 0.102417 0.008527" quat="0.3826831968646483 0.0 -0.0 0.9238796300587284">
+              <geom name="foot_bl_link_collision" pos="-0.000000 0.000000 -0.000000" quat="1.0 0.0 0.0 0.0" type="cylinder" size="0.012816 0.0098995" class="collision" />
+              <site name="foot_bl_site" pos="-0.000000 0.000000 -0.000000" type="cylinder" size="0.012816 0.0098995" quat="1.0 0.0 0.0 0.0" group="5" />
+            </body>
+          </body>
+        </body>
+      </body>
+      <body name="leg_block_br_link" pos="-0.133924 -0.062262 0.002451" quat="0.5000001633974483 0.4999999999999733 0.49999983660255165 0.4999999999999733">
+        <joint name="leg_block_br_joint" type="hinge" ref="0.0" class="scs40" range="-1.745329 0.959931" axis="0.000000 0.000000 1.000000" />
+        <inertial pos="-0.003255 -0.010060 0.000339" quat="0.000000 0.000000 0.000000 1.000000" mass="0.193000" diaginertia="0.000095 0.000070 0.000061" />
+        <geom name="leg_block_br_link_visual" pos="-0.004218 -0.010309 -0.000000" quat="0.7071068967259818 -0.7071066656470943 0.0 0.0" material="App0.010" type="mesh" mesh="leg_block_br.obj" class="visual" />
+        <body name="hip_br_link" pos="-0.031717 -0.000295 -0.010561" quat="0.6532815487607498 -0.27059810344534674 -0.6532813719005914 0.27059810344534674">
+          <joint name="hip_br_joint" type="hinge" ref="0.0" class="scs40" range="-1.047200 1.047200" axis="0.000000 0.000000 -1.000000" />
+          <inertial pos="-0.042963 -0.000022 0.004941" quat="0.500000 0.500000 0.500000 0.500000" mass="0.023000" diaginertia="0.000035 0.000035 0.000001" />
+          <geom name="hip_br_link_visual" pos="-0.000000 0.000000 -0.000000" quat="1.0 0.0 -0.0 0.0" material="App0.010" type="mesh" mesh="hip_br.obj" class="visual" />
+          <body name="shin_br_link" pos="-0.100133 0.000005 0.004477" quat="0.7071065431725606 0.0 -0.0 -0.7071070192004544">
+            <joint name="shin_br_joint" type="hinge" ref="0.0" class="scs40" range="-1.134464 0.523599" axis="0.000000 0.000000 -1.000000" />
+            <inertial pos="0.048057 0.001422 0.000398" quat="0.500000 0.500000 0.500000 0.500000" mass="0.049000" diaginertia="0.000094 0.000092 0.000005" />
+            <geom name="shin_br_link_visual" pos="-0.000000 -0.000000 -0.000000" quat="3.2679489653813835e-07 0.0 0.0 0.9999999999999466" material="App0.010" type="mesh" mesh="shin_br.obj" class="visual" />
+            <body name="foot_br_link" pos="0.102457 0.000276 0.000002" quat="0.9238795637760319 0.0 0.0 -0.3826833568853094">
+              <geom name="foot_br_link_collision" pos="0.000000 0.000000 0.000000" quat="3.2679489653813835e-07 -0.9999999999999466 0.0 -0.0" type="cylinder" size="0.012816 0.0098995" class="collision" />
+              <site name="foot_br_site" pos="0.000000 0.000000 0.000000" type="cylinder" size="0.012816 0.0098995" quat="3.2679489653813835e-07 -0.9999999999999466 0.0 -0.0" group="5" />
+            </body>
+          </body>
+        </body>
+      </body>
+      <body name="panda_visual_link" pos="0.069342 -0.000054 0.020418" quat="0.7071068967259818 -0.0 0.0 0.7071066656470943">
+        <geom name="panda_visual_link_visual" pos="-0.000000 0.000000 0.000000" quat="1.0 0.0 0.0 0.0" material="App0.010" type="mesh" mesh="panda_visual.obj" class="visual" />
+      </body>
+    </body>
+  </worldbody>
+  <actuator>
+    <position name="leg_block_fl_joint_ctrl" joint="leg_block_fl_joint" class="scs40" ctrlrange="-0.959931 1.745329" />
+    <position name="hip_fl_joint_ctrl" joint="hip_fl_joint" class="scs40" ctrlrange="-1.047200 1.047200" />
+    <position name="shin_fl_joint_ctrl" joint="shin_fl_joint" class="scs40" ctrlrange="-1.134464 0.523599" />
+    <position name="leg_block_fr_joint_ctrl" joint="leg_block_fr_joint" class="scs40" ctrlrange="-1.745329 0.959931" />
+    <position name="hip_fr_joint_ctrl" joint="hip_fr_joint" class="scs40" ctrlrange="-1.047198 1.047200" />
+    <position name="shin_fr_joint_ctrl" joint="shin_fr_joint" class="scs40" ctrlrange="-1.134464 0.523599" />
+    <position name="leg_block_bl_joint_ctrl" joint="leg_block_bl_joint" class="scs40" ctrlrange="-0.959931 1.745329" />
+    <position name="hip_bl_joint_ctrl" joint="hip_bl_joint" class="scs40" ctrlrange="-1.047200 1.047200" />
+    <position name="shin_bl_joint_ctrl" joint="shin_bl_joint" class="scs40" ctrlrange="-1.134464 0.523599" />
+    <position name="leg_block_br_joint_ctrl" joint="leg_block_br_joint" class="scs40" ctrlrange="-1.745329 0.959931" />
+    <position name="hip_br_joint_ctrl" joint="hip_br_joint" class="scs40" ctrlrange="-1.047200 1.047200" />
+    <position name="shin_br_joint_ctrl" joint="shin_br_joint" class="scs40" ctrlrange="-1.134464 0.523599" />
+  </actuator>
+  <contact>
+    <exclude body1="base_link" body2="leg_block_bl_link" />
+    <exclude body1="leg_block_bl_link" body2="hip_bl_link" />
+    <exclude body1="hip_fl_link" body2="shin_fl_link" />
+    <exclude body1="shin_fl_link" body2="foot_fl_link" />
+    <exclude body1="base_link" body2="leg_block_fr_link" />
+    <exclude body1="leg_block_fr_link" body2="hip_fr_link" />
+    <exclude body1="hip_fr_link" body2="shin_fr_link" />
+    <exclude body1="shin_fr_link" body2="foot_fr_link" />
+    <exclude body1="hip_bl_link" body2="shin_bl_link" />
+    <exclude body1="shin_bl_link" body2="foot_bl_link" />
+    <exclude body1="base_link" body2="leg_block_br_link" />
+    <exclude body1="leg_block_br_link" body2="hip_br_link" />
+    <exclude body1="hip_br_link" body2="shin_br_link" />
+    <exclude body1="shin_br_link" body2="foot_br_link" />
+    <exclude body1="base_link" body2="leg_block_fl_link" />
+    <exclude body1="leg_block_fl_link" body2="hip_fl_link" />
+  </contact>
+  <sensor>
+    <framepos name="base_link_site_pos" objtype="site" objname="base_link_site" />
+    <framequat name="base_link_site_quat" objtype="site" objname="base_link_site" />
+    <framelinvel name="base_link_site_linvel" objtype="site" objname="base_link_site" />
+    <frameangvel name="base_link_site_angvel" objtype="site" objname="base_link_site" />
+    <velocimeter name="base_link_site_vel" site="base_link_site" />
+    <accelerometer name="base_link_acc" site="base_link_site" noise="0.001" />
+    <gyro name="base_link_gyro" site="base_link_site" noise="0.001" />
+    <magnetometer name="base_link_mag" site="base_link_site" />
+    <framezaxis name="base_link_site_upvector" objtype="site" objname="base_link_site" />
+    <framexaxis name="base_link_site_forwardvector" objtype="site" objname="base_link_site" />
+    <framelinvel name="base_link_site_global_linvel" objtype="site" objname="base_link_site" />
+    <frameangvel name="base_link_site_global_angvel" objtype="site" objname="base_link_site" />
+    <framelinvel name="foot_fl_site_global_linvel" objtype="site" objname="foot_fl_site" />
+    <framelinvel name="foot_fr_site_global_linvel" objtype="site" objname="foot_fr_site" />
+    <framelinvel name="foot_bl_site_global_linvel" objtype="site" objname="foot_bl_site" />
+    <framelinvel name="foot_br_site_global_linvel" objtype="site" objname="foot_br_site" />
+    <framepos objtype="site" objname="foot_fl_site" name="foot_fl_site_pos" reftype="site" refname="base_link_site" />
+    <framepos objtype="site" objname="foot_fr_site" name="foot_fr_site_pos" reftype="site" refname="base_link_site" />
+    <framepos objtype="site" objname="foot_bl_site" name="foot_bl_site_pos" reftype="site" refname="base_link_site" />
+    <framepos objtype="site" objname="foot_br_site" name="foot_br_site_pos" reftype="site" refname="base_link_site" />
+    <contact name="foot_fl_link_collision_floor_found" geom1="foot_fl_link_collision" geom2="floor" reduce="mindist" num="1" data="found" />
+    <contact name="foot_fr_link_collision_floor_found" geom1="foot_fr_link_collision" geom2="floor" reduce="mindist" num="1" data="found" />
+    <contact name="foot_bl_link_collision_floor_found" geom1="foot_bl_link_collision" geom2="floor" reduce="mindist" num="1" data="found" />
+    <contact name="foot_br_link_collision_floor_found" geom1="foot_br_link_collision" geom2="floor" reduce="mindist" num="1" data="found" />
+  </sensor>
+  <keyframe>
+    <key name="home" qpos="0.000000 0.000000 0.142000 1.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000" ctrl="0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000" />
+    <key name="home_higher" qpos="0.000000 0.000000 0.180000 1.000000 0.000000 0.000000 0.000000 0.016502 0.061020 -0.082078 -0.024804 -0.086634 0.166163 0.095165 0.006153 0.172680 0.006433 0.006791 -0.003729" ctrl="-0.100000 0.040000 0.300000 0.100000 -0.040000 0.300000 -0.100000 0.040000 0.300000 0.100000 -0.040000 0.300000" />
+    <key name="pre_recovery" qpos="0.000000 0.000000 0.042000 1.000000 0.000000 0.000000 0.000000 0.249439 1.048940 -1.140940 -0.311554 1.045220 -1.137260 0.235032 1.034550 -1.143950 -0.289400 1.048620 -1.141750" ctrl="0.230256 1.047000 -1.134000 -0.311403 1.047000 -1.134000 0.216732 1.047000 -1.134000 -0.257305 1.047000 -1.134000" />
+    <key name="test" qpos="0.000000 0.000000 0.142000 1.000000 0.000000 0.000000 0.000000 0.557006 0.038963 -0.139662 -0.507725 -0.050120 -0.062269 0.644591 -0.049880 -0.046050 -0.441669 -0.039669 -0.186592" ctrl="0.379026 0.000000 0.000000 -0.473697 0.000000 0.000000 0.568368 0.000000 0.000000 -0.230256 0.000000 0.000000" />
+  </keyframe>
+</mujoco>

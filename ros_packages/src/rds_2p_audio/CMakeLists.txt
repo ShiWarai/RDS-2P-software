@@ -8,5 +8,10 @@ install(DIRECTORY launch
   DESTINATION share/${PROJECT_NAME}
 )
 
+install(PROGRAMS
+  scripts/audio_player_node.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_package()
 

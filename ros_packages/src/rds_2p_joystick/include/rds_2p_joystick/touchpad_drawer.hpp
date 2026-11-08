@@ -5,6 +5,7 @@
 #include <geometry_msgs/msg/point_stamped.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <sensor_msgs/msg/joy.hpp>
+#include <std_msgs/msg/float32.hpp>
 #include <rclcpp/qos.hpp>
 #include <vector>
 #include <deque>
@@ -37,6 +38,7 @@ private:
     rclcpp::Subscription<geometry_msgs::msg::PointStamped>::SharedPtr touchpad_sub_;
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr image_pub_;
+    rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr touch_rate_pub_;
     rclcpp::TimerBase::SharedPtr publish_timer_;
     
     // Данные
@@ -55,6 +57,10 @@ private:
     
     // Состояние
     std::atomic<int> brush_size_;  // Atomic для быстрого доступа без блокировок
+    std::atomic<bool> drawing_enabled_;  // Рисование разрешено только при достаточном нажатии L2
+    double last_touch_msg_time_;  // Время последнего сообщения touchpad
+    size_t touch_rate_intervals_count_;  // Количество интервалов в текущей сессии касания
+    double touch_rate_intervals_sum_;  // Сумма интервалов в текущей сессии касания
     double last_clear_time_;
     size_t last_drawn_index_;  // Индекс последней отрисованной точки в touch_history_
     std::atomic<bool> dirty_;  // Флаг изменений для пропуска пустых публикаций

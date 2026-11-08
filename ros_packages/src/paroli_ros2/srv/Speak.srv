@@ -1,0 +1,5 @@
+string text
+float64 volume
+---
+bool success
+string message

@@ -2,9 +2,9 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>mpu6500_ros</name>
-  <version>0.1.0</version>
-  <description>ROS2 node for MPU6500 IMU sensor</description>
-  <maintainer email="maintainer@example.com">RDS-2P Team</maintainer>
+  <version>1.0.0</version>
+  <description>Узел ROS 2 для MPU6500 (I²C/SPI): публикация sensor_msgs/Imu с DMP и опциональной калибровкой</description>
+  <maintainer email="zhuravliov.pav@yandex.ru">ShiWarai</maintainer>
   <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>

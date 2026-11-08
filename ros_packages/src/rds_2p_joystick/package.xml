@@ -2,10 +2,10 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>rds_2p_joystick</name>
-  <version>0.0.1</version>
-  <description>ROS2 package for PS4 joystick control with IMU support for RDS-2P robot</description>
-  <maintainer email="zhuravliov.pav@yandex.ru">Zhuravliov Pavel</maintainer>
-  <license>MIT License</license>
+  <version>1.0.0</version>
+  <description>Телеуправление роботом RDS-2P с DualShock/PS4: joy, камера, TF; опционально IMU-трекинг геймпада</description>
+  <maintainer email="zhuravliov.pav@yandex.ru">ShiWarai</maintainer>
+  <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 

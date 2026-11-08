@@ -98,8 +98,11 @@ install(TARGETS
 # Install models directory
 install(DIRECTORY
   models/
-  DESTINATION share/${PROJECT_NAME}/models
-)
+  DESTINATION share/${PROJECT_NAME}/models)
+
+# Внешняя python-зависимость mujoco_playground (ros_packages/deps, ставится build_for_desktop.sh):
+# добавляем deps в PYTHONPATH при source install/setup.bash
+ament_environment_hooks("${CMAKE_CURRENT_SOURCE_DIR}/env/${PROJECT_NAME}.dsv")
 
 # Install launch files
 install(DIRECTORY

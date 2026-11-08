@@ -71,7 +71,16 @@ install(DIRECTORY launch/
 # Install scripts
 install(PROGRAMS
   scripts/publish_image.py
+  scripts/lip_sync_face_node.py
   DESTINATION lib/${PROJECT_NAME}
+)
+
+install(FILES config/lip_sync_manifest.json
+  DESTINATION share/${PROJECT_NAME}/config
+)
+
+install(DIRECTORY data/lip_sync/
+  DESTINATION share/${PROJECT_NAME}/data/lip_sync
 )
 
 if(BUILD_TESTING)

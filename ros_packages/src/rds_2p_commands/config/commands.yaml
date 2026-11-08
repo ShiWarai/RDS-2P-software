@@ -1,0 +1,63 @@
+# Единый конфиг команд: routine_id = ключ записи.
+# keywords — русские триггеры (fallback по подстроке в нижнем регистре).
+# sound / face / face_init — данные для исполнителя PandaCommand; остальное см. RobotRoutineHandler.
+# Позы приводов (12 чисел на позу) — в panda_poses.yaml (параметр panda_poses_config у unified_action_server).
+#
+# PandaCommand: один слот «motors» в command_parser и unified_action_server (см. PANDA_GOAL_CLASS / PANDA_ACTION_SLOT).
+#
+# panda_dialog_interrupt — фразы первого приоритета: прерывают rkllm+Paroli
+# и снимают блокировку новых команд, пока панда говорит или идёт запрос к LLM. PandaCommand не шлётся.
+
+panda_dialog_interrupt:
+  keywords: ['хватит']
+
+commands:
+  give_paw:
+    keywords: ["лапу"]
+    sound: idle1.wav
+    face: smile_W_open mouth_240x280.png
+    face_init: false
+
+  stand_at_attention:
+    keywords: ["равняйсь"]
+    sound: idle6.wav
+    face: smile240x280.png
+    face_init: false
+
+  dismiss:
+    keywords: ["отставить", "вставай"]
+    sound: idle3.wav
+    face: smileW.png
+
+  lie_down:
+    keywords: ["лежать", "ложись"]
+    sound: idle3.wav
+    face: smileW.png
+
+  rotate:
+    keywords: ["кувырок", "вращайся"]
+    sound: death1.wav
+    face: smileW.png
+
+  run:
+    keywords: ["бегать", "пошли"]
+    sound: idle1.wav
+    face: null
+    allow_real_systemd: false
+
+  stop_running:
+    keywords: ["смирно"]
+    sound: bleat2.wav
+    face: null
+    allow_real_systemd: false
+
+  pray:
+    keywords: ["служить"]
+    sound: bleat2.wav
+    face: null
+
+  reconnect_joystick:
+    keywords: ["держи джойстик", "возьми джойстик", "подключись к джойстику"]
+    sound: bleat3.wav
+    face: null
+    allow_real_joystick_script: false

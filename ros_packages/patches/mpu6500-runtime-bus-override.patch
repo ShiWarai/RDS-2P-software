@@ -1,0 +1,124 @@
+diff --git a/interface/driver_mpu6500_interface.h b/interface/driver_mpu6500_interface.h
+index 2ed6313..d7e21e2 100644
+--- a/interface/driver_mpu6500_interface.h
++++ b/interface/driver_mpu6500_interface.h
+@@ -103,6 +103,26 @@ uint8_t mpu6500_interface_iic_write(uint8_t addr, uint8_t reg, uint8_t *buf, uin
+  */
+ uint8_t mpu6500_interface_spi_init(void);
+ 
++/**
++ * @brief  set the iic device name used by mpu6500_interface_iic_init
++ * @param[in] *name pointer to the device name
++ * @return     status code
++ *             - 0 success
++ *             - 1 name is null
++ * @note   overridable at runtime (e.g. from a ROS2 parameter)
++ */
++uint8_t mpu6500_interface_set_iic_device(const char *name);
++
++/**
++ * @brief  set the spi device name used by mpu6500_interface_spi_init
++ * @param[in] *name pointer to the device name
++ * @return     status code
++ *             - 0 success
++ *             - 1 name is null
++ * @note   overridable at runtime (e.g. from a ROS2 parameter)
++ */
++uint8_t mpu6500_interface_set_spi_device(const char *name);
++
+ /**
+  * @brief  interface spi bus deinit
+  * @return status code
+diff --git a/project/raspberrypi4b/driver/src/raspberrypi4b_driver_mpu6500_interface.c b/project/raspberrypi4b/driver/src/raspberrypi4b_driver_mpu6500_interface.c
+index e1f8786..c44cace 100644
+--- a/project/raspberrypi4b/driver/src/raspberrypi4b_driver_mpu6500_interface.c
++++ b/project/raspberrypi4b/driver/src/raspberrypi4b_driver_mpu6500_interface.c
+@@ -38,26 +38,65 @@
+ #include "iic.h"
+ #include "spi.h"
+ #include <stdarg.h>
++#include <string.h>
+ 
+ /**
+- * @brief iic device name definition
++ * @brief iic device name definition (default value, overridable at runtime)
+  */
+ #define IIC_DEVICE_NAME "/dev/i2c-1"        /**< iic device name */
+ 
+ /**
+- * @brief spi device name definition
++ * @brief spi device name definition (default value, overridable at runtime)
+  */
+ #define SPI_DEVICE_NAME "/dev/spidev0.0"    /**< spi device name */
+ 
+ /**
+- * @brief iic device handle definition
++ * @brief  runtime-overridable device names
++ * @note   initialised to the #define defaults; change with mpu6500_interface_set_*_device
+  */
++static char gs_iic_device[] = IIC_DEVICE_NAME;
++
++static char gs_spi_device[] = SPI_DEVICE_NAME;
++
+ static int gs_iic_fd;                       /**< iic handle */
+ 
++static int gs_spi_fd;                       /**< spi handle */
++
+ /**
+- * @brief spi device handle definition
++ * @brief  set the iic device name used by mpu6500_interface_iic_init
++ * @param[in] *name pointer to the device name
++ * @return     status code
++ *             - 0 success
++ *             - 1 name is null
+  */
+-static int gs_spi_fd;                       /**< spi handle */
++uint8_t mpu6500_interface_set_iic_device(const char *name)
++{
++    if (name == NULL)
++    {
++        return 1;
++    }
++    strncpy(gs_iic_device, name, sizeof(gs_iic_device) - 1);
++    gs_iic_device[sizeof(gs_iic_device) - 1] = '\0';
++    return 0;
++}
++
++/**
++ * @brief  set the spi device name used by mpu6500_interface_spi_init
++ * @param[in] *name pointer to the device name
++ * @return     status code
++ *             - 0 success
++ *             - 1 name is null
++ */
++uint8_t mpu6500_interface_set_spi_device(const char *name)
++{
++    if (name == NULL)
++    {
++        return 1;
++    }
++    strncpy(gs_spi_device, name, sizeof(gs_spi_device) - 1);
++    gs_spi_device[sizeof(gs_spi_device) - 1] = '\0';
++    return 0;
++}
+ 
+ /**
+  * @brief  interface iic bus init
+@@ -68,7 +107,7 @@ static int gs_spi_fd;                       /**< spi handle */
+  */
+ uint8_t mpu6500_interface_iic_init(void)
+ {
+-    return iic_init(IIC_DEVICE_NAME, &gs_iic_fd);
++    return iic_init(gs_iic_device, &gs_iic_fd);
+ }
+ 
+ /**
+@@ -124,7 +163,7 @@ uint8_t mpu6500_interface_iic_write(uint8_t addr, uint8_t reg, uint8_t *buf, uin
+  */
+ uint8_t mpu6500_interface_spi_init(void)
+ {
+-    return spi_init(SPI_DEVICE_NAME, &gs_spi_fd, SPI_MODE_TYPE_3, 1000 * 1000);
++    return spi_init(gs_spi_device, &gs_spi_fd, SPI_MODE_TYPE_3, 1000 * 1000);
+ }
+ 
+ /**

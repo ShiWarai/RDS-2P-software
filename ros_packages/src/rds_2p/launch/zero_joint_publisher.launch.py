@@ -15,7 +15,7 @@ def generate_launch_description():
     
     keyframes_file_arg = DeclareLaunchArgument(
         'keyframes_file',
-        default_value='/home/orangepi/RDS-2P-simulator/mjcf_src/configs/keyframes.yml',
+        default_value='/home/orangepi/RDS-2P-software/mjcf_src/configs/keyframes.yml',
         description='Path to keyframes YAML file'
     )
     
