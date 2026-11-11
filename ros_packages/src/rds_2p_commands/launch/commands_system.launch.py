@@ -48,19 +48,19 @@ def generate_launch_description():
     )
     rkllm_complete_action_arg = DeclareLaunchArgument(
         'rkllm_complete_action',
-        default_value='/rkllm_ros2/complete',
+        default_value='/rkllm_ros/complete',
     )
     rkllm_clear_kv_arg = DeclareLaunchArgument(
         'rkllm_clear_kv_service',
-        default_value='/rkllm_ros2/clear_kv_cache',
+        default_value='/rkllm_ros/clear_kv_cache',
     )
     paroli_speak_arg = DeclareLaunchArgument(
         'paroli_speak_service',
-        default_value='/paroli_ros2/speak',
+        default_value='/paroli_ros/speak',
     )
     paroli_stop_speech_arg = DeclareLaunchArgument(
         'paroli_stop_speech_service',
-        default_value='/paroli_ros2/stop_speech',
+        default_value='/paroli_ros/stop_speech',
     )
     rkllm_wait_arg = DeclareLaunchArgument('rkllm_wait_server_sec', default_value='5.0')
     paroli_wait_arg = DeclareLaunchArgument('paroli_wait_service_sec', default_value='3.0')

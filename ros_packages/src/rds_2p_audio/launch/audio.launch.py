@@ -23,10 +23,9 @@ def _as_bool(v: str) -> bool:
 def _opaque_audio_nodes(context, *_args, **_kwargs):
     enable_capturer = _as_bool(context.launch_configurations.get("enable_capturer", "true"))
     capturer_respawn = _as_bool(context.launch_configurations.get("capturer_respawn", "true"))
-
     audio_player_node = Node(
         package="rds_2p_audio",
-        executable="audio_player_node.py",
+        executable="audio_player_node",
         name="audio_player",
         output="screen",
         parameters=[{
@@ -38,9 +37,14 @@ def _opaque_audio_nodes(context, *_args, **_kwargs):
             "output_sample_rate": ParameterValue(
                 LaunchConfiguration("output_sample_rate"), value_type=int
             ),
-            "mix_period_ms": ParameterValue(LaunchConfiguration("mix_period_ms"), value_type=float),
+            "block_ms": ParameterValue(LaunchConfiguration("block_ms"), value_type=float),
+            "latency_ms": ParameterValue(LaunchConfiguration("latency_ms"), value_type=float),
+            "preroll_ms": ParameterValue(LaunchConfiguration("preroll_ms"), value_type=float),
             "source_evict_sec": ParameterValue(
                 LaunchConfiguration("source_evict_sec"), value_type=float
+            ),
+            "max_source_buffer_sec": ParameterValue(
+                LaunchConfiguration("max_source_buffer_sec"), value_type=float
             ),
             "qos_depth": ParameterValue(LaunchConfiguration("qos_depth"), value_type=int),
         }],
@@ -72,11 +76,11 @@ def _opaque_audio_nodes(context, *_args, **_kwargs):
 
 def generate_launch_description():
     return LaunchDescription([
-        DeclareLaunchArgument(
-            "output_topic",
-            default_value="/audio/output",
-            description="Шина воспроизведения AudioStamped (контрактный frame_id + rate)",
-        ),
+    DeclareLaunchArgument(
+        "output_topic",
+        default_value="/audio/output",
+        description="Шина воспроизведения AudioStamped (контрактный frame_id + rate)",
+    ),
         DeclareLaunchArgument(
             "output_device",
             default_value="-1",
@@ -106,14 +110,35 @@ def generate_launch_description():
             description="Должен совпадать с полем audio.info.rate у входящего потока",
         ),
         DeclareLaunchArgument(
-            "mix_period_ms",
+            "block_ms",
             default_value="20.0",
-            description="Шаг смешения одного блока миллисекунд для микшера",
+        description="Размер блока PortAudio (мс) — такт колбэка и шага микширования. Больше — запас против underflow, меньше — задержка",
+    ),
+    DeclareLaunchArgument(
+        "latency_ms",
+        default_value="100.0",
+        description=(
+            "Размер буфера вывода PortAudio/ALSA (мс). Больше — сглаживание джиттера и "
+            "меньше «прирывов» звука, но выше задержка. ≤0 — дефолтный high-latency устройства"
         ),
-        DeclareLaunchArgument(
-            "source_evict_sec",
+    ),
+    DeclareLaunchArgument(
+        "preroll_ms",
+        default_value="120.0",
+        description=(
+            "Джиттер-буфер источника (мс): плеер не начинает играть, пока не накопит этот "
+            "запас. Сглаживает рывки при realtime-подаче с джиттером. 0 — без preroll"
+        ),
+    ),
+    DeclareLaunchArgument(
+        "source_evict_sec",
             default_value="5.0",
             description="Удалять источник frame_id если нет новых сообщений дольше (с)",
+        ),
+        DeclareLaunchArgument(
+            "max_source_buffer_sec",
+            default_value="15.0",
+            description="Буфер одного источника не длиннее этого (с); сверху — сброс старых кадров (backpressure)",
         ),
         DeclareLaunchArgument(
             "qos_depth",

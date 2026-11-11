@@ -71,7 +71,7 @@ ros2 launch audio_filters audio_gain.launch.py \
 По умолчанию Vosk подписан на **`/audio/input`**. Чтобы использовать очищенный поток:
 
 ```bash
-ros2 launch vosk_ros2 vosk.launch.py audio_topic:=/audio/input/clean
+ros2 launch vosk_ros vosk.launch.py audio_topic:=/audio/input/clean
 ```
 
 (или передайте тот же аргумент в ваш объединённый launch.)

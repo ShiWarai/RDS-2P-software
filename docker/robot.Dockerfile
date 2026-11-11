@@ -78,10 +78,9 @@ RUN set -eux; \
 # Констрейнт numpy<=1.26.4 (rknn-toolkit2) закреплён в самих requirements-файлах.
 RUN cd /opt/rds2p/ros-ws \
     && python3 -m pip install --no-cache-dir \
-         -r src/vosk_ros2/requirements.txt \
+         -r src/vosk_ros/requirements.txt \
          -r src/rds_2p_telegram_bot/requirements.txt \
          -r src/rds_2p_inference/requirements.txt \
-         -r src/rds_2p_audio/requirements.txt \
          -r src/rds_2p_joystick/requirements.txt
 
 # Колонки colcon: на 2GB SBC 4 компилятора параллельно вызывают OOM — build_robot.sh
@@ -95,16 +94,16 @@ RUN set -ex; \
     . /opt/ros/humble/setup.sh; \
     SKIP=""; \
     if [ "${NPU}" = "0" ]; then \
-      SKIP="$SKIP rkllm_ros2"; \
-      echo "INFO: NPU=0 — rkllm_ros2 НЕ собран (платформа без RK NPU). Команды работают, LLM-экшены отключены."; \
+      SKIP="$SKIP rkllm_ros"; \
+      echo "INFO: NPU=0 — rkllm_ros НЕ собран (платформа без RK NPU). Команды работают, LLM-экшены отключены."; \
     else \
       for f in vendor/lib/librkllmrt.so vendor/lib/librknnrt.so vendor/include/rkllm.h vendor/include/rknn_api.h; do \
-        if [ ! -f "src/rkllm_ros2/$f" ]; then SKIP="$SKIP rkllm_ros2"; break; fi; \
+        if [ ! -f "src/rkllm_ros/$f" ]; then SKIP="$SKIP rkllm_ros"; break; fi; \
       done; \
-      if [ -n "$SKIP" ]; then echo "WARNING: rkllm_ros2 НЕ собран (нет vendor RK-рантайма)"; fi; \
+      if [ -n "$SKIP" ]; then echo "WARNING: rkllm_ros НЕ собран (нет vendor RK-рантайма)"; fi; \
     fi; \
-    if [ "${NPU}" = "1" ] && echo "$SKIP" | grep -q rkllm_ros2; then \
-      echo "ERROR: NPU=1 запрошен, но vendor RK-рантайм отсутствует. Положите .so/заголовки по rkllm_ros2/vendor/README.md."; \
+    if [ "${NPU}" = "1" ] && echo "$SKIP" | grep -q rkllm_ros; then \
+      echo "ERROR: NPU=1 запрошен, но vendor RK-рантайм отсутствует. Положите .so/заголовки по rkllm_ros/vendor/README.md."; \
       exit 1; \
     fi; \
     if [ -f /tmp/orbbec-apt-ok ]; then SKIP="$SKIP orbbec_camera orbbec_camera_msgs orbbec_description"; fi; \

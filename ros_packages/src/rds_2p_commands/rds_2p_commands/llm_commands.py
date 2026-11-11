@@ -9,8 +9,8 @@ from typing import List, Optional, Tuple
 
 from rclpy.action import ActionClient
 from rclpy.node import Node
-from paroli_ros2.srv import Speak
-from rkllm_ros2_msgs.action import ChatCompletion
+from paroli_ros.srv import Speak
+from rkllm_ros_msgs.action import ChatCompletion
 from std_srvs.srv import Trigger
 
 

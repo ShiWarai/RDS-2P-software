@@ -130,26 +130,26 @@ else
     echo "ℹ️ audio_common уже существует"
 fi
 
-# Клонируем vosk_ros2 если его нет
-VOSK_ROS2_PATH="src/vosk_ros2"
-if [ ! -d "$VOSK_ROS2_PATH" ]; then
-    echo "📥 Клонируем vosk_ros2..."
+# Клонируем vosk_ros если его нет
+VOSK_ROS_PATH="src/vosk_ros"
+if [ ! -d "$VOSK_ROS_PATH" ]; then
+    echo "📥 Клонируем vosk_ros..."
     cd src
-    git clone -b dev https://github.com/ShiWarai/vosk_ros2.git
+    git clone -b dev https://github.com/ShiWarai/vosk_ros.git
     cd ..
-    echo "✅ vosk_ros2 клонирован"
+    echo "✅ vosk_ros клонирован"
 else
-    echo "ℹ️ vosk_ros2 уже существует"
+    echo "ℹ️ vosk_ros уже существует"
 fi
 
 # Модель Vosk — runtime-актив: native качает всегда, docker/prepare — только с --models.
 # Зеркало на HF: alphacephei.com подвешивает тело ответа — соединение открывается,
 # но байты не идут; размер файла сверен с официальным ETag: 46236750 байт.
-# ВАЖНО: свежий клон vosk_ros2 не содержит каталога models (он в .gitignore пакета),
+# ВАЖНО: свежий клон vosk_ros не содержит каталога models (он в .gitignore пакета),
 # а CMake install(DIRECTORY models) без него падает — гарантируем пустой каталог.
 # Сама модель — runtime-актив (в контейнере монтируется в /models).
-VOSK_MODEL_PATH="src/vosk_ros2/models/vosk-model-small-ru-0.22"
-VOSK_MODEL_DIR="src/vosk_ros2/models"
+VOSK_MODEL_PATH="src/vosk_ros/models/vosk-model-small-ru-0.22"
+VOSK_MODEL_DIR="src/vosk_ros/models"
 mkdir -p "$VOSK_MODEL_DIR"
 if [ -d "$VOSK_MODEL_PATH" ]; then
     echo "ℹ️ Модель Vosk уже установлена: $VOSK_MODEL_PATH"
@@ -491,7 +491,7 @@ if [[ ! -f "${RNN_INST}/lib/librnnoise.a" ]]; then
     COLCON_SKIP_EXTRA="audio_filters"
     echo "⚠️  audio_filters в сборку не входит (нет собранного RNNoise)."
 fi
-colcon build --parallel-workers "${JOBS}" --symlink-install --packages-skip mpu6500_ros rds_2p_joystick orbbec_camera mtf02p_ros rkllm_ros2 ${COLCON_SKIP_EXTRA} --packages-ignore rds_2p_face
+colcon build --parallel-workers "${JOBS}" --symlink-install --packages-skip mpu6500_ros rds_2p_joystick orbbec_camera mtf02p_ros rkllm_ros ${COLCON_SKIP_EXTRA} --packages-ignore rds_2p_face
 
 echo "✅ Готово! Загрузите переменные: source install/setup.bash"
 

@@ -59,22 +59,22 @@ def generate_launch_description():
     )
     rkllm_complete_action_arg = DeclareLaunchArgument(
         'rkllm_complete_action',
-        default_value='/rkllm_ros2/complete',
+        default_value='/rkllm_ros/complete',
         description='Имя action rkllm (ChatCompletion)',
     )
     rkllm_clear_kv_arg = DeclareLaunchArgument(
         'rkllm_clear_kv_service',
-        default_value='/rkllm_ros2/clear_kv_cache',
+        default_value='/rkllm_ros/clear_kv_cache',
         description='Сервис сброса KV rkllm (пустая строка — не создавать клиент)',
     )
     paroli_speak_arg = DeclareLaunchArgument(
         'paroli_speak_service',
-        default_value='/paroli_ros2/speak',
+        default_value='/paroli_ros/speak',
         description='Сервис Paroli Speak (пустая строка — отключить озвучку)',
     )
     paroli_stop_speech_arg = DeclareLaunchArgument(
         'paroli_stop_speech_service',
-        default_value='/paroli_ros2/stop_speech',
+        default_value='/paroli_ros/stop_speech',
         description='std_srvs/Trigger — прервать синтез Paroli (команда «хватит» и т.п.)',
     )
     rkllm_wait_arg = DeclareLaunchArgument(
@@ -90,7 +90,7 @@ def generate_launch_description():
     rkllm_keep_hist_arg = DeclareLaunchArgument(
         'rkllm_keep_history',
         default_value='true',
-        description='Поле keep_history в goal ChatCompletion (см. README rkllm_ros2 / persist_session_kv)',
+        description='Поле keep_history в goal ChatCompletion (см. README rkllm_ros / persist_session_kv)',
     )
     rkllm_clear_before_arg = DeclareLaunchArgument(
         'rkllm_clear_kv_before_query',

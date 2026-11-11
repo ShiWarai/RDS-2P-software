@@ -12,7 +12,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
 from std_msgs.msg import String
-from vosk_ros2.msg import Transcription
+from vosk_ros.msg import Transcription
 from rds_2p_commands.action import PandaCommand
 from rds_2p_commands.llm_commands import LlmCommands
 from pathlib import Path
@@ -72,10 +72,10 @@ class CommandParserNode(Node):
 
         self.declare_parameter('panda_llm_tts_enabled', True)
         self.declare_parameter('panda_llm_trigger_substring', 'панда')
-        self.declare_parameter('rkllm_complete_action', '/rkllm_ros2/complete')
-        self.declare_parameter('rkllm_clear_kv_service', '/rkllm_ros2/clear_kv_cache')
-        self.declare_parameter('paroli_speak_service', '/paroli_ros2/speak')
-        self.declare_parameter('paroli_stop_speech_service', '/paroli_ros2/stop_speech')
+        self.declare_parameter('rkllm_complete_action', '/rkllm_ros/complete')
+        self.declare_parameter('rkllm_clear_kv_service', '/rkllm_ros/clear_kv_cache')
+        self.declare_parameter('paroli_speak_service', '/paroli_ros/speak')
+        self.declare_parameter('paroli_stop_speech_service', '/paroli_ros/stop_speech')
         self.declare_parameter('rkllm_wait_server_sec', 5.0)
         self.declare_parameter('paroli_wait_service_sec', 3.0)
         self.declare_parameter('rkllm_keep_history', True)

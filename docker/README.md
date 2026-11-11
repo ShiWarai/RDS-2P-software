@@ -114,9 +114,9 @@ docker/run_desktop.sh      # окно MuJoCo через WSLg (DISPLAY/Wayland м
 ### Предварительно на роботе
 1. Docker: `sudo apt-get install -y docker.io && sudo usermod -aG docker $USER` (перелогин).
 2. `git pull` в `RDS-2P-software`.
-3. Vendor RK: положить в `ros_packages/src/rkllm_ros2/vendor/`
+3. Vendor RK: положить в `ros_packages/src/rkllm_ros/vendor/`
    `lib/librkllmrt.so`, `lib/librknnrt.so`, `include/rkllm.h`, `include/rknn_api.h`
-   (см. `ros_packages/src/rkllm_ros2/vendor/README.md`). Без них образ соберётся **без rkllm_ros2** (LLM-экшенов не будет), сборка не упадёт.
+   (см. `ros_packages/src/rkllm_ros/vendor/README.md`). Без них образ соберётся **без rkllm_ros** (LLM-экшенов не будет), сборка не упадёт.
 4. Модели (не в git) — в каталог, который смонтируется в `/models`:
    `.rkllm`/`.rknn` для rkllm, onnx-политика уже в образе (`rds_2p_inference`).
 
@@ -124,14 +124,14 @@ docker/run_desktop.sh      # окно MuJoCo через WSLg (DISPLAY/Wayland м
 ```bash
 docker/build_robot.sh
 ```
-Скрипт: проверяет aarch64 и docker; предупреждает о неполном vendor; докачивает отсутствующие клоны (FTServoLibrary, mpu6500, OrbbecSDK_ROS2, audio_common, vosk_ros2 + модель Vosk); затем `docker build`. `ros-humble-orbbec-camera` ставится из apt, если доступен для arm64; если нет — илиbbec-нода добирается сборкой из исходников (с предупреждением при неудаче), сообщения — всегда из workspace-клона.
+Скрипт: проверяет aarch64 и docker; предупреждает о неполном vendor; докачивает отсутствующие клоны (FTServoLibrary, mpu6500, OrbbecSDK_ROS2, audio_common, vosk_ros + модель Vosk); затем `docker build`. `ros-humble-orbbec-camera` ставится из apt, если доступен для arm64; если нет — илиbbec-нода добирается сборкой из исходников (с предупреждением при неудаче), сообщения — всегда из workspace-клона.
 
 ### Запуск
 ```bash
 MODELS_DIR=$HOME/RDS-2P-models docker/run_robot.sh
 # rkllm (имена файлов внутри MODELS_DIR):
 RKLLM_MODEL=qwen3-vl.rkllm RKNN_ENCODER_MODEL=encoder.rknn \
-LAUNCH_OVERRIDE="ros2 launch rkllm_ros2 rkllm.launch.py llm_model_path:=/models/qwen3-vl.rkllm encoder_model_path:=/models/encoder.rknn" \
+LAUNCH_OVERRIDE="ros2 launch rkllm_ros rkllm.launch.py llm_model_path:=/models/qwen3-vl.rkllm encoder_model_path:=/models/encoder.rknn" \
 docker/run_robot.sh
 ```
 `--privileged --network host --shm-size=4g --group-add audio` — сознательно (разработка): разом открывает `ttyS7`, SocketCAN, NPU (`/dev/rga`, `/dev/dri`, `/dev/mpp_service`), SPI/GPIO дисплея, `/dev/snd`, USB-камеры. Точечные `--device/--cap-add` — закомментированный блок в `run_robot.sh` для будущего харденинга.

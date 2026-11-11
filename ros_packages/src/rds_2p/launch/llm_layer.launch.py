@@ -2,20 +2,20 @@
 """LLM-прослойка: микрофон → VAD → vosk → классификатор system-one → команда | разговор (rkllm+Paroli).
 
 Состав:
-- ``vosk_ros2 vad.launch.py`` — VAD-шлюз (Silero VAD, CPU): в vosk идут только фразы речи.
+- ``vosk_ros vad.launch.py`` — VAD-шлюз (Silero VAD, CPU): в vosk идут только фразы речи.
   **По умолчанию выключен** (``vad_enabled:=false`` — vosk слушает микрофон напрямую; у ES8388
   слабый SNR и гейтинг там не спасает). Включение: ``vad_enabled:=true vosk_audio_topic:=/audio/vad``.
 - ``rds_2p voice_system.launch.py`` — audio (микрофон/плеер) + vosk + Paroli + lip_sync («рот»);
   выключается ``include_voice:=false`` (например, для отладки текстом).
-- ``rkllm_ros2 rkllm.launch.py`` — LLM (по умолчанию Qwen3.5-2B из ~/models).
-- ``rkllm_ros2 system_one.launch.py`` — HTTP-обёртка system-one-rknn (kev-0.8b).
+- ``rkllm_ros rkllm.launch.py`` — LLM (по умолчанию Qwen3.5-2B из ~/models).
+- ``rkllm_ros system_one.launch.py`` — HTTP-обёртка system-one-rknn (kev-0.8b).
 - ``rds_2p_commands llm_layer`` — маршрутизация: команда → ``/audio/command_transcription``,
   разговор → rkllm ChatCompletion + озвучка Paroli; «посмотри …» → кадр камеры + текст
   (мультимодально); ``llm_system_prompt`` добавляется в начало запроса к LLM.
 
 Контейнер system-one-rknn должен быть поднят заранее::
 
-    ros2 run rkllm_ros2 system_one_docker.sh run
+    ros2 run rkllm_ros system_one_docker.sh run
 
 Командная система тут НЕ запускается (запускайте отдельно и кормите её тем же топиком)::
 
@@ -75,12 +75,12 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'encoder_model_path',
             default_value='/home/orangepi/models/qwen3.5-2b-rkllm-rk3588/qwen3.5-2b_vision_rk3588.rknn',
-            description='Vision encoder (.rknn) для rkllm_ros2',
+            description='Vision encoder (.rknn) для rkllm_ros',
         ),
         DeclareLaunchArgument(
             'llm_model_path',
             default_value='/home/orangepi/models/qwen3.5-2b-rkllm-rk3588/qwen3.5-2b_w8a8_rk3588.rkllm',
-            description='LLM (.rkllm) для rkllm_ros2',
+            description='LLM (.rkllm) для rkllm_ros',
         ),
         DeclareLaunchArgument(
             'rkllm_max_new_tokens', default_value='512',
@@ -92,11 +92,11 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'input_topic', default_value='/audio/transcription',
-            description='Топик vosk_ros2/Transcription (вход прослойки)',
+            description='Топик vosk_ros/Transcription (вход прослойки)',
         ),
         DeclareLaunchArgument(
             'command_topic', default_value='/audio/command_transcription',
-            description='Топик vosk_ros2/Transcription с канонической фразой команды',
+            description='Топик vosk_ros/Transcription с канонической фразой команды',
         ),
         DeclareLaunchArgument(
             'classifier_json', default_value=CLASSIFIER_JSON,
@@ -115,7 +115,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'vad_enabled', default_value='false',
-            description='VAD-шлюз vosk_ros2 (mic → только речь → /audio/vad → vosk); по умолчанию выключен',
+            description='VAD-шлюз vosk_ros (mic → только речь → /audio/vad → vosk); по умолчанию выключен',
         ),
         DeclareLaunchArgument(
             'vosk_audio_topic', default_value='/audio/input',
@@ -138,7 +138,7 @@ def generate_launch_description():
     vad = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution([
-                FindPackageShare('vosk_ros2'), 'launch', 'vad.launch.py',
+                FindPackageShare('vosk_ros'), 'launch', 'vad.launch.py',
             ]),
         ),
         condition=IfCondition(PythonExpression(
@@ -162,7 +162,7 @@ def generate_launch_description():
     rkllm = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution([
-                FindPackageShare('rkllm_ros2'), 'launch', 'rkllm.launch.py',
+                FindPackageShare('rkllm_ros'), 'launch', 'rkllm.launch.py',
             ]),
         ),
         launch_arguments={
@@ -175,7 +175,7 @@ def generate_launch_description():
     system_one = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution([
-                FindPackageShare('rkllm_ros2'), 'launch', 'system_one.launch.py',
+                FindPackageShare('rkllm_ros'), 'launch', 'system_one.launch.py',
             ]),
         ),
         launch_arguments={

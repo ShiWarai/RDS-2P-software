@@ -1,0 +1,7 @@
+# numpy<=1.26.4: совместимость с rknn-toolkit2 2.3.2 на роботе
+numpy<=1.26.4
+# Фронтенд GigaAM (log-mel, CPU): torch/torchaudio — ровно как в scripts/frontend.py модели
+torch
+torchaudio
+# VAD CPU (Silero VAD v4): src/vad_node.py backend=cpu
+sherpa-onnx

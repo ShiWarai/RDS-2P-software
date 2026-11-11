@@ -48,7 +48,7 @@ ros2 launch rds_2p_audio audio.launch.py \
 Пример («лежать»):
 
 ```bash
-ros2 topic pub --once /audio/transcription vosk_ros2/msg/Transcription \
+ros2 topic pub --once /audio/transcription vosk_ros/msg/Transcription \
   "{text: 'лежать', audio_time: 0.0, transcription_time: 0.0}"
 ```
 
@@ -73,7 +73,7 @@ ros2 action send_goal /robot/panda_command rds_2p_commands/action/PandaCommand \
 ros2 launch rds_2p_commands commands_system.launch.py
 ```
 
-Нужны отдельно **`ros2 launch rkllm_ros2 rkllm.launch.py …`** (модель уже у вас) и **`ros2 launch paroli_ros2 tts.launch.py`** плюс **`rds_2p_audio`** для `/audio/output`, если озвучка должна идти в динамик.
+Нужны отдельно **`ros2 launch rkllm_ros rkllm.launch.py …`** (модель уже у вас) и **`ros2 launch paroli_ros tts.launch.py`** плюс **`rds_2p_audio`** для `/audio/output`, если озвучка должна идти в динамик.
 
 ### 6. Слово «панда» → сценарий + ответ LLM (rkllm) и Paroli
 
@@ -81,12 +81,12 @@ ros2 launch rds_2p_commands commands_system.launch.py
 
 1. Если рутина **есть** — как обычно отправляется **`PandaCommand`** (звук, моторы, морда).
 2. Если рутины **нет** — **`PandaCommand` не шлётся**, только диалог.
-3. В обоих случаях тот же текст уходит в **`rkllm_ros2`** (`ChatCompletion`, `user_message` = фраза пользователя).
-4. Поле **`result.text`** озвучивается через **`/paroli_ros2/speak`**.
+3. В обоих случаях тот же текст уходит в **`rkllm_ros`** (`ChatCompletion`, `user_message` = фраза пользователя).
+4. Поле **`result.text`** озвучивается через **`/paroli_ros/speak`**.
 
 **Блокировка:** с момента старта запроса к LLM до опустошения очереди озвучки новые фразы **не** обрабатываются (ни рутины по YAML, ни второй LLM). Это **не** однопоточность executor: узел по-прежнему получает транскрипты, но в лог пишется **`Пропуск … занят диалог LLM/озвучка`**. Пока играет динамик, Vosk часто выдаёт **обрывки своей же речи** (как в вашем логе) — это акустическое эхо. После последней фразы Paroli смотрите **`LLM+Paroli: озвучка завершена, приём команд возобновлён`** — до этой строки парсер сознательно «молчит» по командам. Прервать: ключи **`panda_dialog_interrupt`** (см. ниже); в железе — тише динамик, микрофон дальше от динамика, AEC при наличии.
 
-**«Хватит»:** фразы из **`panda_dialog_interrupt.keywords`** проверяются **первыми** и **вне** блокировки: отменяется goal rkllm (если был), вызывается **`/paroli_ros2/stop_speech`**, снимается блокировка. Отдельного **`PandaCommand`** нет.
+**«Хватит»:** фразы из **`panda_dialog_interrupt.keywords`** проверяются **первыми** и **вне** блокировки: отменяется goal rkllm (если был), вызывается **`/paroli_ros/stop_speech`**, снимается блокировка. Отдельного **`PandaCommand`** нет.
 
 Раньше пункты 3–4 срабатывали только при успешно распознанной рутине; для фраз вроде «панда, ты меня слышишь» без ключевых слов теперь вызывается только LLM+Paroli.
 
@@ -96,11 +96,11 @@ ros2 launch rds_2p_commands commands_system.launch.py
 |----------|--------|
 | `panda_llm_tts_enabled` | Включить цепочку (по умолчанию `true`). |
 | `panda_llm_trigger_substring` | Подстрока-триггер (по умолчанию `панда`). |
-| `rkllm_complete_action` | Action, по умолчанию `/rkllm_ros2/complete`. |
-| `rkllm_clear_kv_service` | `std_srvs/Trigger`, по умолчанию `/rkllm_ros2/clear_kv_cache`; пустая строка — клиент не создаётся. |
-| `paroli_speak_service` | По умолчанию `/paroli_ros2/speak`; пустая строка — без озвучки. |
-| `paroli_stop_speech_service` | `std_srvs/Trigger`, по умолчанию `/paroli_ros2/stop_speech` — прерывание TTS (команда «хватит»). |
-| `rkllm_clear_kv_before_query` | Перед запросом сбросить KV (см. README `rkllm_ros2` / `persist_session_kv`). |
+| `rkllm_complete_action` | Action, по умолчанию `/rkllm_ros/complete`. |
+| `rkllm_clear_kv_service` | `std_srvs/Trigger`, по умолчанию `/rkllm_ros/clear_kv_cache`; пустая строка — клиент не создаётся. |
+| `paroli_speak_service` | По умолчанию `/paroli_ros/speak`; пустая строка — без озвучки. |
+| `paroli_stop_speech_service` | `std_srvs/Trigger`, по умолчанию `/paroli_ros/stop_speech` — прерывание TTS (команда «хватит»). |
+| `rkllm_clear_kv_before_query` | Перед запросом сбросить KV (см. README `rkllm_ros` / `persist_session_kv`). |
 | `rkllm_keep_history`, `rkllm_max_new_tokens`, таймауты | Как в declare в коде. |
 | `llm_stream_tts_by_punctuation` | `true` (по умолчанию): по **feedback** rkllm копится текст; на `. , ; : ! ? …` фрагменты ставятся в очередь `/speak` — раньше старт озвучки. |
 | `llm_sanitize_user_and_reply` | `true`: в LLM и в TTS только буквы (Unicode), цифры, пробелы, пунктуация; эмодзи убираются; **markdown-символы `*` `_` `` ` `` `#` `|`** выкидываются отдельным шагом (иначе `*` остаётся как знак препинания Unicode). |
@@ -116,21 +116,21 @@ ros2 launch rds_2p_commands commands_system.launch.py
 
 Отдельная нода **`llm_layer`** (launch: **`rds_2p/launch/llm_layer.launch.py`**) слушает тот же топик транскрипций, но перед обработкой спрашивает **system-one** (kev-0.8b; choice по `criteria` из `classifier_json`):
 
-- метка входит в **`actions`** (по умолчанию: `dismiss` → «вставай», `lie_down` → «ложись», `stand_at_attention` → «равняйсь»): сначала голосом объявляется **`say`** («Встаю!», «Ложусь!», «Равняюсь!», параметр `announce_commands`), и только **после конца объявления** в **`/audio/command_transcription`** публикуется `vosk_ros2/Transcription` с **канонической фразой** (её и находят `keywords` из `commands.yaml`);
+- метка входит в **`actions`** (по умолчанию: `dismiss` → «вставай», `lie_down` → «ложись», `stand_at_attention` → «равняйсь»): сначала голосом объявляется **`say`** («Встаю!», «Ложусь!», «Равняюсь!», параметр `announce_commands`), и только **после конца объявления** в **`/audio/command_transcription`** публикуется `vosk_ros/Transcription` с **канонической фразой** (её и находят `keywords` из `commands.yaml`);
 - иначе (разговор, метка `unknown`) — текст уходит в **rkllm + Paroli** (`LlmCommands`, как в п.6).
 
 **«Посмотри …» (зрение):** если в тексте есть подстрока из **`look_trigger_substrings`** (`смотри`, `глянь`, `гляни`), классификатор пропускается: берётся **последний кадр камеры** (`camera_topic`, по умолчанию `/camera/color/image_raw`, запуск — `ros2 launch rds_2p astra_mini.launch.py`) и вместе с текстом уходит в rkllm как **мультимодальный** запрос (`goal.image`), ответ озвучивается как обычно. Свежесть кадра — `camera_stale_sec` (2 с); если кадра нет, уходит без изображения (в логе предупреждение).
 
 **System prompt:** **`llm_system_prompt`** (по умолчанию «Ты робот-панда, отвечай на вопросы гостей. На вопросы отвечай кратко. Не придумывай точную информацию.») добавляется в начало `user_message` каждого диалога и «посмотри» (встроенный шаблон Qwen3.5 не даёт отдельного system-поля, поэтому префикс в user-turn). Пустая строка — выключить.
 
-**VAD:** в `rds_2p/launch/llm_layer.launch.py` VAD-шлюз (`vosk_ros2/vad_node`, `/audio/vad`) есть, но **по умолчанию выключен** (`vad_enabled:=false` — vosk слушает микрофон напрямую: на встроенном ES8388 у микрофона низкий SNR и гейтинг не улучшает распознавание). Включение: `vad_enabled:=true vosk_audio_topic:=/audio/vad` (см. README `vosk_ros2`).
+**VAD:** в `rds_2p/launch/llm_layer.launch.py` VAD-шлюз (`vosk_ros/vad_node`, `/audio/vad`) есть, но **по умолчанию выключен** (`vad_enabled:=false` — vosk слушает микрофон напрямую: на встроенном ES8388 у микрофона низкий SNR и гейтинг не улучшает распознавание). Включение: `vad_enabled:=true vosk_audio_topic:=/audio/vad` (см. README `vosk_ros`).
 
-**Не слушаем себя:** после конца озвучки действует окно **`post_speech_cooldown_sec`** (по умолчанию **2.5 с**) — транскрипции в нём игнорируются; это основной механизм гашения самоэха (мик+vosk отдают речь робота через ~1.5–2 с). Альтернативно есть жёсткая пауза распознавания в `vosk_ros2` (`speech_pause_enabled`, по умолчанию выключена). Пока идёт генерация, озвучка диалога или объявление команды, транскрипции отбрасываются (`Пропуск: …`) — наружу пропускается только **`dialog_interrupt_keywords`** (по умолчанию **`стоп`**). «Стоп» прерывает диалог; если он приходит во время объявления — **команда не отправляется**. Отдельные логи: `Пропуск: робот объявляет команду`, `Прерывание ('стоп')`, `Команда отменена (объявление прервано)`.
+**Не слушаем себя:** после конца озвучки действует окно **`post_speech_cooldown_sec`** (по умолчанию **2.5 с**) — транскрипции в нём игнорируются; это основной механизм гашения самоэха (мик+vosk отдают речь робота через ~1.5–2 с). Альтернативно есть жёсткая пауза распознавания в `vosk_ros` (`speech_pause_enabled`, по умолчанию выключена). Пока идёт генерация, озвучка диалога или объявление команды, транскрипции отбрасываются (`Пропуск: …`) — наружу пропускается только **`dialog_interrupt_keywords`** (по умолчанию **`стоп`**). «Стоп» прерывает диалог; если он приходит во время объявления — **команда не отправляется**. Отдельные логи: `Пропуск: робот объявляет команду`, `Прерывание ('стоп')`, `Команда отменена (объявление прервано)`.
 
 Командная система запускается **отдельно** и подписывается на выход прослойки:
 
 ```bash
-ros2 run rkllm_ros2 system_one_docker.sh run   # контейнер system-one-rknn (GHCR), порт 8080
+ros2 run rkllm_ros system_one_docker.sh run   # контейнер system-one-rknn (GHCR), порт 8080
 ros2 launch rds_2p llm_layer.launch.py         # include_voice:=false — отладка без микрофона/динамика
 ros2 launch rds_2p_commands commands_system.launch.py \
   transcription_topics:="['/audio/command_transcription']"
@@ -141,9 +141,9 @@ ros2 launch rds_2p_commands commands_system.launch.py \
 Отладка без микрофона:
 
 ```bash
-ros2 topic pub --once /audio/transcription vosk_ros2/msg/Transcription "{text: 'встань, пожалуйста'}"
+ros2 topic pub --once /audio/transcription vosk_ros/msg/Transcription "{text: 'встань, пожалуйста'}"
 ros2 topic echo /audio/command_transcription --field text   # 'Встаю!' в динамик, затем 'вставай' в топик
-ros2 topic pub --once /audio/transcription vosk_ros2/msg/Transcription "{text: 'стоп'}"  # прервать
+ros2 topic pub --once /audio/transcription vosk_ros/msg/Transcription "{text: 'стоп'}"  # прервать
 ```
 
 ---
@@ -186,7 +186,7 @@ ros2 topic pub --once /audio/transcription vosk_ros2/msg/Transcription "{text: '
 
 - **`config_file`** — имя YAML в `share/rds_2p_commands/config/` (по умолчанию **`commands.yaml`**). Встроенного дубля команд в Python нет: при отсутствии файла или ошибке чтения **`commands`** и **`panda_dialog_interrupt`** пусты.
 - **`panda_dialog_interrupt`** — в **`commands.yaml`**: список **`keywords`**. Одно слово — совпадение по **токенам** (не срабатывает на фразу **«не хватит»** при ключе `хватит`). Несколько слов через пробел — вхождение подстроки в текст. Не отправляют `PandaCommand`, только прерывают rkllm+Paroli и снимают блокировку.
-- **`transcription_topics`** — список топиков `vosk_ros2/Transcription`; новые мосты публикуют сюда или в `/telegram/message` (`std_msgs/String`).
+- **`transcription_topics`** — список топиков `vosk_ros/Transcription`; новые мосты публикуют сюда или в `/telegram/message` (`std_msgs/String`).
 - **`command_debounce_sec`** (default **3.0**) — дребезг по паре **`(источник, имя команды в YAML)`**.
 
 ---
@@ -229,7 +229,7 @@ ros2 launch rds_2p_telegram_bot telegram_bot.launch.py \
 ## ROS 2 топики
 
 - `/telegram/message` (`std_msgs/String`)
-- транскрипции: топики из `transcription_topics` (`vosk_ros2/Transcription`)
+- транскрипции: топики из `transcription_topics` (`vosk_ros/Transcription`)
 - воспроизведение звука: публикует `unified_action_server` → см. параметр **`audio_output_topic`**
 - изображение морды: топик см. **`face_image_topic`** (подписчик `display_face` в **`rds_2p_face`**)
 

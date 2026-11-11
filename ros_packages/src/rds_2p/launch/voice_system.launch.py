@@ -2,7 +2,7 @@
 """Голосовой контур робота: аудио (``rds_2p_audio``) + Vosk + Paroli + липсинк лица.
 
 1. ``rds_2p_audio/launch/audio.launch.py`` — сначала плеер, затем микрофон.
-2. Затем без задержек: ``vosk_ros2``, ``paroli_ros2``, ``rds_2p_face/lip_sync_face.launch.py``.
+2. Затем без задержек: ``vosk_ros``, ``paroli_ros``, ``rds_2p_face/lip_sync_face.launch.py``.
 
 Так можно обойтись без ``TimerAction``. Это **не** то же самое, что ожидание «готовности» по ROS
 (topic/service): при ``IncludeLaunchDescription`` на звук родитель не видит ``Node``
@@ -59,7 +59,7 @@ def _setup(context, *_args, **_kwargs):
     vosk_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
             PathJoinSubstitution([
-                FindPackageShare("vosk_ros2"),
+                FindPackageShare("vosk_ros"),
                 "launch",
                 "vosk.launch.py",
             ]),
@@ -70,7 +70,7 @@ def _setup(context, *_args, **_kwargs):
     paroli_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
             PathJoinSubstitution([
-                FindPackageShare("paroli_ros2"),
+                FindPackageShare("paroli_ros"),
                 "launch",
                 "tts.launch.py",
             ]),
@@ -158,7 +158,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "vosk_model_path",
                 default_value="",
-                description="Пусто — дефолт из share vosk_ros2",
+                description="Пусто — дефолт из share vosk_ros",
             ),
             DeclareLaunchArgument(
                 "paroli_frame_id",

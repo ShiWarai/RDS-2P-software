@@ -45,7 +45,7 @@ ros2 launch rds_2p_telegram_bot telegram_bot.launch.py \
 
 ### Подписка:
 - `/commands` (`std_msgs/String`) — список доступных команд от action серверов
-- `/telegram/audio/transcription` (`vosk_ros2/Transcription`) — транскрипции голосовых сообщений от vosk
+- `/telegram/audio/transcription` (`vosk_ros/Transcription`) — транскрипции голосовых сообщений от vosk
 
 ## Работа с голосовыми сообщениями
 
@@ -55,9 +55,9 @@ ros2 launch rds_2p_telegram_bot telegram_bot.launch.py \
 4. Бот автоматически отправляет расшифровку пользователю, заменяя сообщение "Обрабатываю..."
 
 **Требования:**
-- Запущен `vosk_ros2` с подпиской на `/telegram/audio`:
+- Запущен `vosk_ros` с подпиской на `/telegram/audio`:
   ```bash
-  ros2 launch vosk_ros2 vosk_telegram.launch.py
+  ros2 launch vosk_ros vosk_telegram.launch.py
   ```
 
 ## Зависимости (Python)

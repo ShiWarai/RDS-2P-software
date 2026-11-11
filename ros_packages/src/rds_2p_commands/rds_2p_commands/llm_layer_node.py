@@ -3,7 +3,7 @@
 
 Схема:
 
-  /audio/transcription (vosk_ros2/Transcription)
+  /audio/transcription (vosk_ros/Transcription)
         → choice-классификатор /system_one/systemone (kev-0.8b, критерии classifier_json)
         ├─ метка из classifier.actions:
         │    объявление classifier.say через Paroli /speak (например «Встаю!»),
@@ -29,9 +29,9 @@ import time
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
-from vosk_ros2.msg import Transcription
-from rkllm_ros2_msgs.srv import SystemOne
-from paroli_ros2.srv import Speak
+from vosk_ros.msg import Transcription
+from rkllm_ros_msgs.srv import SystemOne
+from paroli_ros.srv import Speak
 
 from rds_2p_commands.llm_commands import LlmCommands
 
@@ -89,10 +89,10 @@ class LlmLayerNode(Node):
         self.declare_parameter('llm_system_prompt', PANDA_SYSTEM_PROMPT)
 
         # Параметры, которые читает LlmCommands (те же имена, что у command_parser).
-        self.declare_parameter('rkllm_complete_action', '/rkllm_ros2/complete')
-        self.declare_parameter('rkllm_clear_kv_service', '/rkllm_ros2/clear_kv_cache')
-        self.declare_parameter('paroli_speak_service', '/paroli_ros2/speak')
-        self.declare_parameter('paroli_stop_speech_service', '/paroli_ros2/stop_speech')
+        self.declare_parameter('rkllm_complete_action', '/rkllm_ros/complete')
+        self.declare_parameter('rkllm_clear_kv_service', '/rkllm_ros/clear_kv_cache')
+        self.declare_parameter('paroli_speak_service', '/paroli_ros/speak')
+        self.declare_parameter('paroli_stop_speech_service', '/paroli_ros/stop_speech')
         self.declare_parameter('rkllm_wait_server_sec', 5.0)
         self.declare_parameter('paroli_wait_service_sec', 3.0)
         self.declare_parameter('rkllm_keep_history', True)

@@ -99,7 +99,7 @@
 
 ### lip_sync_face
 
-Подписка на **`/audio/output`** (`audio_common_msgs/msg/AudioStamped`), по умолчанию только `header.frame_id` = `tts.paroli` (совместимо с `paroli_ros2`).
+Подписка на **`/audio/output`** (`audio_common_msgs/msg/AudioStamped`), по умолчанию только `header.frame_id` = `tts.paroli` (совместимо с `paroli_ros`).
 
 Публикация в **`/face/image`** (`sensor_msgs/msg/Image`, rgb8, 280×240 по умолчанию).
 

@@ -20,11 +20,11 @@
   <depend>builtin_interfaces</depend>
 
   <member_of_group>rosidl_interface_packages</member_of_group>
-  <depend>vosk_ros2</depend>
+  <depend>vosk_ros</depend>
   <depend>ament_index_python</depend>
   <depend>audio_common_msgs</depend>
-  <depend>rkllm_ros2_msgs</depend>
-  <depend>paroli_ros2</depend>
+  <depend>rkllm_ros_msgs</depend>
+  <depend>paroli_ros</depend>
   <depend>std_srvs</depend>
 
   <exec_depend>python3-yaml</exec_depend>

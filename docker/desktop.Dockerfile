@@ -56,10 +56,9 @@ RUN set -eux; \
 # только на роботе. Констрейнт numpy<=1.26.4 закреплён в самих файлах.
 RUN cd /opt/rds2p/ros-ws \
     && python3 -m pip install --no-cache-dir \
-         -r src/vosk_ros2/requirements.txt \
+         -r src/vosk_ros/requirements.txt \
          -r src/rds_2p_telegram_bot/requirements.txt \
-         -r src/rds_2p_inference/requirements.txt \
-         -r src/rds_2p_audio/requirements.txt
+         -r src/rds_2p_inference/requirements.txt
 
 RUN mkdir -p /opt/rds2p/ros-ws/deps/mujoco_playground; \
     if [ -z "$(ls -A /opt/rds2p/ros-ws/deps/mujoco_playground)" ]; then \
@@ -70,7 +69,7 @@ RUN cd /opt/rds2p/ros-ws \
     && . /opt/ros/humble/setup.sh \
     && colcon build --parallel-workers "$(nproc)" \
          --install-base /opt/rds2p/install --build-base /tmp/colcon-build \
-         --packages-skip mpu6500_ros rds_2p_joystick orbbec_camera mtf02p_ros rkllm_ros2 \
+         --packages-skip mpu6500_ros rds_2p_joystick orbbec_camera mtf02p_ros rkllm_ros \
          --packages-ignore rds_2p_face
 
 RUN for d in /opt/rds2p/install/*/lib; do \

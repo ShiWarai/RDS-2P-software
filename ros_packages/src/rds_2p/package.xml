@@ -26,8 +26,8 @@
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>rds_2p_audio</exec_depend>
-  <exec_depend>vosk_ros2</exec_depend>
-  <exec_depend>paroli_ros2</exec_depend>
+  <exec_depend>vosk_ros</exec_depend>
+  <exec_depend>paroli_ros</exec_depend>
   <exec_depend>rds_2p_face</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>

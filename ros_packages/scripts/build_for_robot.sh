@@ -116,27 +116,27 @@ if [ "$MODE" != native ]; then
 
     VENDOR_OK=true
     for f in lib/librkllmrt.so lib/librknnrt.so include/rkllm.h include/rknn_api.h; do
-        if [ ! -f "$ROSPKG_DIR/src/rkllm_ros2/vendor/$f" ]; then
+        if [ ! -f "$ROSPKG_DIR/src/rkllm_ros/vendor/$f" ]; then
             VENDOR_OK=false
-            echo "❗ Нет ros_packages/src/rkllm_ros2/vendor/$f"
+            echo "❗ Нет ros_packages/src/rkllm_ros/vendor/$f"
         fi
     done
     if [ "$VENDOR_OK" = true ]; then
-        echo "✅ vendor RK-рантайм (librkllmrt.so/librknnrt.so + заголовки) в vendor/ — rkllm_ros2 соберётся при наличии NPU."
+        echo "✅ vendor RK-рантайм (librkllmrt.so/librknnrt.so + заголовки) в vendor/ — rkllm_ros соберётся при наличии NPU."
     else
-        echo "⚠️  RK-рантайм не полностью в vendor/ — rkllm_ros2 НЕ соберётся (LLM-экшены отключатся)."
-        echo "    Положите .so и заголовки по инструкции ros_packages/src/rkllm_ros2/vendor/README.md"
+        echo "⚠️  RK-рантайм не полностью в vendor/ — rkllm_ros НЕ соберётся (LLM-экшены отключатся)."
+        echo "    Положите .so и заголовки по инструкции ros_packages/src/rkllm_ros/vendor/README.md"
         echo "    и пересоберите, если нужны LLM-экшены."
     fi
 
     RESOLVED_PLATFORM="$(resolve_platform)"
     if rk_platform_has_npu "$RESOLVED_PLATFORM"; then
         NPU_ENABLED=1
-        echo "🎯 Платформа: $RESOLVED_PLATFORM (NPU вкл — будет собран rkllm_ros2)."
+        echo "🎯 Платформа: $RESOLVED_PLATFORM (NPU вкл — будет собран rkllm_ros)."
     else
         case "$RESOLVED_PLATFORM" in
-            generic) echo "🎯 Платформа: generic (NPU выкл — rkllm_ros2 НЕ собран). Repka-Pi4 / Orange Pi без RK." ;;
-            *) echo "🎯 Платформа: $RESOLVED_PLATFORM (NPU выкл — rkllm_ros2 НЕ собран: нет vendor RK-рантайма)." ;;
+            generic) echo "🎯 Платформа: generic (NPU выкл — rkllm_ros НЕ собран). Repka-Pi4 / Orange Pi без RK." ;;
+            *) echo "🎯 Платформа: $RESOLVED_PLATFORM (NPU выкл — rkllm_ros НЕ собран: нет vendor RK-рантайма)." ;;
         esac
     fi
     echo "   Управление: PLATFORM=rk3588 (NPU) | PLATFORM=generic (без NPU) | PLATFORM=auto (авто)."
@@ -274,26 +274,26 @@ else
     echo "ℹ️ audio_common уже существует"
 fi
 
-# Клонируем vosk_ros2 если его нет
-VOSK_ROS2_PATH="src/vosk_ros2"
-if [ ! -d "$VOSK_ROS2_PATH" ]; then
-    echo "📥 Клонируем vosk_ros2..."
+# Клонируем vosk_ros если его нет
+VOSK_ROS_PATH="src/vosk_ros"
+if [ ! -d "$VOSK_ROS_PATH" ]; then
+    echo "📥 Клонируем vosk_ros..."
     cd src
-    git clone https://github.com/ShiWarai/vosk_ros2.git
+    git clone https://github.com/ShiWarai/vosk_ros.git
     cd ..
-    echo "✅ vosk_ros2 клонирован"
+    echo "✅ vosk_ros клонирован"
 else
-    echo "ℹ️ vosk_ros2 уже существует"
+    echo "ℹ️ vosk_ros уже существует"
 fi
 
 # Модель Vosk — runtime-актив (монтируется в /models): native качает её всегда,
 # docker/prepare — только с флагом --models (иначе лишние 44+88 МБ едут в контекст/образ).
 # Качаем с HF-зеркала: alphacephei.com подвешивает тело ответа; размер сверен с ETag.
-# ВАЖНО: свежий клон vosk_ros2 не содержит каталога models (он в .gitignore пакета),
+# ВАЖНО: свежий клон vosk_ros не содержит каталога models (он в .gitignore пакета),
 # а CMake install(DIRECTORY models) без него падает — гарантируем пустой каталог.
 # Сама модель — runtime-актив (в контейнере монтируется в /models).
-VOSK_MODEL_PATH="src/vosk_ros2/models/vosk-model-small-ru-0.22"
-VOSK_MODEL_DIR="src/vosk_ros2/models"
+VOSK_MODEL_PATH="src/vosk_ros/models/vosk-model-small-ru-0.22"
+VOSK_MODEL_DIR="src/vosk_ros/models"
 mkdir -p "$VOSK_MODEL_DIR"
 if [ -d "$VOSK_MODEL_PATH" ]; then
     echo "ℹ️ Модель Vosk уже установлена: $VOSK_MODEL_PATH"
@@ -325,13 +325,13 @@ else
     echo "ℹ️ Модель Vosk не качаем (docker/prepare): runtime-актив, монтируется в /models; --models — чтобы положить в контекст"
 fi
 
-# Vendor для rkllm_ros2: RKLLM/RKNN runtime (.so + заголовки). Качаем с GitHub
+# Vendor для rkllm_ros: RKLLM/RKNN runtime (.so + заголовки). Качаем с GitHub
 # airockchip/rknn-llm; fallback — локальный клон (~/rknn-llm, override: RKLLM_SRC).
 # Ref закреплён на теге (override: RKLLM_REF): в main API rkllm_init() уже изменено
 # (RKLLMCallback*, без img_start), а rkllm_node.cpp написан под SDK 1.2.3.
-# CMakeLists rkllm_ros2 фаталит без этих файлов, поэтому в native режиме отсутствующие
+# CMakeLists rkllm_ros фаталит без этих файлов, поэтому в native режиме отсутствующие
 # файлы = ошибка сборки, в docker-prepare — предупреждение (NPU=0 всё равно скипает пакет).
-RKLLM_VENDOR_DIR="src/rkllm_ros2/vendor"
+RKLLM_VENDOR_DIR="src/rkllm_ros/vendor"
 RKLLM_REF="${RKLLM_REF:-release-v1.2.3}"
 RKLLM_RAW="https://raw.githubusercontent.com/airockchip/rknn-llm/$RKLLM_REF"
 RKLLM_LOCAL_CLONE="${RKLLM_SRC:-$HOME/rknn-llm}"
@@ -356,7 +356,7 @@ rkllm_ensure_file() {
     fi
     [ -f "$dst" ]
 }
-echo "🧩 Готовим vendor rkllm_ros2 (librkllmrt.so / librknnrt.so / rkllm.h / rknn_api.h)..."
+echo "🧩 Готовим vendor rkllm_ros (librkllmrt.so / librknnrt.so / rkllm.h / rknn_api.h)..."
 RKLLM_OK=true
 rkllm_ensure_file "lib/librkllmrt.so" "rkllm-runtime/Linux/librkllm_api/aarch64/librkllmrt.so" 1000000 || RKLLM_OK=false
 rkllm_ensure_file "lib/librknnrt.so" "examples/multimodal_model_demo/deploy/3rdparty/librknnrt/Linux/librknn_api/aarch64/librknnrt.so" 1000000 || RKLLM_OK=false
@@ -364,11 +364,11 @@ rkllm_ensure_file "include/rkllm.h" "rkllm-runtime/Linux/librkllm_api/include/rk
 rkllm_ensure_file "include/rknn_api.h" "examples/multimodal_model_demo/deploy/3rdparty/librknnrt/Linux/librknn_api/include/rknn_api.h" 1000 || RKLLM_OK=false
 if [ "$RKLLM_OK" != true ]; then
     if [ "$MODE" = native ]; then
-        echo "❌ rkllm_ros2: vendor-библиотеки не получены (ни GitHub, ни локальный клон)." >&2
+        echo "❌ rkllm_ros: vendor-библиотеки не получены (ни GitHub, ни локальный клон)." >&2
         echo "   Задайте RKLLM_SRC=/путь/к/rknn-llm или склонируйте: git clone --depth 1 https://github.com/airockchip/rknn-llm ~/rknn-llm" >&2
         exit 1
     fi
-    echo "⚠️  rkllm_ros2: vendor неполный — docker-образ с NPU=1 не соберётся (NPU=0 скипнет пакет)." >&2
+    echo "⚠️  rkllm_ros: vendor неполный — docker-образ с NPU=1 не соберётся (NPU=0 скипнет пакет)." >&2
 fi
 
 # Модель RNNoise (rnnoise_data-<ver>.tar.gz): native предзагружает в deps/, чтобы
