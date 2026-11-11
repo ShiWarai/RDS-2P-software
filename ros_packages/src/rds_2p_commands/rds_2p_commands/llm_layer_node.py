@@ -3,7 +3,7 @@
 
 Схема:
 
-  /audio/transcription (vosk_ros/Transcription)
+  /audio/transcription (rds_2p_audio/Transcription)
         → choice-классификатор /system_one/systemone (kev-0.8b, критерии classifier_json)
         ├─ метка из classifier.actions:
         │    объявление classifier.say через Paroli /speak (например «Встаю!»),
@@ -29,7 +29,7 @@ import time
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
-from vosk_ros.msg import Transcription
+from rds_2p_audio.msg import Transcription
 from rkllm_ros_msgs.srv import SystemOne
 from paroli_ros.srv import Speak
 

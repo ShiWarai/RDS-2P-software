@@ -92,11 +92,11 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'input_topic', default_value='/audio/transcription',
-            description='Топик vosk_ros/Transcription (вход прослойки)',
+            description='Топик rds_2p_audio/Transcription (вход прослойки)',
         ),
         DeclareLaunchArgument(
             'command_topic', default_value='/audio/command_transcription',
-            description='Топик vosk_ros/Transcription с канонической фразой команды',
+            description='Топик rds_2p_audio/Transcription с канонической фразой команды',
         ),
         DeclareLaunchArgument(
             'classifier_json', default_value=CLASSIFIER_JSON,

@@ -491,7 +491,7 @@ if [[ ! -f "${RNN_INST}/lib/librnnoise.a" ]]; then
     COLCON_SKIP_EXTRA="audio_filters"
     echo "⚠️  audio_filters в сборку не входит (нет собранного RNNoise)."
 fi
-colcon build --parallel-workers "${JOBS}" --symlink-install --packages-skip mpu6500_ros rds_2p_joystick orbbec_camera mtf02p_ros rkllm_ros ${COLCON_SKIP_EXTRA} --packages-ignore rds_2p_face
+colcon build --parallel-workers "${JOBS}" --symlink-install --packages-skip mpu6500_ros rds_2p_joystick orbbec_camera mtf02p_ros rkllm_ros gigaam_ros ${COLCON_SKIP_EXTRA} --packages-ignore rds_2p_face
 
 echo "✅ Готово! Загрузите переменные: source install/setup.bash"
 

@@ -20,7 +20,7 @@
   <depend>builtin_interfaces</depend>
 
   <member_of_group>rosidl_interface_packages</member_of_group>
-  <depend>vosk_ros</depend>
+  <depend>rds_2p_audio</depend>
   <depend>ament_index_python</depend>
   <depend>audio_common_msgs</depend>
   <depend>rkllm_ros_msgs</depend>

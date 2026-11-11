@@ -13,12 +13,8 @@
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
   <depend>audio_common_msgs</depend>
-  <!-- общий топик /audio/transcription несёт vosk_ros/msg/Transcription -->
-  <exec_depend>vosk_ros</exec_depend>
-
-  <build_depend>rosidl_default_generators</build_depend>
-  <exec_depend>rosidl_default_runtime</exec_depend>
-  <member_of_group>rosidl_interface_packages</member_of_group>
+  <!-- общие интерфейсы Transcription/GrammarConfig/STT -->
+  <depend>rds_2p_audio</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

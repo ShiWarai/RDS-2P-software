@@ -20,7 +20,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
 from std_msgs.msg import String
-from vosk_ros.msg import Transcription
+from rds_2p_audio.msg import Transcription
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command

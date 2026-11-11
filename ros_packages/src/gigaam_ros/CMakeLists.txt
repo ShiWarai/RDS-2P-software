@@ -11,20 +11,13 @@ find_package(ament_cmake_python REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
-find_package(rosidl_default_generators REQUIRED)
 
-# Generate messages and actions
-rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/Transcription.msg"
-  "msg/GrammarConfig.msg"
-  "action/STT.action"
-  DEPENDENCIES std_msgs
-)
+# Интерфейсы Transcription/GrammarConfig/STT теперь общие — в rds_2p_audio.
 
 # Install Python executables.
 # rknn_engine.py is a plain module installed alongside the nodes into
 # lib/${PROJECT_NAME}; the nodes add that directory to sys.path at runtime and
-# import it (the gigaam_ros namespace belongs to the generated interfaces).
+# import it.
 install(PROGRAMS
   src/gigaam_node.py
   DESTINATION lib/${PROJECT_NAME}

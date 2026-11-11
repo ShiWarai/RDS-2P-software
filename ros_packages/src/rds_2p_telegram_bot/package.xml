@@ -12,6 +12,7 @@
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
   <depend>audio_common_msgs</depend>
+  <depend>rds_2p_audio</depend>
   <depend>ament_index_python</depend>
   
   <depend>libsndfile1-dev</depend>

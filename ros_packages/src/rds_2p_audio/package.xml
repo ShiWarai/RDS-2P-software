@@ -3,16 +3,20 @@
 <package format="3">
   <name>rds_2p_audio</name>
   <version>1.0.0</version>
-  <description>Аудио для RDS-2P: C++ нода воспроизведения (PortAudio pull-микшер AudioStamped по frame_id) и launch с audio_capturer</description>
+  <description>Аудио для RDS-2P: C++ нода воспроизведения (PortAudio pull-микшер AudioStamped по frame_id), launch с audio_capturer и общие интерфейсы распознавания речи (Transcription/GrammarConfig/STT) для vosk_ros и gigaam_ros</description>
   <maintainer email="zhuravliov.pav@yandex.ru">ShiWarai</maintainer>
   <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>rosidl_default_generators</buildtool_depend>
 
   <build_depend>rclcpp</build_depend>
   <build_depend>portaudio19-dev</build_depend>
   <depend>audio_common</depend>
   <depend>audio_common_msgs</depend>
+
+  <exec_depend>rosidl_default_runtime</exec_depend>
+  <member_of_group>rosidl_interface_packages</member_of_group>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

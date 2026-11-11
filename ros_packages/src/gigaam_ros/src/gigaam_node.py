@@ -3,7 +3,7 @@
 ROS2 узел распознавания речи на GigaAM CTC (RKNN, RK3588 NPU).
 
 Зеркаляет интерфейс ``vosk_ros/vosk_node``: подписывается на аудио-топик
-(``audio_common_msgs/AudioStamped``), публикует ``gigaam_ros/msg/Transcription``
+(``audio_common_msgs/AudioStamped``), публикует ``rds_2p_audio/msg/Transcription``
 и держит action ``STT`` (имя ``listen``). Загрузка модели — по аналогии с Vosk:
 параметр ``model_path`` указывает на каталог модели (или напрямую на ``.rknn``),
 контекст ``librknnrt`` инициализируется один раз в ``__init__``.
@@ -42,19 +42,10 @@ from rclpy.qos import (
     ReliabilityPolicy,
 )
 
-from gigaam_ros.action import STT
-from gigaam_ros.msg import Transcription as _TranscriptionGigaam
-
-# Общий топик /audio/transcription в стеке — это vosk_ros/msg/Transcription
-# (его слушают llm_layer / command_parser / telegram_bot). Публикуем тот же тип,
-# иначе DDS не соединит. Fallback на собственный msg, если vosk_ros недоступен.
-_MSG_KIND = 'gigaam'
-try:  # noqa: SIM105
-    from vosk_ros.msg import Transcription as _TranscriptionVosk
-    _MSG_KIND = 'vosk'
-except Exception:  # noqa: BLE001
-    _TranscriptionVosk = None
-TranscriptionMsg = _TranscriptionVosk if _MSG_KIND == 'vosk' else _TranscriptionGigaam
+# Общие интерфейсы распознавания (используют и vosk_ros, и потребители
+# llm_layer / command_parser / telegram_bot) живут в rds_2p_audio.
+from rds_2p_audio.action import STT
+from rds_2p_audio.msg import Transcription as TranscriptionMsg
 
 from rknn_engine import (
     SR,
@@ -325,7 +316,7 @@ class GigaamNode(Node):
         """
         result_msg = STT.Result()
         goal_handle.succeed()
-        result_msg.transcription = _TranscriptionGigaam()
+        result_msg.transcription = TranscriptionMsg()
         return result_msg
 
     def destroy_node(self):

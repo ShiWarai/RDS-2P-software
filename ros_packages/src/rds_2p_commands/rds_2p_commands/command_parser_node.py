@@ -12,7 +12,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
 from std_msgs.msg import String
-from vosk_ros.msg import Transcription
+from rds_2p_audio.msg import Transcription
 from rds_2p_commands.action import PandaCommand
 from rds_2p_commands.llm_commands import LlmCommands
 from pathlib import Path

@@ -5,7 +5,15 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(audio_common_msgs REQUIRED)
 find_package(audio_common REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
 find_library(PORTAUDIO_LIB portaudio REQUIRED)
+
+# Общие интерфейсы распознавания речи (используют vosk_ros и gigaam_ros)
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/Transcription.msg"
+  "msg/GrammarConfig.msg"
+  "action/STT.action"
+)
 
 # C++ плеер (pull-микшер PortAudio)
 add_executable(audio_player_node
@@ -30,4 +38,5 @@ install(DIRECTORY launch
   DESTINATION share/${PROJECT_NAME}
 )
 
+ament_export_dependencies(rosidl_default_runtime)
 ament_package()
