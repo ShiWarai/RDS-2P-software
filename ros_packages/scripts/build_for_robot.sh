@@ -454,6 +454,15 @@ fi
 
 # ================= native: установка в живую систему =================
 
+# paroli_ros больше не генерирует Speak (интерфейс переехал в rds_2p_audio).
+# Удаляем устаревшие build/install, иначе ros2 interface list продолжает
+# показывать paroli_ros/srv/Speak, а ros2 interface show на нём падает.
+if [ ! -d "$ROSPKG_DIR/src/paroli_ros/srv" ] && \
+   [ -d "$ROSPKG_DIR/install/paroli_ros/share/paroli_ros/srv" ]; then
+    echo "🧹 Удаляем устаревший paroli_ros/srv (Speak теперь в rds_2p_audio)..."
+    rm -rf "$ROSPKG_DIR/build/paroli_ros" "$ROSPKG_DIR/install/paroli_ros"
+fi
+
 # Устанавливаем Python-зависимости из всех requirements.txt (после скачивания всех пакетов)
 echo "🐍 Ищем и устанавливаем Python-зависимости..."
 REQ_FILES=$(find "src" -maxdepth 2 -name "requirements.txt" -type f 2>/dev/null)
@@ -511,6 +520,12 @@ if [ -n "$REQ_FILES" ]; then
             echo "   ⏭️ Пропускаем: $REQ_FILE (пакет $PKG_NAME не собирается)"
             continue
         fi
+        # ds4drv ставится отдельно ниже: evdev на aarch64 собирается из sdist,
+        # pip не может прочитать его метаданные и уходит в долгий backtracking.
+        if [ "$PKG_NAME" = "rds_2p_joystick" ]; then
+            echo "   ⏭️ Пропускаем: $REQ_FILE (ds4drv ставится отдельно)"
+            continue
+        fi
 
         REQ_PATH=$(realpath "$REQ_FILE")
         REQ_HASH=$(cat "$REQ_FILE" "$CONSTRAINTS_FILE" | sha256sum | awk '{print $1}')
@@ -543,15 +558,16 @@ fi
 # (в dist-packages из find-цикла он не попадёт на PATH); состав — в requirements пакета.
 echo "🎮 Проверяем установку ds4drv..."
 if ! command -v ds4drv &> /dev/null; then
-    echo "📥 Устанавливаем ds4drv (из src/rds_2p_joystick/requirements.txt)..."
+    echo "📥 Устанавливаем ds4drv (evdev/pyudev — из apt, pip без зависимостей)..."
+    sudo apt-get install -y python3-evdev python3-pyudev
     if command -v pip3 &> /dev/null; then
-        sudo pip3 install -r "$ROSPKG_DIR/src/rds_2p_joystick/requirements.txt"
+        sudo pip3 install --no-deps ds4drv
         echo "✅ ds4drv установлен через pip3"
     elif command -v pip &> /dev/null; then
-        sudo pip install -r "$ROSPKG_DIR/src/rds_2p_joystick/requirements.txt"
+        sudo pip install --no-deps ds4drv
         echo "✅ ds4drv установлен через pip"
     else
-        echo "⚠️ pip не найден. Установите вручную: sudo pip3 install -r src/rds_2p_joystick/requirements.txt"
+        echo "⚠️ pip не найден. Установите вручную: sudo apt install python3-evdev python3-pyudev && sudo pip3 install --no-deps ds4drv"
     fi
 else
     echo "ℹ️ ds4drv уже установлен: $(which ds4drv)"
