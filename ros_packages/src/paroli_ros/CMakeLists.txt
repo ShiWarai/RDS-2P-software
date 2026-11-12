@@ -2,17 +2,13 @@ cmake_minimum_required(VERSION 3.8)
 project(paroli_ros)
 
 find_package(ament_cmake REQUIRED)
-find_package(rosidl_default_generators REQUIRED)
+find_package(rds_2p_audio REQUIRED)
 
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vendor/paroli-cli")
   message(
     FATAL_ERROR
     "Нет vendor/paroli-cli. Скопируйте paroli-cli и vendor/lib из сборки paroli-tts (см. README.md).")
 endif()
-
-rosidl_generate_interfaces(${PROJECT_NAME}
-  "srv/Speak.srv"
-)
 
 install(PROGRAMS
   scripts/tts_node.py
@@ -35,5 +31,4 @@ install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
 install(DIRECTORY models/
   DESTINATION share/${PROJECT_NAME}/models)
 
-ament_export_dependencies(rosidl_default_runtime)
 ament_package()

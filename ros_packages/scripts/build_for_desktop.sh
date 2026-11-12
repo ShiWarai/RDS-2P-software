@@ -68,6 +68,25 @@ if [ ! -d "src" ]; then
     exit 1
 fi
 
+# Пакеты, которые не собираются/игнорируются colcon. Тот же список используется
+# для pip-зависимостей: requirements.txt ставим только для собираемых пакетов.
+# vosk_ros/paroli_ros на desktop не собираем: их интерфейсы (Transcription/STT/Speak)
+# уже в rds_2p_audio, а сами движки работают на роботе (NPU). Исходники оставляем,
+# чтобы rosdep с --ignore-src видел пакеты.
+COLCON_SKIP_PACKAGES="mpu6500_ros rds_2p_joystick orbbec_camera mtf02p_ros rkllm_ros gigaam_ros"
+COLCON_IGNORE_PACKAGES="rds_2p_face vosk_ros paroli_ros"
+
+package_is_skipped() {
+    local pkg="$1"
+    local skipped
+    for skipped in $COLCON_SKIP_PACKAGES $COLCON_IGNORE_PACKAGES; do
+        if [ "$pkg" = "$skipped" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
 # ================= общий prepare (все режимы) =================
 
 echo "📦 Устанавливаем зависимости..."
@@ -118,19 +137,34 @@ else
     fi
 fi
 
-# Клонируем audio_common если его нет
+# Клонируем audio_common если его нет. Версия закреплена на актуальном релизе 4.1.0
+# (audio_common_dsp + audio_aec; для audio_aec нужен libwebrtc-audio-processing-dev).
 AUDIO_COMMON_PATH="src/audio_common"
+AUDIO_COMMON_REF="4.1.0"
 if [ ! -d "$AUDIO_COMMON_PATH" ]; then
-    echo "📥 Клонируем audio_common..."
+    echo "📥 Клонируем audio_common ($AUDIO_COMMON_REF)..."
     cd src
-    git clone https://github.com/mgonzs13/audio_common.git
+    git clone --branch "$AUDIO_COMMON_REF" --depth 1 https://github.com/mgonzs13/audio_common.git
     cd ..
-    echo "✅ audio_common клонирован"
+    echo "✅ audio_common клонирован ($AUDIO_COMMON_REF)"
 else
     echo "ℹ️ audio_common уже существует"
+    if git -C "$AUDIO_COMMON_PATH" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        CURRENT_AUDIO_REF=$(git -C "$AUDIO_COMMON_PATH" describe --tags --always 2>/dev/null)
+        if [ "$CURRENT_AUDIO_REF" != "$AUDIO_COMMON_REF" ]; then
+            echo "⚠️ audio_common: ожидается $AUDIO_COMMON_REF (сейчас $CURRENT_AUDIO_REF), переключаем..."
+            git -C "$AUDIO_COMMON_PATH" fetch --tags origin >/dev/null 2>&1 || true
+            if git -C "$AUDIO_COMMON_PATH" checkout "$AUDIO_COMMON_REF" >/dev/null 2>&1; then
+                echo "✅ audio_common переключён на $AUDIO_COMMON_REF"
+            else
+                echo "⚠️ Не удалось переключить audio_common на $AUDIO_COMMON_REF (локальные изменения?)" >&2
+            fi
+        fi
+    fi
 fi
 
-# Клонируем vosk_ros если его нет
+# Клонируем vosk_ros если его нет. Клон нужен даже когда пакет не собирается:
+# rosdep с --ignore-src должен видеть пакет, иначе rds_2p/exec_depend не резолвится.
 VOSK_ROS_PATH="src/vosk_ros"
 if [ ! -d "$VOSK_ROS_PATH" ]; then
     echo "📥 Клонируем vosk_ros..."
@@ -151,7 +185,9 @@ fi
 VOSK_MODEL_PATH="src/vosk_ros/models/vosk-model-small-ru-0.22"
 VOSK_MODEL_DIR="src/vosk_ros/models"
 mkdir -p "$VOSK_MODEL_DIR"
-if [ -d "$VOSK_MODEL_PATH" ]; then
+if package_is_skipped "vosk_ros"; then
+    echo "⏭️ vosk_ros игнорируется на desktop — модель Vosk не скачиваем"
+elif [ -d "$VOSK_MODEL_PATH" ]; then
     echo "ℹ️ Модель Vosk уже установлена: $VOSK_MODEL_PATH"
 elif [ "$MODE" = native ] || [ "$MODELS" = true ]; then
     echo "📥 Скачиваем модель Vosk (vosk-model-small-ru-0.22)..."
@@ -292,6 +328,7 @@ fi
 # Устанавливаем Python-зависимости из всех requirements.txt (после скачивания всех пакетов)
 echo "🐍 Ищем и устанавливаем Python-зависимости..."
 REQ_FILES=$(find "src" -maxdepth 2 -name "requirements.txt" -type f 2>/dev/null)
+CONSTRAINTS_FILE="$ROSPKG_DIR/constraints.txt"
 
 CACHE_FILE="$SCRIPT_DIR/.requirements_cache"
 declare -A REQ_CACHE
@@ -318,14 +355,21 @@ if [ -n "$REQ_FILES" ]; then
 
     if command -v uv &> /dev/null; then
         echo "   ⚡ Используем uv для ускорения"
-        INSTALL_CMD="uv pip install --python /usr/bin/python3 --target=$ROS_PYTHON_DIR"
+        INSTALL_CMD="uv pip install --python /usr/bin/python3 --target=$ROS_PYTHON_DIR --constraint $CONSTRAINTS_FILE"
     else
-        INSTALL_CMD="/usr/bin/python3 -m pip install --target=$ROS_PYTHON_DIR"
+        INSTALL_CMD="/usr/bin/python3 -m pip install --target=$ROS_PYTHON_DIR --constraint $CONSTRAINTS_FILE"
     fi
 
     for REQ_FILE in $REQ_FILES; do
+        PKG_DIR=$(dirname "$REQ_FILE")
+        PKG_NAME=$(sed -n 's:.*<name>\(.*\)</name>.*:\1:p' "$PKG_DIR/package.xml" 2>/dev/null | head -n 1)
+        if [ -n "$PKG_NAME" ] && package_is_skipped "$PKG_NAME"; then
+            echo "   ⏭️ Пропускаем: $REQ_FILE (пакет $PKG_NAME не собирается)"
+            continue
+        fi
+
         REQ_PATH=$(realpath "$REQ_FILE")
-        REQ_HASH=$(sha256sum "$REQ_FILE" | awk '{print $1}')
+        REQ_HASH=$(cat "$REQ_FILE" "$CONSTRAINTS_FILE" | sha256sum | awk '{print $1}')
         CACHED_HASH="${REQ_CACHE[$REQ_PATH]}"
 
         if [ "$CACHED_HASH" = "$REQ_HASH" ]; then
@@ -397,7 +441,7 @@ if [ "$ROS_DEPS_IGNORE" = false ]; then
                     rosdep update 2>/dev/null || true
                 fi
             fi
-            rosdep install --from-paths src --ignore-src -y --rosdistro $ROS_DISTRO 2>/dev/null || true
+            rosdep install --from-paths src --ignore-src -y --rosdistro "$ROS_DISTRO"
             echo "✅ rosdep выполнен"
         fi
     else
@@ -491,7 +535,7 @@ if [[ ! -f "${RNN_INST}/lib/librnnoise.a" ]]; then
     COLCON_SKIP_EXTRA="audio_filters"
     echo "⚠️  audio_filters в сборку не входит (нет собранного RNNoise)."
 fi
-colcon build --parallel-workers "${JOBS}" --symlink-install --packages-skip mpu6500_ros rds_2p_joystick orbbec_camera mtf02p_ros rkllm_ros gigaam_ros ${COLCON_SKIP_EXTRA} --packages-ignore rds_2p_face
+colcon build --parallel-workers "${JOBS}" --symlink-install --packages-skip ${COLCON_SKIP_PACKAGES} ${COLCON_SKIP_EXTRA} --packages-ignore ${COLCON_IGNORE_PACKAGES}
 
 echo "✅ Готово! Загрузите переменные: source install/setup.bash"
 

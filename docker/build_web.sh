@@ -72,6 +72,7 @@ NM="$CTX_APP/node_modules"
 tar -C "$APP_DIR" \
     --exclude='./models/laya' \
     --exclude='./models/stt' \
+    --exclude='./models/vision/training' \
     --exclude='./.test' \
     --exclude='./.certs' \
     --exclude='./tools/.venv' \

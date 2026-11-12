@@ -13,7 +13,7 @@ ROS 2 узел **Paroli** на **RK3588** (ONNX + RKNN, Piper‑совмести
 
 Другой голос: параметры **`encoder_path`**, **`decoder_path`**, **`model_config_path`**; **`espeak_data_path`** обычно общий.
 
-**Сервис `paroli_ros/speak`** → **`paroli_ros/srv/Speak`**: **`text`**, **`volume`** — множитель амплитуды PCM после ресемплинга (`0` — тишина, `1` — без изменений, `>1` — усиление с клипом int16). Поле **`volume` в запросе нужно задавать явно**; если в YAML оно опущено, часто приходит `0` → тишина.
+**Сервис `paroli_ros/speak`** → **`rds_2p_audio/srv/Speak`**: **`text`**, **`volume`** — множитель амплитуды PCM после ресемплинга (`0` — тишина, `1` — без изменений, `>1` — усиление с клипом int16). Поле **`volume` в запросе нужно задавать явно**; если в YAML оно опущено, часто приходит `0` → тишина.
 
 **Параметр ноды `tts_volume`** используется только для топика **`~/speak_text`** (там нет поля громкости); задать: `ros2 run paroli_ros tts_node.py --ros-args -p tts_volume:=1.5`.
 
@@ -42,16 +42,16 @@ ros2 launch rds_2p_audio audio.launch.py enable_capturer:=false
 
 ros2 launch paroli_ros tts.launch.py
 
-ros2 service call /paroli_ros/speak paroli_ros/srv/Speak "{text: 'Привет.', volume: 1.0}"
+ros2 service call /paroli_ros/speak rds_2p_audio/srv/Speak "{text: 'Привет.', volume: 1.0}"
 
 # громче на этом вызове
-ros2 service call /paroli_ros/speak paroli_ros/srv/Speak "{text: 'Привет.', volume: 1.5}"
+ros2 service call /paroli_ros/speak rds_2p_audio/srv/Speak "{text: 'Привет.', volume: 1.5}"
 ```
 
 В **bash** с **`!`** в тексте не используйте внешние двойные кавычки (история подставок). Надёжно:
 
 ```bash
-ros2 service call /paroli_ros/speak paroli_ros/srv/Speak '{text: "Привет, как дела!", volume: 1.0}'
+ros2 service call /paroli_ros/speak rds_2p_audio/srv/Speak '{text: "Привет, как дела!", volume: 1.0}'
 ```
 
 ### Параметры ноды (`tts_node.py`)

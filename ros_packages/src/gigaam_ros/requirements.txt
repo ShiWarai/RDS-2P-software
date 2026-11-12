@@ -1,7 +1,13 @@
+# CPU-индекс PyTorch: без него pip берёт CUDA-сборку torch с PyPI и тянет
+# nvidia-* (сотни МБ). Инференс GigaAM идёт на RKNN NPU, torch нужен только
+# для log-mel фронтенда на CPU.
+--extra-index-url https://download.pytorch.org/whl/cpu
 # numpy<=1.26.4: совместимость с rknn-toolkit2 2.3.2 на роботе
 numpy<=1.26.4
 # Фронтенд GigaAM (log-mel, CPU): torch/torchaudio — ровно как в scripts/frontend.py модели
-torch
-torchaudio
+torch==2.2.0+cpu ; platform_machine == "x86_64"
+torch==2.2.0 ; platform_machine == "aarch64"
+torchaudio==2.2.0+cpu ; platform_machine == "x86_64"
+torchaudio==2.2.0 ; platform_machine == "aarch64"
 # VAD CPU (Silero VAD v4): src/vad_node.py backend=cpu
 sherpa-onnx

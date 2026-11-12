@@ -34,8 +34,7 @@ RUN set -eux; \
 RUN rosdep init || true \
     && rosdep update --rosdistro=humble \
     && apt-get update \
-    && rosdep install --from-paths /opt/rds2p/ros-ws/src --ignore-src -r -y \
-         --skip-keys "python3-sounddevice python3-aiogram"
+    && rosdep install --from-paths /opt/rds2p/ros-ws/src --ignore-src -r -y
 
 RUN set -eux; \
     cd /opt/rds2p/ros-ws; \
@@ -53,10 +52,13 @@ RUN set -eux; \
 # Runtime-pip: единственный источник зависимостей — requirements каждого пакета
 # (rds_2p_inference/requirements.txt — runtime-подмножество, train-флот во flax/brax
 # вынесен в requirements-train.txt). rds_2p_joystick/ds4drv не берём: джойстик —
-# только на роботе. Констрейнт numpy<=1.26.4 закреплён в самих файлах.
+# только на роботе. gigaam_ros не берём: пакет нужен только на роботе (RKNN NPU).
+# vosk_ros/paroli_ros не собираем: интерфейсы (Transcription/STT/Speak) уже в
+# rds_2p_audio, а сами движки работают на роботе (Vosk STT, Paroli TTS на NPU).
+# numpy<=1.26.4 задаётся общим constraints.txt.
 RUN cd /opt/rds2p/ros-ws \
     && python3 -m pip install --no-cache-dir \
-         -r src/vosk_ros/requirements.txt \
+         -c constraints.txt \
          -r src/rds_2p_telegram_bot/requirements.txt \
          -r src/rds_2p_inference/requirements.txt
 
@@ -70,7 +72,7 @@ RUN cd /opt/rds2p/ros-ws \
     && colcon build --parallel-workers "$(nproc)" \
          --install-base /opt/rds2p/install --build-base /tmp/colcon-build \
          --packages-skip mpu6500_ros rds_2p_joystick orbbec_camera mtf02p_ros rkllm_ros gigaam_ros \
-         --packages-ignore rds_2p_face
+         --packages-ignore rds_2p_face vosk_ros paroli_ros
 
 RUN for d in /opt/rds2p/install/*/lib; do \
       if [ -f "$d/libonnxruntime.so.1.19.2" ]; then \
@@ -81,7 +83,7 @@ RUN for d in /opt/rds2p/install/*/lib; do \
 FROM ${ROS_BASE} AS runtime
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      libasound2 libsoxr0 libportaudio2 libglfw3 \
+      libasound2 libsoxr0 libportaudio2 libwebrtc-audio-processing1 libglfw3 \
       libgl1 libglu1-mesa libegl1 libgles2 \
       libx11-6 libxrandr2 libxi6 libxxf86vm1 libxcursor1 libxinerama1 libxkbcommon0 \
       libwayland-client0 libglib2.0-0 \

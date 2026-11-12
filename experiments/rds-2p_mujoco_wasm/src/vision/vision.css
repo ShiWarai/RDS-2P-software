@@ -1,0 +1,174 @@
+#vision-controls {
+  flex: 0 0 auto;
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  box-sizing: border-box;
+  color: var(--ink, #17212b);
+  background: var(--panel, #f7f8fa);
+  border-bottom: 1px solid var(--line, #d5dce2);
+  font-family: Arial, sans-serif;
+}
+
+.vision-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 7px;
+  min-width: 0;
+}
+
+.vision-heading-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+.vision-title {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.vision-subtitle {
+  font-size: 10px;
+  color: var(--muted, #65717c);
+}
+
+.vision-status {
+  min-width: 0;
+  padding: 4px 7px;
+  border-radius: 4px;
+  background: var(--card, #fff);
+  border: 1px solid var(--line, #d5dce2);
+  color: var(--muted, #65717c);
+  font-size: 10px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.vision-panel-body {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+/* Левая часть — статистика, занимает всё свободное место. */
+.vision-stats {
+  order: 0;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 12px 14px;
+  box-sizing: border-box;
+  background: var(--card, #fff);
+  border: 1px solid var(--line, #d5dce2);
+  border-radius: 5px;
+}
+
+.vision-stats h3 {
+  margin: 0 0 12px;
+  color: var(--ink, #17212b);
+  font-size: clamp(14px, 1.15vw, 18px);
+  line-height: 1.4;
+  font-weight: 700;
+}
+
+.vision-hud {
+  color: var(--ink, #17212b);
+  font-size: clamp(13px, 1.05vw, 17px);
+  line-height: 1.75;
+  font-weight: 600;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+/* Правая часть — камера. Ширина рассчитывается из высоты 4:3. */
+.vision-fallback {
+  order: 1;
+  flex: 0 1 auto;
+  width: clamp(160px, calc((50vh - 120px) * 4 / 3), 640px);
+  max-width: min(640px, 62%);
+  min-width: 0;
+  margin-left: auto;
+  box-sizing: border-box;
+}
+
+.vision-fallback-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+  min-height: 25px;
+  padding: 2px 5px;
+  box-sizing: border-box;
+  color: var(--ink, #17212b);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+#vision-preview-count {
+  color: #168044;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.vision-preview-viewport {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: #000;
+  border: 1px solid var(--line, #d5dce2);
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.vision-preview-viewport canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+.vision-init-error {
+  position: fixed;
+  z-index: 10001;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  padding: 12px;
+  color: #fff;
+  background: #862f2f;
+  border-radius: 5px;
+  font: 13px Arial, sans-serif;
+}
+
+@media (max-width: 480px) {
+  .vision-panel-body {
+    gap: 6px;
+  }
+
+  .vision-stats {
+    padding: 7px;
+  }
+
+  .vision-stats h3 {
+    font-size: 12px;
+  }
+
+  .vision-hud {
+    font-size: 12px;
+    line-height: 1.55;
+  }
+
+  .vision-fallback {
+    max-width: 58%;
+  }
+}

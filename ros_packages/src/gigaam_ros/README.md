@@ -16,7 +16,8 @@
 
 ## Зависимости
 - Python: `numpy<=1.26.4` (совместимость с rknn-toolkit2 2.3.2), `torch==2.2.0`, `torchaudio==2.2.0`
-  (лог-мел фронтенд, CPU), `sherpa-onnx` (VAD backend=cpu).
+  (лог-мел фронтенд, **CPU-колёса**; CPU-индекс прописан в `requirements.txt`,
+  CUDA/nvidia-* не скачиваются), `sherpa-onnx` (VAD backend=cpu).
 - Системно: `librknnrt.so` 2.3.2 — **уже стоит в системе** (`/usr/lib/librknnrt.so`, тот же,
   что вендорит `rkllm_ros`). Нода грузит его по имени (`rknn_lib` пусто → `librknnrt.so`);
   альтернативу задают параметром `rknn_lib` или `RKNN_LIB`.

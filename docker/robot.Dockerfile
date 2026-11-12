@@ -40,8 +40,7 @@ RUN if [ -d /opt/rds2p/ros-ws/src/OrbbecSDK_ROS2/orbbec_camera ]; then \
 RUN rosdep init || true \
     && rosdep update --rosdistro=humble \
     && apt-get update \
-    && rosdep install --from-paths /opt/rds2p/ros-ws/src --ignore-src -r -y \
-         --skip-keys "python3-sounddevice python3-aiogram"
+    && rosdep install --from-paths /opt/rds2p/ros-ws/src --ignore-src -r -y
 
 RUN set -eux; \
     cd /opt/rds2p/ros-ws; \
@@ -75,13 +74,22 @@ RUN set -eux; \
 # Runtime-pip: единственный источник зависимостей — requirements каждого пакета
 # (rds_2p_inference/requirements.txt — runtime-подмножество; тренировочный флот
 # flax/brax/jax вынесен в requirements-train.txt и в образ не идёт).
-# Констрейнт numpy<=1.26.4 (rknn-toolkit2) закреплён в самих requirements-файлах.
+# numpy<=1.26.4 (rknn-toolkit2) задаётся общим constraints.txt, в т.ч. для
+# внешнего vosk_ros.
 RUN cd /opt/rds2p/ros-ws \
     && python3 -m pip install --no-cache-dir \
+         -c constraints.txt \
          -r src/vosk_ros/requirements.txt \
          -r src/rds_2p_telegram_bot/requirements.txt \
          -r src/rds_2p_inference/requirements.txt \
          -r src/rds_2p_joystick/requirements.txt
+
+# gigaam_ros — отдельным pip-вызовом: его requirements подключают CPU-индекс
+# PyTorch, чтобы не тянуть CUDA/nvidia-*; остальные пакеты этот индекс не видят.
+RUN cd /opt/rds2p/ros-ws \
+    && python3 -m pip install --no-cache-dir \
+         -c constraints.txt \
+         -r src/gigaam_ros/requirements.txt
 
 # Колонки colcon: на 2GB SBC 4 компилятора параллельно вызывают OOM — build_robot.sh
 # считает значение по MemTotal. Ручной override: --build-arg BUILD_WORKERS=N.
@@ -132,7 +140,7 @@ RUN for d in /opt/rds2p/install/*/lib; do \
 FROM ${ROS_BASE} AS runtime
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      libasound2 libgpiod2 libsoxr0 libudev1 libusb-1.0-0 libportaudio2 \
+      libasound2 libgpiod2 libsoxr0 libwebrtc-audio-processing1 libudev1 libusb-1.0-0 libportaudio2 \
       alsa-utils \
       libglfw3 libgl1 libegl1 libgles2 \
       python3-opencv python3-numpy python3-pil python3-yaml python3-scipy \

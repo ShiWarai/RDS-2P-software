@@ -27,7 +27,7 @@ from ament_index_python.packages import get_package_prefix, get_package_share_di
 from audio_common_msgs.msg import AudioStamped
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
-from paroli_ros.srv import Speak
+from rds_2p_audio.srv import Speak
 from scipy import signal
 from std_msgs.msg import String
 from std_srvs.srv import Trigger

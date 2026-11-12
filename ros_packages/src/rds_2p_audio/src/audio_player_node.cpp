@@ -16,7 +16,7 @@
 #include <portaudio.h>
 #include <rclcpp/rclcpp.hpp>
 
-#include <audio_common/sample_rate_converter.hpp>
+#include <audio_common_dsp/multi_channel_resampler.hpp>
 #include <audio_common_msgs/msg/audio_stamped.hpp>
 
 using namespace std::chrono_literals;
@@ -147,7 +147,7 @@ public:
 private:
   struct Source {
     std::deque<float> buf; // interleaved float @ rate_, channels_
-    audio_common::SampleRateConverter src;
+    audio_common_dsp::MultiChannelResampler src;
     int in_channels = 0;
     int in_rate = 0;
     double last_active = 0.0;
@@ -205,7 +205,7 @@ private:
 
     // Ресет ресемплера при смене формата источника.
     if (s.in_channels != in_ch || s.in_rate != info.rate) {
-      s.src = audio_common::SampleRateConverter{};
+      s.src = audio_common_dsp::MultiChannelResampler{};
       s.buf.clear();
       s.in_channels = in_ch;
       s.in_rate = info.rate;
@@ -217,7 +217,7 @@ private:
     }
 
     if (info.rate != rate_) {
-      ready = s.src.convert(ready, channels_, info.rate, rate_);
+      ready = s.src.process(ready, channels_, info.rate, rate_);
     }
 
     s.buf.insert(s.buf.end(), ready.begin(), ready.end());

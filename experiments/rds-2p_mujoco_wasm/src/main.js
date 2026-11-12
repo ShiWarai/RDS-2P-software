@@ -35,6 +35,7 @@ import {
   SAY_BLOCK,
 } from "./blocks/workspace.js";
 import { buildSliderPanel, buildCommandButtons, toast } from "./ui/panels.js";
+import { initPanelTabs } from "./ui/panelTabs.js";
 import { parseRef, refValueForRes, compareOp, fmtP, fmtValue } from "./rules/to_laya.js";
 
 const app = {
@@ -940,6 +941,18 @@ async function boot() {
   } else {
     toast("Blockly не загрузился.", { kind: "err" });
   }
+
+  // Вкладки левой панели: конвейер ЗРения стартует лениво, при первом открытии вкладки.
+  initPanelTabs({
+    onSwitch: (id) => {
+      if (id === "cv") {
+        window.__vision?.ensureStarted();
+        window.__vision?.resume();
+      } else {
+        window.__vision?.pause();
+      }
+    },
+  });
 
   // Кнопки ручных команд
   buildCommandButtons($("command-buttons"), MANUAL_BUTTONS, runCommand);

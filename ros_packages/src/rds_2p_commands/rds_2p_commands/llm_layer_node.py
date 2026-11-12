@@ -31,7 +31,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import Image
 from rds_2p_audio.msg import Transcription
 from rkllm_ros_msgs.srv import SystemOne
-from paroli_ros.srv import Speak
+from rds_2p_audio.srv import Speak
 
 from rds_2p_commands.llm_commands import LlmCommands
 

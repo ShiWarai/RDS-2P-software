@@ -106,6 +106,44 @@ html, body {
   background: var(--panel);
 }
 
+#panel-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 6px 10px 0;
+  background: var(--card);
+  border-bottom: 2px solid var(--line);
+}
+
+.panel-tab-btn {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  background: var(--panel);
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+  padding: 8px 14px;
+  cursor: pointer;
+  margin-bottom: -2px;
+}
+
+.panel-tab-btn.active {
+  background: var(--card);
+  color: var(--ink);
+}
+
+.panel-tab {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-tab.hidden { display: none; }
+
+#vision-mount { flex: 1 1 auto; min-height: 0; overflow: auto; }
+
 #panel-right {
   flex: 1 1 54%;
   min-width: 360px;

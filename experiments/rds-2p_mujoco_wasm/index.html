@@ -7,6 +7,7 @@
   <meta name="description" content="Мастер-класс: собери правило из блоков и скажи фразу роботу-панде Панде">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='10' r='4' fill='%23ff8f3c'/%3E%3Ccircle cx='4' cy='5' r='2' fill='%234cc9f0'/%3E%3Ccircle cx='12' cy='5' r='2' fill='%23ffd166'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="./src/ui/theme.css">
+  <link rel="stylesheet" href="./src/vision/vision.css">
   <script src="/variant.js"></script>
   <style>
     #variant-banner{
@@ -55,28 +56,39 @@
     </header>
 
     <main id="split">
-      <section id="panel-left" aria-label="Конструктор правил">
-        <div id="toolbar">
-          <button id="btn-mic" class="btn icon-btn mic-btn" title="Готовлюсь…" disabled>🎤</button>
-          <input id="phrase-input" type="text" placeholder="…или напиши фразу" autocomplete="off" title="Напиши фразу словами, если микрофон недоступен">
-          <button id="btn-check" class="btn icon-btn accent" title="Готовлюсь…" disabled>▶</button>
-          <span id="run-time" class="run-time" title="Сколько думала модель: запуск вопросов и развилок">⏱ —</span>
-          <span class="sep"></span>
-          <button id="btn-poses" class="btn icon-btn" title="Открыть редактор моих поз">🐾</button>
+      <section id="panel-left" aria-label="Панель управления">
+        <div id="panel-tabs" role="tablist" aria-label="Разделы панели">
+          <button id="tab-btn-osm" class="panel-tab-btn active" role="tab" aria-selected="true" aria-controls="tab-osm" data-tab="osm">🧩 Конструктор</button>
+          <button id="tab-btn-cv" class="panel-tab-btn" role="tab" aria-selected="false" aria-controls="tab-cv" data-tab="cv">👁 Компьютерное зрение</button>
         </div>
-        <div id="loadbars">
-          <div class="loadbar hidden" id="bar-voice">
-            <span class="loadbar-label">🎙 Голос</span>
-            <div class="loadbar-track"><div class="loadbar-fill"></div></div>
-            <span class="loadbar-pct">0%</span>
+
+        <div id="tab-osm" class="panel-tab" role="tabpanel" aria-labelledby="tab-btn-osm">
+          <div id="toolbar">
+            <button id="btn-mic" class="btn icon-btn mic-btn" title="Готовлюсь…" disabled>🎤</button>
+            <input id="phrase-input" type="text" placeholder="…или напиши фразу" autocomplete="off" title="Напиши фразу словами, если микрофон недоступен">
+            <button id="btn-check" class="btn icon-btn accent" title="Готовлюсь…" disabled>▶</button>
+            <span id="run-time" class="run-time" title="Сколько думала модель: запуск вопросов и развилок">⏱ —</span>
+            <span class="sep"></span>
+            <button id="btn-poses" class="btn icon-btn" title="Открыть редактор моих поз">🐾</button>
           </div>
-          <div class="loadbar hidden" id="bar-laya">
-            <span class="loadbar-label">🧠 Модель ИИ</span>
-            <div class="loadbar-track"><div class="loadbar-fill"></div></div>
-            <span class="loadbar-pct">0%</span>
+          <div id="loadbars">
+            <div class="loadbar hidden" id="bar-voice">
+              <span class="loadbar-label">🎙 Голос</span>
+              <div class="loadbar-track"><div class="loadbar-fill"></div></div>
+              <span class="loadbar-pct">0%</span>
+            </div>
+            <div class="loadbar hidden" id="bar-laya">
+              <span class="loadbar-label">🧠 Модель ИИ</span>
+              <div class="loadbar-track"><div class="loadbar-fill"></div></div>
+              <span class="loadbar-pct">0%</span>
+            </div>
           </div>
+          <div id="blocklyDiv"></div>
         </div>
-        <div id="blocklyDiv"></div>
+
+        <div id="tab-cv" class="panel-tab hidden" role="tabpanel" aria-labelledby="tab-btn-cv">
+          <div id="vision-mount"></div>
+        </div>
       </section>
 
       <section id="panel-right" aria-label="Симулятор">
@@ -136,5 +148,6 @@
     })();
   </script>
   <script type="module" src="./src/main.js"></script>
+  <script type="module" src="./src/vision/bootstrap.js"></script>
 </body>
 </html>

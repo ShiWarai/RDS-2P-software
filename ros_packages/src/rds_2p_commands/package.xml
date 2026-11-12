@@ -24,7 +24,7 @@
   <depend>ament_index_python</depend>
   <depend>audio_common_msgs</depend>
   <depend>rkllm_ros_msgs</depend>
-  <depend>paroli_ros</depend>
+  <exec_depend>paroli_ros</exec_depend>
   <depend>std_srvs</depend>
 
   <exec_depend>python3-yaml</exec_depend>
