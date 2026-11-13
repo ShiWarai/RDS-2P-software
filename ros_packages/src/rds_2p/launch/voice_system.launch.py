@@ -80,13 +80,30 @@ def _setup(context, *_args, **_kwargs):
             launch_arguments=stt_ld_args.items(),
         )
     else:
-        # GigaAM не потоковый: распознаёт фразу целиком, поэтому перед ним
-        # обязателен VAD-шлюз (capturer → vad_node → gigaam). Без VAD каждый
-        # мелкий чанк микрофона уходил бы в распознавание как отдельная «фраза»
-        # и текст получался рваным («ан», «чка», …).
-        # scoped=True: аргумент output_topic у vad.launch.py (/audio/vad) не
-        # должен протекать в общий scope и подменять шину динамика output_topic
-        # (/audio/output), которую используют Paroli и lip_sync.
+        # GigaAM не потоковый → перед ним VAD-шлюз; опционально RNNoise-шумодав.
+        denoise = context.launch_configurations.get("denoise", "rnnoise").strip().lower()
+        vad_input = LaunchConfiguration("capturer_topic")
+        if denoise == "rnnoise":
+            rnnoise_inc = GroupAction(
+                actions=[
+                    IncludeLaunchDescription(
+                        PythonLaunchDescriptionSource([
+                            PathJoinSubstitution([
+                                FindPackageShare("audio_filters"),
+                                "launch",
+                                "rnnoise_filter.launch.py",
+                            ]),
+                        ]),
+                        launch_arguments={
+                            "input_topic": LaunchConfiguration("capturer_topic"),
+                            "output_topic": "/audio/input/clean",
+                        }.items(),
+                    ),
+                ],
+                scoped=True,
+            )
+            stt_extras.append(rnnoise_inc)
+            vad_input = "/audio/input/clean"
         vad_inc = GroupAction(
             actions=[
                 IncludeLaunchDescription(
@@ -98,7 +115,7 @@ def _setup(context, *_args, **_kwargs):
                         ]),
                     ]),
                     launch_arguments={
-                        "audio_topic": LaunchConfiguration("capturer_topic"),
+                        "audio_topic": vad_input,
                         "output_topic": "/audio/vad",
                         "min_silence_duration": LaunchConfiguration("vad_min_silence_duration"),
                         "hangover_sec": LaunchConfiguration("vad_hangover_sec"),
@@ -213,6 +230,12 @@ def generate_launch_description():
                 "stt",
                 default_value="vosk",
                 description="STT backend: vosk (CPU) или gigaam (RKNN NPU)",
+            ),
+            DeclareLaunchArgument(
+                "denoise",
+                default_value="none",
+                description="Шумодав перед VAD (только gigaam): none / rnnoise. "
+                            "rnnoise вырезает тихую речь и снижает дальность — для дальности none",
             ),
             DeclareLaunchArgument(
                 "gigaam_model_path",
