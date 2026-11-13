@@ -51,6 +51,7 @@ from rknn_engine import (
     SR,
     Engine,
     GigaamFrontend,
+    allowed_ids_for_lang,
     decode_ids,
     load_vocab,
     resolve_model_rknn,
@@ -76,6 +77,7 @@ class GigaamNode(Node):
         self.declare_parameter('speech_bus_frame_ids', [])
         self.declare_parameter('speech_pause_tail_sec', 0.8)
         self.declare_parameter('reliable_audio', True)
+        self.declare_parameter('decode_lang', 'ru+en')
 
         model_path = self._param('model_path').string_value.strip()
         model_file = self._param('model_file').string_value.strip()
@@ -118,10 +120,16 @@ class GigaamNode(Node):
                     '(положите multilingual_vocab.txt рядом с .rknn или задайте vocab_path)')
             self.vocab = load_vocab(vocab_path)
             self.engine = Engine(rknn_path, rknn_lib)
-            self.frontend = GigaamFrontend(num_threads=torch_threads)
+            decode_lang = self._param('decode_lang').string_value.strip()
+            allowed_ids = allowed_ids_for_lang(self.vocab, decode_lang)
+            self.frontend = GigaamFrontend(
+                num_threads=torch_threads, allowed_ids=allowed_ids)
             self.get_logger().info(
                 f'Модель GigaAM загружена: {rknn_path} (vocab {vocab_path}, '
                 f'lib {rknn_lib}); входы NPU: {self.engine.input_names()}')
+            self.get_logger().info(
+                f'Язык декодера: {decode_lang or "all"} '
+                f'({"ограничение " + str(len(allowed_ids)) + " токенов" if allowed_ids is not None else "без ограничения"})')
         except Exception as e:  # noqa: BLE001
             self.get_logger().fatal(f'Ошибка загрузки модели GigaAM: {e}')
             raise

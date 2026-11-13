@@ -161,6 +161,103 @@ def _apply_tts_volume_gain(mono_i16: np.ndarray, gain: float) -> np.ndarray:
     return np.clip(y, -32768.0, 32767.0).astype(np.int16)
 
 
+# --- Войсморфинг (пост-обработка синтеза, duration-preserving) ---------------
+# Фазовый вокодер: тайм-стретч без изменения высоты, затем pitch/formant/tempo.
+# Все параметры нейтральны по умолчанию → нулевой оверхед на обычном TTS.
+
+
+def _pv_time_stretch(x: np.ndarray, stretch: float, n_fft: int = 2048, hop: int = 512) -> np.ndarray:
+    """Тайм-стретч фазовым вокодером: длина ≈ len(x)*stretch, высота не меняется.
+
+    stretch>1 → длиннее/медленнее, stretch<1 → короче/быстрее.
+    """
+    if x.size < n_fft:
+        return signal.resample(x, max(1, int(round(x.size * stretch))))
+    if abs(stretch - 1.0) < 1e-6:
+        return x
+    win = np.hanning(n_fft)
+    pad = n_fft
+    xp = np.pad(x, (pad, pad + hop), mode="reflect")
+    n_frames = 1 + (xp.size - n_fft) // hop
+    starts = np.arange(n_frames) * hop
+    frames = np.stack([xp[s : s + n_fft] for s in starts]) * win
+    spec = np.fft.rfft(frames, axis=1)
+    mag = np.abs(spec)
+    phase = np.angle(spec)
+    k = np.arange(n_fft // 2 + 1)
+    omega = 2.0 * np.pi * hop * k / n_fft
+    hs = max(1, int(round(hop * stretch)))
+    out_len = n_fft + (n_frames - 1) * hs
+    y = np.zeros(out_len)
+    wsum = np.zeros(out_len)
+    acc = phase[0].copy()
+    for i in range(n_frames):
+        if i > 0:
+            dphi = phase[i] - phase[i - 1] - omega
+            dphi = (dphi + np.pi) % (2.0 * np.pi) - np.pi
+            acc = acc + (omega + dphi) * (hs / hop)
+        frame = np.fft.irfft(mag[i] * np.exp(1j * acc), n=n_fft)
+        p = i * hs
+        y[p : p + n_fft] += frame * win
+        wsum[p : p + n_fft] += win * win
+    y /= np.maximum(wsum, 1e-8)
+    target = max(1, int(round(x.size * stretch)))
+    y = y[pad : pad + target]
+    if y.size < target:
+        y = np.pad(y, (0, target - y.size))
+    return y[:target]
+
+
+def _pitch_shift(x: np.ndarray, sr: int, semitones: float) -> np.ndarray:
+    """Сдвиг высоты в полутонах с сохранением длительности (растянуть → ресемпл обратно)."""
+    if abs(semitones) < 1e-6:
+        return x
+    factor = 2.0 ** (semitones / 12.0)
+    stretched = _pv_time_stretch(x, factor)
+    return signal.resample(stretched, x.size)
+
+
+def _time_stretch(x: np.ndarray, sr: int, factor: float) -> np.ndarray:
+    """Темп: factor>1 быстрее/короче, factor<1 медленнее; высота не меняется."""
+    if abs(factor - 1.0) < 1e-6:
+        return x
+    return _pv_time_stretch(x, 1.0 / factor)
+
+
+def _formant_shift(x: np.ndarray, sr: int, semitones: float) -> np.ndarray:
+    """Сдвиг формант (тембр/«размер голоса») без смены высоты и длительности.
+
+    Ресемпл (двигает форманты+высоту) → обратный pitch-сдвиг (возвращает высоту)
+    → темп-коррекция (возвращает длительность).
+    """
+    if abs(semitones) < 1e-6:
+        return x
+    f = 2.0 ** (semitones / 12.0)
+    y = signal.resample(x, max(1, int(round(x.size / f))))
+    y = _pitch_shift(y, sr, -semitones)
+    y = _time_stretch(y, sr, 1.0 / f)
+    return y
+
+
+def _apply_voice_morph(
+    mono_i16: np.ndarray, sr: int, pitch_st: float, formant_st: float, tempo: float
+) -> np.ndarray:
+    """Применить морфинг к PCM16; нейтральные параметры → без изменений."""
+    pitch_st = float(np.clip(pitch_st, -12.0, 12.0))
+    formant_st = float(np.clip(formant_st, -12.0, 12.0))
+    tempo = float(np.clip(tempo, 0.5, 2.0))
+    if abs(pitch_st) < 1e-6 and abs(formant_st) < 1e-6 and abs(tempo - 1.0) < 1e-6:
+        return mono_i16
+    x = mono_i16.astype(np.float64) / 32768.0
+    if abs(formant_st) >= 1e-6:
+        x = _formant_shift(x, sr, formant_st)
+    if abs(pitch_st) >= 1e-6:
+        x = _pitch_shift(x, sr, pitch_st)
+    if abs(tempo - 1.0) >= 1e-6:
+        x = _time_stretch(x, sr, tempo)
+    return (np.clip(x, -1.0, 1.0) * 32767.0).astype(np.int16)
+
+
 class TtsNode(Node):
     def __init__(self) -> None:
         super().__init__("paroli_ros")
@@ -201,6 +298,14 @@ class TtsNode(Node):
         self.declare_parameter("between_sentence_silence_sec", 0.12)
         # 1.0 = без изменений; 0…1 — ослабление; >1 — усиление (например 1.5), с клипом int16.
         self.declare_parameter("tts_volume", 1.0)
+        # Войсморфинг (пост-обработка синтеза, длительность сохраняется):
+        # voice_pitch — высота в полутонах (−12…12): >0 выше/«детский», <0 ниже/«бас».
+        # voice_formant — форманты в полутонах (−12…12): меняет тембр/«размер голоса»,
+        #                 не трогая высоту (эффект «другой человек», а не просто питч).
+        # voice_tempo — темп (0.5…2.0): >1 быстрее, <1 медленнее, высота не меняется.
+        self.declare_parameter("voice_pitch", 0.0)
+        self.declare_parameter("voice_formant", 0.0)
+        self.declare_parameter("voice_tempo", 1.0)
 
         qos_depth = max(10, int(self.get_parameter("qos_depth").value))
         qos = QoSProfile(
@@ -462,6 +567,13 @@ class TtsNode(Node):
         try:
             pcm, sr_nat = self._synth_pcm_mono(text)
             pcm_out = _resample_mono_int16(pcm, sr_nat, sr_target)
+            pcm_out = _apply_voice_morph(
+                pcm_out,
+                sr_target,
+                float(self.get_parameter("voice_pitch").get_parameter_value().double_value),
+                float(self.get_parameter("voice_formant").get_parameter_value().double_value),
+                float(self.get_parameter("voice_tempo").get_parameter_value().double_value),
+            )
             vol = self._effective_tts_gain(service_volume)
             pcm_out = _apply_tts_volume_gain(pcm_out, vol)
             self._publish_segments(pcm_out, sr_target)

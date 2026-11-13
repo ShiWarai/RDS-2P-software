@@ -64,6 +64,17 @@ ros2 launch gigaam_ros vad.launch.py
 ros2 launch gigaam_ros gigaam.launch.py audio_topic:=/audio/vad
 ```
 
+### В общем голосовом контуре RDS-2P
+```bash
+# STT=GigaAM вместо Vosk (микрофон напрямую, reliable_audio=false)
+ros2 launch rds_2p voice_system.launch.py stt:=gigaam
+
+# В llm_layer; для VAD дополнительно включите gigaam_reliable_audio
+ros2 launch rds_2p llm_layer.launch.py stt:=gigaam
+ros2 launch rds_2p llm_layer.launch.py stt:=gigaam vad_enabled:=true \
+  vosk_audio_topic:=/audio/vad gigaam_reliable_audio:=true
+```
+
 ## Проверено (RK3588, ROS 2 Humble, domain 1)
 Живой тракт `audio_capturer(/audio/input) → vad_node → gigaam_node → /audio/transcription`
 при параллельно работающем `paroli_ros`. `ros2 topic pub --once /speak_text std_msgs/msg/String

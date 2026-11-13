@@ -149,6 +149,7 @@ aplay -l                               # /dev/snd виден
 ros2 launch rds_2p display.launch.py
 # голос:
 ros2 launch rds_2p voice_system.launch.py
+ros2 launch rds_2p voice_system.launch.py stt:=gigaam   # GigaAM (RKNN NPU)
 # камера Astra Mini (если orbbec в образе):
 ros2 launch rds_2p astra_mini.launch.py
 ```

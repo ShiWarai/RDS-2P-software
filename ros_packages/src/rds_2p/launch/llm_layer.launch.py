@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""LLM-прослойка: микрофон → VAD → vosk → классификатор system-one → команда | разговор (rkllm+Paroli).
+"""LLM-прослойка: микрофон → VAD → STT → классификатор system-one → команда | разговор (rkllm+Paroli).
 
 Состав:
-- ``vosk_ros vad.launch.py`` — VAD-шлюз (Silero VAD, CPU): в vosk идут только фразы речи.
-  **По умолчанию выключен** (``vad_enabled:=false`` — vosk слушает микрофон напрямую; у ES8388
-  слабый SNR и гейтинг там не спасает). Включение: ``vad_enabled:=true vosk_audio_topic:=/audio/vad``.
-- ``rds_2p voice_system.launch.py`` — audio (микрофон/плеер) + vosk + Paroli + lip_sync («рот»);
-  выключается ``include_voice:=false`` (например, для отладки текстом).
+- ``vosk_ros vad.launch.py`` — VAD-шлюз (Silero VAD, CPU): в STT идут только фразы речи.
+  **По умолчанию выключен** (``vad_enabled:=false`` — STT слушает микрофон напрямую; у ES8388
+  слабый SNR и гейтинг там не спасает). Включение: ``vad_enabled:=true vosk_audio_topic:=/audio/vad``
+  (для ``stt:=gigaam`` добавьте ``gigaam_reliable_audio:=true``).
+- ``rds_2p voice_system.launch.py`` — audio (микрофон/плеер) + STT (``stt:=vosk`` или
+  ``stt:=gigaam``) + Paroli + lip_sync («рот»); выключается ``include_voice:=false``
+  (например, для отладки текстом).
 - ``rkllm_ros rkllm.launch.py`` — LLM (по умолчанию Qwen3.5-2B из ~/models).
 - ``rkllm_ros system_one.launch.py`` — HTTP-обёртка system-one-rknn (kev-0.8b).
 - ``rds_2p_commands llm_layer`` — маршрутизация: команда → ``/audio/command_transcription``,
@@ -70,7 +72,19 @@ def generate_launch_description():
     args = [
         DeclareLaunchArgument(
             'include_voice', default_value='true',
-            description='Поднимать voice_system (audio+vosk+Paroli+lip_sync)',
+            description='Поднимать voice_system (audio+STT+Paroli+lip_sync)',
+        ),
+        DeclareLaunchArgument(
+            'stt', default_value='vosk',
+            description='STT backend: vosk (CPU) или gigaam (RKNN NPU)',
+        ),
+        DeclareLaunchArgument(
+            'gigaam_model_path', default_value='',
+            description='Только для stt:=gigaam; пусто — дефолт из share gigaam_ros',
+        ),
+        DeclareLaunchArgument(
+            'gigaam_reliable_audio', default_value='false',
+            description='RELIABLE QoS для gigaam; true при vosk_audio_topic:=/audio/vad',
         ),
         DeclareLaunchArgument(
             'encoder_model_path',
@@ -111,15 +125,15 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'post_speech_cooldown_sec', default_value='2.5',
             description='Окно после озвучки, в котором транскрипции игнорируются '
-                        '(гасит самоэхо: мик+vosk отдают его через ~1.5–2 с)',
+                        '(гасит самоэхо: мик+STT отдают его через ~1.5–2 с)',
         ),
         DeclareLaunchArgument(
             'vad_enabled', default_value='false',
-            description='VAD-шлюз vosk_ros (mic → только речь → /audio/vad → vosk); по умолчанию выключен',
+            description='VAD-шлюз (mic → только речь → /audio/vad → STT); по умолчанию выключен',
         ),
         DeclareLaunchArgument(
             'vosk_audio_topic', default_value='/audio/input',
-            description='Топик аудио для vosk; при vad_enabled:=true поставьте /audio/vad',
+            description='Топик аудио для выбранного STT; при vad_enabled:=true поставьте /audio/vad',
         ),
         DeclareLaunchArgument(
             'capturer_device', default_value='-1',
@@ -153,6 +167,9 @@ def generate_launch_description():
             ]),
         ),
         launch_arguments={
+            'stt': LaunchConfiguration('stt'),
+            'gigaam_model_path': LaunchConfiguration('gigaam_model_path'),
+            'gigaam_reliable_audio': LaunchConfiguration('gigaam_reliable_audio'),
             'vosk_audio_topic': LaunchConfiguration('vosk_audio_topic'),
             'capturer_device': LaunchConfiguration('capturer_device'),
         }.items(),

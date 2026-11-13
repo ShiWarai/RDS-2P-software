@@ -233,6 +233,9 @@ class Engine:
 
 # --- CTC decode --------------------------------------------------------------
 
+WORD_SEP_ID = 0
+
+
 def collapse(am, blank: int = 70):
     """argmax → схлопнуть повторы → убрать CTC-blank (id 70)."""
     ids = [a for i, a in enumerate(am) if i == 0 or a != am[i - 1]]
@@ -253,6 +256,40 @@ def load_vocab(path: str) -> dict:
 
 def decode_ids(ids, vocab: dict) -> str:
     return "".join(vocab.get(i, "?") for i in ids).replace("\u2581", " ").strip()
+
+
+_RU_LETTERS = set("абвгдежзийклмнопрстуфхцчшщъыьэюяё")
+_TURKIC_EXTRA = set("іғқңүұһәө")
+
+
+def allowed_ids_for_lang(vocab: dict, lang: str):
+    """Разрешённые id токенов для ``lang`` (ru / en / ru+en / all); None — без фильтра."""
+    lang = (lang or "all").strip().lower()
+    if lang in ("", "all", "multi", "multilingual"):
+        return None
+    langs = {x.strip() for x in lang.replace("+", ",").split(",") if x.strip()}
+    want_ru = bool(langs & {"ru", "rus", "russian"})
+    want_en = bool(langs & {"en", "eng", "english"})
+    if not want_ru and not want_en:
+        return None
+    allowed = set()
+    for tid, tok in vocab.items():
+        low = tok.lower()
+        if tok in ("<blk>", "\u2581", "'"):
+            allowed.add(tid)
+            continue
+        if low in _TURKIC_EXTRA:
+            continue
+        if low in _RU_LETTERS:
+            if want_ru:
+                allowed.add(tid)
+            continue
+        if low.isascii() and low.isalpha():
+            if want_en:
+                allowed.add(tid)
+            continue
+        allowed.add(tid)
+    return allowed
 
 
 # --- GigaAM log-mel frontend (ровно как scripts/frontend.py) -----------------
@@ -276,12 +313,14 @@ class GigaamFrontend:
     torch подгружается лениво (CPU-у VAD он не нужен).
     """
 
-    def __init__(self, num_threads: int = 4):
+    def __init__(self, num_threads: int = 4, allowed_ids=None):
         import torch
         from torch import nn
         import torchaudio
         self._torch = torch
         torch.set_num_threads(max(1, int(num_threads)))
+        self._allowed_ids = set(allowed_ids) if allowed_ids is not None else None
+        self._lang_mask = None
 
         class SpecScaler(nn.Module):
             def forward(self, x):
@@ -325,8 +364,22 @@ class GigaamFrontend:
             feats = self.features(chunk)
             out, ms = engine.run(feats)
             lat.append(ms)
-            am = out[0].argmax(-1)
-            collapsed.extend(collapse(am))
+            logits = out[0]
+            if self._allowed_ids is not None:
+                n_tok = logits.shape[-1]
+                if self._lang_mask is None or self._lang_mask.size != n_tok:
+                    self._lang_mask = np.full(n_tok, -1e9, dtype=np.float32)
+                    for tid in self._allowed_ids:
+                        if 0 <= tid < n_tok:
+                            self._lang_mask[tid] = 0.0
+                logits = logits + self._lang_mask
+            am = logits.argmax(-1)
+            win_ids = collapse(am)
+            if (collapsed and win_ids
+                    and collapsed[-1] != WORD_SEP_ID
+                    and win_ids[0] != WORD_SEP_ID):
+                collapsed.append(WORD_SEP_ID)
+            collapsed.extend(win_ids)
             pos += step
             # хвост, короче шага, но не с нуля: обработаем следующим куском
         return collapsed, lat

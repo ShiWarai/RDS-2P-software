@@ -76,12 +76,30 @@ ros2 service call /paroli_ros/speak rds_2p_audio/srv/Speak '{text: "Привет
 | `noise_scale` | **`-1`** | **`≥0`** → `--noise-scale`; **`-1`** — не задавать. |
 | `noise_w` | **`-1`** | **`≥0`** → `--noise-w`; **`-1`** — не задавать. |
 | `tts_volume` | **`1.0`** | Громкость только для топика **`speak_text`**; для **`/speak`** задаётся полем **`volume`**. |
+| `voice_pitch` | **`0.0`** | Войсморфинг: высота в полутонах (−12…12). `>0` выше/«детский», `<0` ниже/«бас». Длительность сохраняется. |
+| `voice_formant` | **`0.0`** | Войсморфинг: форманты в полутонах (−12…12). Меняет тембр/«размер голоса» **без смены высоты** (эффект «другой человек»). |
+| `voice_tempo` | **`1.0`** | Войсморфинг: темп (0.5…2.0). `>1` быстрее, `<1` медленнее; высота не меняется. |
 
 Смена **`length_scale` / `noise_*` / путей модели** вызывает **перезапуск `paroli-cli`** перед следующим синтезом.
 
 Пример быстрой речи: `ros2 launch paroli_ros tts.launch.py length_scale:=0.88`
 
-**`tts.launch.py`** пробрасывает: `output_topic`, `frame_id`, `output_sample_rate`, `chunk_frames`, `force_stereo`, `use_stdbuf`, **`length_scale`**, **`noise_scale`**, **`noise_w`**. Громкость **`/speak`** — только поле **`volume`** в **`Speak`**; **`tts_volume`** и прочее — через `ros2 run … --ros-args -p …`.
+### Войсморфинг
+Пост-обработка синтезированного PCM (фазовый вокодер, `numpy`/`scipy`), **длительность сохраняется**.
+Параметры нейтральны по умолчанию → на обычном TTS нулевой оверхед. Применяется после ресемплинга,
+до громкости; `paroli-cli` не трогается. Морфинг — это DSP-эффект, не смена диктора модели.
+
+```bash
+# ниже/«крупнее» голос
+ros2 launch paroli_ros tts.launch.py voice_pitch:=-5 voice_formant:=-3
+# выше/«меньше» голос
+ros2 launch paroli_ros tts.launch.py voice_pitch:=6 voice_formant:=4
+# только тембр (высота та же)
+ros2 launch paroli_ros tts.launch.py voice_formant:=-6
+```
+Менять на лету: `ros2 param set /paroli_ros voice_pitch -7.0` (без перезапуска — читается при каждом синтезе).
+
+**`tts.launch.py`** пробрасывает: `output_topic`, `frame_id`, `output_sample_rate`, `chunk_frames`, `force_stereo`, `use_stdbuf`, **`length_scale`**, **`noise_scale`**, **`noise_w`**, **`voice_pitch`**, **`voice_formant`**, **`voice_tempo`**. Громкость **`/speak`** — только поле **`volume`** в **`Speak`**; **`tts_volume`** и прочее — через `ros2 run … --ros-args -p …`.
 
 ### Несколько предложений / «пропало начало или конец текста»
 

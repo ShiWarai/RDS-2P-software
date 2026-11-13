@@ -61,6 +61,21 @@ def generate_launch_description():
             default_value='1.8',
             description='Усиление голоса: 1.0 без изменений, >1 громче (клип int16), <1 тише',
         ),
+        DeclareLaunchArgument(
+            'voice_pitch',
+            default_value='0.0',
+            description='Войсморфинг: высота в полутонах (−12…12), >0 выше, <0 ниже; длительность сохраняется',
+        ),
+        DeclareLaunchArgument(
+            'voice_formant',
+            default_value='0.0',
+            description='Войсморфинг: форманты в полутонах (−12…12), меняет тембр без смены высоты',
+        ),
+        DeclareLaunchArgument(
+            'voice_tempo',
+            default_value='1.0',
+            description='Войсморфинг: темп (0.5…2.0), >1 быстрее, <1 медленнее; высота не меняется',
+        ),
         Node(
             package='paroli_ros',
             executable='tts_node.py',
@@ -85,6 +100,12 @@ def generate_launch_description():
                     LaunchConfiguration('noise_w'), value_type=float),
                 'tts_volume': ParameterValue(
                     LaunchConfiguration('tts_volume'), value_type=float),
+                'voice_pitch': ParameterValue(
+                    LaunchConfiguration('voice_pitch'), value_type=float),
+                'voice_formant': ParameterValue(
+                    LaunchConfiguration('voice_formant'), value_type=float),
+                'voice_tempo': ParameterValue(
+                    LaunchConfiguration('voice_tempo'), value_type=float),
             }],
         ),
     ])

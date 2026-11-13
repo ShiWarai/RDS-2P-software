@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
-"""Голосовой контур робота: аудио (``rds_2p_audio``) + Vosk + Paroli + липсинк лица.
+"""Голосовой контур робота: аудио (``rds_2p_audio``) + STT + Paroli + липсинк лица.
 
 1. ``rds_2p_audio/launch/audio.launch.py`` — сначала плеер, затем микрофон.
-2. Затем без задержек: ``vosk_ros``, ``paroli_ros``, ``rds_2p_face/lip_sync_face.launch.py``.
+2. Затем без задержек: выбранный STT (``stt:=vosk`` или ``stt:=gigaam``),
+   ``paroli_ros``, ``rds_2p_face/lip_sync_face.launch.py``.
 
 Так можно обойтись без ``TimerAction``. Это **не** то же самое, что ожидание «готовности» по ROS
 (topic/service): при ``IncludeLaunchDescription`` на звук родитель не видит ``Node``
 ``audio_player``, поэтому :class:`~launch.event_handlers.OnProcessStart` здесь не используется.
 Если на железе снова понадобятся паузы — поднимайте часть узлов отдельным launch или добавьте
 обратно таймеры в этот файл.
+
+LLM (``rkllm_ros``, ``system_one``, ``llm_layer``) в этот launch не входит: только аудио,
+распознавание, синтез и липсинк. Для команд без LLM используйте ``rds_2p_commands``.
 
 Полный набор параметров звука: ``ros2 launch rds_2p_audio audio.launch.py --show-args``.
 Липсинк слушает тот же ``output_topic``, что и Paroli; ``audio_frame_id`` совпадает с ``paroli_frame_id``.
@@ -17,7 +21,12 @@
 from __future__ import annotations
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
+from launch.actions import (
+    DeclareLaunchArgument,
+    GroupAction,
+    IncludeLaunchDescription,
+    OpaqueFunction,
+)
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
@@ -46,26 +55,81 @@ def _setup(context, *_args, **_kwargs):
         launch_arguments=passthrough_audio.items(),
     )
 
-    vosk_ld_args = {
-        "audio_topic": LaunchConfiguration("vosk_audio_topic"),
-        "transcription_topic": LaunchConfiguration("vosk_transcription_topic"),
-        "default_sample_rate": LaunchConfiguration("output_sample_rate"),
-        "default_channels": LaunchConfiguration("capturer_channels"),
-    }
-    vosk_model = context.launch_configurations.get("vosk_model_path", "").strip()
-    if vosk_model:
-        vosk_ld_args["model_path"] = LaunchConfiguration("vosk_model_path")
+    stt = context.launch_configurations.get("stt", "vosk").strip().lower()
+    if stt not in ("vosk", "gigaam"):
+        raise RuntimeError(
+            f"Неизвестный STT backend: {stt!r}; допустимо: vosk, gigaam")
 
-    vosk_ld = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([
-            PathJoinSubstitution([
-                FindPackageShare("vosk_ros"),
-                "launch",
-                "vosk.launch.py",
+    stt_extras = []
+    if stt == "vosk":
+        stt_ld_args = {
+            "audio_topic": LaunchConfiguration("vosk_audio_topic"),
+            "transcription_topic": LaunchConfiguration("vosk_transcription_topic"),
+        }
+        vosk_model = context.launch_configurations.get("vosk_model_path", "").strip()
+        if vosk_model:
+            stt_ld_args["model_path"] = LaunchConfiguration("vosk_model_path")
+        stt_ld = IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([
+                PathJoinSubstitution([
+                    FindPackageShare("vosk_ros"),
+                    "launch",
+                    "vosk.launch.py",
+                ]),
             ]),
-        ]),
-        launch_arguments=vosk_ld_args.items(),
-    )
+            launch_arguments=stt_ld_args.items(),
+        )
+    else:
+        # GigaAM не потоковый: распознаёт фразу целиком, поэтому перед ним
+        # обязателен VAD-шлюз (capturer → vad_node → gigaam). Без VAD каждый
+        # мелкий чанк микрофона уходил бы в распознавание как отдельная «фраза»
+        # и текст получался рваным («ан», «чка», …).
+        # scoped=True: аргумент output_topic у vad.launch.py (/audio/vad) не
+        # должен протекать в общий scope и подменять шину динамика output_topic
+        # (/audio/output), которую используют Paroli и lip_sync.
+        vad_inc = GroupAction(
+            actions=[
+                IncludeLaunchDescription(
+                    PythonLaunchDescriptionSource([
+                        PathJoinSubstitution([
+                            FindPackageShare("gigaam_ros"),
+                            "launch",
+                            "vad.launch.py",
+                        ]),
+                    ]),
+                    launch_arguments={
+                        "audio_topic": LaunchConfiguration("capturer_topic"),
+                        "output_topic": "/audio/vad",
+                        "min_silence_duration": LaunchConfiguration("vad_min_silence_duration"),
+                        "hangover_sec": LaunchConfiguration("vad_hangover_sec"),
+                        "max_segment_sec": LaunchConfiguration("vad_max_segment_sec"),
+                        "preroll_sec": LaunchConfiguration("vad_preroll_sec"),
+                        "threshold": LaunchConfiguration("vad_threshold"),
+                    }.items(),
+                ),
+            ],
+            scoped=True,
+        )
+        stt_extras.append(vad_inc)
+        stt_ld_args = {
+            "audio_topic": "/audio/vad",
+            "transcription_topic": LaunchConfiguration("vosk_transcription_topic"),
+            # VAD отдаёт длинные фразы одним сообщением по RELIABLE (/audio/vad).
+            "reliable_audio": "true",
+        }
+        gigaam_model = context.launch_configurations.get("gigaam_model_path", "").strip()
+        if gigaam_model:
+            stt_ld_args["model_path"] = LaunchConfiguration("gigaam_model_path")
+        stt_ld = IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([
+                PathJoinSubstitution([
+                    FindPackageShare("gigaam_ros"),
+                    "launch",
+                    "gigaam.launch.py",
+                ]),
+            ]),
+            launch_arguments=stt_ld_args.items(),
+        )
 
     paroli_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
@@ -99,7 +163,7 @@ def _setup(context, *_args, **_kwargs):
         }.items(),
     )
 
-    return [audio_inc, vosk_ld, paroli_ld, lip_sync_ld]
+    return [audio_inc] + stt_extras + [stt_ld, paroli_ld, lip_sync_ld]
 
 
 def generate_launch_description():
@@ -128,7 +192,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "output_sample_rate",
                 default_value="44100",
-                description="Проброс в audio / vosk / paroli",
+                description="Проброс в audio / STT / paroli",
             ),
             DeclareLaunchArgument(
                 "capturer_rate",
@@ -138,7 +202,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "capturer_channels",
                 default_value="1",
-                description="Проброс в audio.launch и vosk default_channels",
+                description="Проброс в audio.launch и STT",
             ),
             DeclareLaunchArgument(
                 "capturer_device",
@@ -146,19 +210,60 @@ def generate_launch_description():
                 description="Индекс PortAudio микрофона (−1 = default input; список: python3 -m sounddevice)",
             ),
             DeclareLaunchArgument(
+                "stt",
+                default_value="vosk",
+                description="STT backend: vosk (CPU) или gigaam (RKNN NPU)",
+            ),
+            DeclareLaunchArgument(
+                "gigaam_model_path",
+                default_value="",
+                description="Только для stt:=gigaam; пусто — дефолт из share gigaam_ros",
+            ),
+            DeclareLaunchArgument(
+                "gigaam_reliable_audio",
+                default_value="true",
+                description="Устарел: gigaam всегда слушает /audio/vad по RELIABLE (VAD добавляется автоматически)",
+            ),
+            DeclareLaunchArgument(
+                "vad_min_silence_duration",
+                default_value="0.6",
+                description="Пауза (с), завершающая фразу. Больше — не режет речь по заминкам "
+                            "и ждёт конца реплики; меньше — быстрее отдаёт, но рвёт фразы",
+            ),
+            DeclareLaunchArgument(
+                "vad_hangover_sec",
+                default_value="2.0",
+                description="Хвост тишины (с), добавляемый к фразе перед распознаванием",
+            ),
+            DeclareLaunchArgument(
+                "vad_max_segment_sec",
+                default_value="15.0",
+                description="Максимальная длина фразы (с) до принудительной отдачи",
+            ),
+            DeclareLaunchArgument(
+                "vad_preroll_sec",
+                default_value="0.5",
+                description="Буфер (с) до старта речи: больше — не проглатывает начало слов",
+            ),
+            DeclareLaunchArgument(
+                "vad_threshold",
+                default_value="0.5",
+                description="Порог вероятности речи VAD: ниже — раньше стартует, но больше ложных",
+            ),
+            DeclareLaunchArgument(
                 "vosk_audio_topic",
                 default_value="/audio/input",
-                description="Топик для vosk (= capturer_topic по умолчанию)",
+                description="Топик для выбранного STT (= capturer_topic по умолчанию)",
             ),
             DeclareLaunchArgument(
                 "vosk_transcription_topic",
                 default_value="/audio/transcription",
-                description="Выход vosk",
+                description="Выход выбранного STT",
             ),
             DeclareLaunchArgument(
                 "vosk_model_path",
                 default_value="",
-                description="Пусто — дефолт из share vosk_ros",
+                description="Только для stt:=vosk; пусто — дефолт из share vosk_ros",
             ),
             DeclareLaunchArgument(
                 "paroli_frame_id",

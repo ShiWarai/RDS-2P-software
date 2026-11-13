@@ -27,6 +27,7 @@
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>rds_2p_audio</exec_depend>
   <exec_depend>vosk_ros</exec_depend>
+  <exec_depend>gigaam_ros</exec_depend>
   <exec_depend>paroli_ros</exec_depend>
   <exec_depend>rds_2p_face</exec_depend>
 

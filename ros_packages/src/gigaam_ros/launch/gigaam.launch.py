@@ -50,6 +50,9 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'reliable_audio', default_value='true',
             description='RELIABLE на входе аудио (нужно для /audio/vad: длинные фразы одним сообщением)'),
+        DeclareLaunchArgument(
+            'decode_lang', default_value='ru+en',
+            description='Язык декодера: ru / en / ru+en / all (фильтр символов мультиязычного CTC)'),
         Node(
             package='gigaam_ros',
             executable='gigaam_node',
@@ -65,6 +68,7 @@ def generate_launch_description():
                 'max_audio_time': LaunchConfiguration('max_audio_time'),
                 'reliable_audio': ParameterValue(
                     LaunchConfiguration('reliable_audio'), value_type=bool),
+                'decode_lang': LaunchConfiguration('decode_lang'),
             }],
             output='screen',
         ),
