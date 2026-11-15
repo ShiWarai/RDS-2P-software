@@ -21,7 +21,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "rkllm.h"
-#include "rkllm_ros_msgs/action/chat_completion.hpp"
+#include "llm_msgs_ros/action/chat_completion.hpp"
 #include "sensor_msgs/image_encodings.hpp"
 #include "sensor_msgs/msg/image.hpp"
 #include "std_msgs/msg/string.hpp"
@@ -211,7 +211,7 @@ static std::string SanitizeUserMessage(std::string input)
 
 class RkllmNode : public rclcpp::Node {
 public:
-  using ChatCompletion = rkllm_ros_msgs::action::ChatCompletion;
+  using ChatCompletion = llm_msgs_ros::action::ChatCompletion;
   using GoalHandleChatCompletion = rclcpp_action::ServerGoalHandle<ChatCompletion>;
 
   explicit RkllmNode()
@@ -220,7 +220,7 @@ public:
     declare_parameter<std::string>("encoder_model_path", "");
     declare_parameter<std::string>("llm_model_path", "");
     declare_parameter<int>("max_new_tokens", 2048);
-    declare_parameter<int>("max_context_len", 4096);
+    declare_parameter<int>("max_context_len", 16384);
     declare_parameter<int>("rknn_core_num", 3);
     declare_parameter<std::string>("img_start", "<|vision_start|>");
     declare_parameter<std::string>("img_end", "<|vision_end|>");
@@ -304,6 +304,9 @@ public:
         }
         const int cret = rkllm_clear_kv_cache(llm_handle_, 1, nullptr, nullptr);
         response->success = (cret == 0);
+        if (cret == 0) {
+          system_prompt_injected_ = false;
+        }
         response->message =
           (cret == 0) ? "ok" : ("rkllm_clear_kv_cache ret=" + std::to_string(cret));
       });
@@ -378,6 +381,8 @@ private:
           get_logger(),
           "rkllm_set_chat_template failed ret=%d (мультиход может вести себя странно)", tret);
       } else {
+        manual_template_active_ = true;
+        active_system_prompt_ = chat_template_system_;
         RCLCPP_INFO(get_logger(), "rkllm_set_chat_template applied (ручной ChatML; отключён авто-шаблон RKLLM)");
       }
     } else {
@@ -443,6 +448,7 @@ private:
       last_llm_activity_ = std::chrono::steady_clock::now();
     }
     if (cret == 0) {
+      system_prompt_injected_ = false;
       RCLCPP_INFO(
         get_logger(),
         "KV сброшен после %.0f с тишины (clear_kv_after_idle_sec=%.0f)",
@@ -534,12 +540,62 @@ private:
       return;
     }
 
-    if (!persist_session_kv_) {
-      if (!goal->keep_history) {
+    if (!persist_session_kv_ && !goal->keep_history) {
+      const int cret = rkllm_clear_kv_cache(llm_handle_, 1, nullptr, nullptr);
+      if (cret != 0) {
+        RCLCPP_WARN(get_logger(), "rkllm_clear_kv_cache failed ret=%d", cret);
+      }
+      system_prompt_injected_ = false;
+    }
+
+    const std::string goal_system_prompt = TrimCopy(goal->system_prompt);
+    std::string run_user_text = user_text;
+
+    if (apply_chat_template_) {
+      if (!goal_system_prompt.empty() &&
+        (!manual_template_active_ || goal_system_prompt != active_system_prompt_))
+      {
+        const int tret = rkllm_set_chat_template(
+          llm_handle_,
+          goal_system_prompt.c_str(),
+          chat_template_prefix_.c_str(),
+          chat_template_postfix_.c_str());
+        if (tret != 0) {
+          result->message = "rkllm_set_chat_template failed ret=" + std::to_string(tret);
+          goal_handle->abort(result);
+          return;
+        }
+        const int cret = rkllm_clear_kv_cache(llm_handle_, 0, nullptr, nullptr);
+        if (cret != 0) {
+          result->message = "rkllm_clear_kv_cache after system prompt failed ret=" +
+            std::to_string(cret);
+          goal_handle->abort(result);
+          return;
+        }
+        manual_template_active_ = true;
+        active_system_prompt_ = goal_system_prompt;
+        RCLCPP_INFO(
+          get_logger(),
+          "system prompt из goal применён (ручной ChatML), KV сброшен — будет полный prefill");
+      }
+    } else if (!goal_system_prompt.empty()) {
+      if (goal_system_prompt != active_system_prompt_) {
         const int cret = rkllm_clear_kv_cache(llm_handle_, 1, nullptr, nullptr);
         if (cret != 0) {
-          RCLCPP_WARN(get_logger(), "rkllm_clear_kv_cache failed ret=%d", cret);
+          result->message = "rkllm_clear_kv_cache before system prompt failed ret=" +
+            std::to_string(cret);
+          goal_handle->abort(result);
+          return;
         }
+        active_system_prompt_ = goal_system_prompt;
+        system_prompt_injected_ = false;
+      }
+      if (!system_prompt_injected_) {
+        run_user_text = goal_system_prompt + "\n\n" + user_text;
+        system_prompt_injected_ = true;
+        RCLCPP_INFO(
+          get_logger(),
+          "system prompt из goal встроен в первый user-turn (нативный шаблон)");
       }
     }
 
@@ -587,7 +643,7 @@ private:
         return;
       }
 
-      const std::string multimodal_prompt = std::string("<image>") + user_text;
+      const std::string multimodal_prompt = std::string("<image>") + run_user_text;
       prompt_buf.assign(multimodal_prompt.begin(), multimodal_prompt.end());
       prompt_buf.push_back('\0');
 
@@ -602,7 +658,7 @@ private:
       rkllm_input.multimodal_input.image.image_height = image_height_;
       rkllm_input.multimodal_input.image.image_width = image_width_;
     } else {
-      prompt_buf.assign(user_text.begin(), user_text.end());
+      prompt_buf.assign(run_user_text.begin(), run_user_text.end());
       prompt_buf.push_back('\0');
       rkllm_input.input_type = RKLLM_INPUT_PROMPT;
       rkllm_input.prompt_input = prompt_buf.data();
@@ -719,7 +775,7 @@ private:
   std::string encoder_path_;
   std::string llm_path_;
   int max_new_tokens_{2048};
-  int max_context_len_{4096};
+  int max_context_len_{16384};
   int rknn_core_num_{3};
 
   std::string img_start_owned_;
@@ -743,6 +799,9 @@ private:
   bool persist_session_kv_{true};
 
   bool apply_chat_template_{false};
+  bool manual_template_active_{false};
+  bool system_prompt_injected_{false};
+  std::string active_system_prompt_;
   std::string chat_template_system_;
   std::string chat_template_prefix_;
   std::string chat_template_postfix_;

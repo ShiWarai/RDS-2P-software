@@ -33,7 +33,7 @@ def generate_launch_description():
             description='Путь к LLM (.rkllm)',
         ),
         DeclareLaunchArgument('max_new_tokens', default_value='2048'),
-        DeclareLaunchArgument('max_context_len', default_value='4096'),
+        DeclareLaunchArgument('max_context_len', default_value='16384'),
         DeclareLaunchArgument('rknn_core_num', default_value='3'),
         DeclareLaunchArgument('img_start', default_value='<|vision_start|>'),
         DeclareLaunchArgument('img_end', default_value='<|vision_end|>'),
@@ -124,9 +124,12 @@ def generate_launch_description():
                     LaunchConfiguration('clear_kv_after_idle_sec'), value_type=float),
                 'apply_chat_template': ParameterValue(
                     LaunchConfiguration('apply_chat_template'), value_type=bool),
-                'chat_template_system': LaunchConfiguration('system_prompt'),
-                'text_chunk_topic': LaunchConfiguration('text_chunk_topic'),
-                'text_topic': LaunchConfiguration('text_topic'),
+                'chat_template_system': ParameterValue(
+                    LaunchConfiguration('system_prompt'), value_type=str),
+                'text_chunk_topic': ParameterValue(
+                    LaunchConfiguration('text_chunk_topic'), value_type=str),
+                'text_topic': ParameterValue(
+                    LaunchConfiguration('text_topic'), value_type=str),
             }],
         ),
     ])

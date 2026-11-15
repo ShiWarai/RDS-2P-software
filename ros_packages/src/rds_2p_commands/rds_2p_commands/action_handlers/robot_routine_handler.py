@@ -26,6 +26,7 @@ from rclpy.qos import (
 
 from sensor_msgs.msg import Image
 from audio_common_msgs.msg import AudioStamped
+from ftservo_ros.msg import MotorParam, MotorParams
 
 from rds_2p_commands.action import PandaCommand
 from rds_2p_commands.face_assets import resolve_face_png
@@ -107,12 +108,14 @@ class RobotRoutineHandler:
         self.node.declare_parameter("audio_wait_for_subscribers_sec", 2.0)
         self.node.declare_parameter("audio_output_force_stereo", True)
         self.node.declare_parameter("face_image_topic", "/face/image")
+        self.node.declare_parameter("motor_params_topic", "/motors/params")
         self.node.declare_parameter("face_output_width", 280)
         self.node.declare_parameter("face_output_height", 240)
         self.node.declare_parameter("playback_volume_percent", 100.0)
         # Подогнать уровень тихих WAV под полный float [-1,1] до умножения на volume (как «громче» TTS).
         self.node.declare_parameter("wav_peak_normalize", True)
         self.node.declare_parameter("allow_real_systemd", False)
+        self.node.declare_parameter("run_manage_sim_service", True)
         self.node.declare_parameter("allow_real_joystick_script", False)
         self.node.declare_parameter(
             "joystick_script_path",
@@ -153,6 +156,13 @@ class RobotRoutineHandler:
             Image,
             self.node.get_parameter("face_image_topic").get_parameter_value().string_value,
             face_qos,
+        )
+        self._motor_params_pub = self.node.create_publisher(
+            MotorParams,
+            self.node.get_parameter("motor_params_topic")
+            .get_parameter_value()
+            .string_value,
+            10,
         )
 
         self._share = Path(get_package_share_directory("rds_2p_commands"))
@@ -355,8 +365,27 @@ class RobotRoutineHandler:
             feedback=feedback,
         )
 
+    def _set_motors_enabled(self, enabled: bool, feedback=None) -> None:
+        """Реальное включение/отключение момента всех приводов через motor_controller."""
+        msg = MotorParams()
+        msg.header.stamp = self.node.get_clock().now().to_msg()
+        msg.header.frame_id = "base_link"
+        for motor_id in SERVO_IDS:
+            param = MotorParam()
+            param.motor_id = int(motor_id)
+            param.enabled = bool(enabled)
+            msg.params.append(param)
+        self._motor_params_pub.publish(msg)
+        self.node.get_logger().info(
+            f"[MOTORS] enable={int(bool(enabled))} all ({len(msg.params)}) "
+            f"-> {self._motor_params_pub.topic_name}"
+        )
+        if feedback:
+            feedback(f"motor: torque {'on' if enabled else 'off'} all")
+
     def _motor_dismiss(self, source: str, canceled_fn, feedback) -> None:
         _ = canceled_fn
+        self._set_motors_enabled(True, feedback=feedback)
         self._log_motor(
             "dismiss",
             source,
@@ -367,6 +396,7 @@ class RobotRoutineHandler:
 
     def _motor_lie_down(self, source: str, canceled_fn, feedback) -> None:
         rid = "lie_down"
+        self._set_motors_enabled(True, feedback=feedback)
         self._log_motor(rid, source, "set_position position_0", self._pose("position_0"), feedback=feedback)
         for _ in range(10):
             if canceled_fn():
@@ -374,6 +404,7 @@ class RobotRoutineHandler:
             time.sleep(0.1)
         note = f"[MOTORS:{rid}:{source}] stop_drivers EnableTorque(all, 0)"
         self.node.get_logger().info(note)
+        self._set_motors_enabled(False, feedback=feedback)
         feedback("motor: torque off all")
 
     def _motor_rotate(self, source: str, canceled_fn, feedback) -> None:
@@ -806,10 +837,20 @@ class RobotRoutineHandler:
                 .get_parameter_value()
                 .bool_value
             )
+        manage_sim = cfg_r.get("run_manage_sim_service")
+        if manage_sim is None:
+            manage_sim = (
+                self.node.get_parameter("run_manage_sim_service")
+                .get_parameter_value()
+                .bool_value
+            )
+        run_services = ["rds_2p_inference_node.service"]
+        if manage_sim:
+            run_services.insert(0, "rds_2p_inference_sim.service")
 
         if rid == "run" and allow_sys:
             feedback("systemd start inference")
-            for svc in ("rds_2p_inference_sim.service", "rds_2p_inference_node.service"):
+            for svc in run_services:
                 subprocess.run(
                     ["sudo", "-n", "systemctl", "start", svc],
                     capture_output=True,
@@ -825,7 +866,7 @@ class RobotRoutineHandler:
 
         if rid == "stop_running" and allow_sys:
             feedback("systemd stop inference")
-            for svc in ("rds_2p_inference_sim.service", "rds_2p_inference_node.service"):
+            for svc in run_services:
                 subprocess.run(
                     ["sudo", "-n", "systemctl", "stop", svc],
                     capture_output=True,
@@ -833,13 +874,14 @@ class RobotRoutineHandler:
                     timeout=8,
                     check=False,
                 )
-            subprocess.run(
-                ["sudo", "-n", "pkill", "-9", "-f", "virtual_twin_sim.launch.py"],
-                capture_output=True,
-                text=True,
-                timeout=8,
-                check=False,
-            )
+            if manage_sim:
+                subprocess.run(
+                    ["sudo", "-n", "pkill", "-9", "-f", "virtual_twin_sim.launch.py"],
+                    capture_output=True,
+                    text=True,
+                    timeout=8,
+                    check=False,
+                )
         elif rid == "stop_running" and not allow_sys:
             self.node.get_logger().info(
                 "[STOP_RUNNING] симуляция systemctl stop + pkill virtual_twin_sim "

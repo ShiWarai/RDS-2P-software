@@ -23,7 +23,10 @@
   <depend>rds_2p_audio</depend>
   <depend>ament_index_python</depend>
   <depend>audio_common_msgs</depend>
-  <depend>rkllm_ros_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>llm_msgs_ros</depend>
+  <depend>system_one_ros</depend>
+  <depend>ftservo_ros</depend>
   <exec_depend>paroli_ros</exec_depend>
   <depend>std_srvs</depend>
 

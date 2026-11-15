@@ -24,7 +24,7 @@ from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image as RosImage
 
-from rkllm_ros_msgs.action import ChatCompletion
+from llm_msgs_ros.action import ChatCompletion
 
 
 def _try_clear_kv(node: Node, action_name: str) -> float | None:
@@ -149,6 +149,11 @@ def main() -> None:
         help='goal.keep_history=true',
     )
     parser.add_argument(
+        '--system',
+        default='',
+        help='Системный промпт (goal.system_prompt); пусто — текущий шаблон ноды',
+    )
+    parser.add_argument(
         '--quiet',
         action='store_true',
         help='Меньше промежуточных логов',
@@ -246,6 +251,7 @@ def main() -> None:
         goal.user_message = prompt
         goal.keep_history = args.keep_history
         goal.max_new_tokens = 0
+        goal.system_prompt = args.system
 
         goal_payload_bytes = len(rgb_msg.data)
 

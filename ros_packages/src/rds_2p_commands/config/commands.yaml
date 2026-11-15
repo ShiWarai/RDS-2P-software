@@ -43,6 +43,8 @@ commands:
     keywords: ["бегать", "пошли"]
     sound: idle1.wav
     face: null
+    # В ROS-only политика уже поднята panda_ros_only.launch.py; не дублируем
+    # systemd-сервисом. Для старого voice_control «бегать» работает отдельно.
     allow_real_systemd: false
 
   stop_running:

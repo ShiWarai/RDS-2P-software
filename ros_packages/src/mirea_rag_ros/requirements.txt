@@ -1,0 +1,8 @@
+# Локальный retrieval 1:1 с сервером на ROS2 Python (torch 2.2).
+# Ставить в тот же python, из которого запускается ros2 run mirea_rag_ros.
+# На роботе проверено: torch 2.2.0, Python 3.10, aarch64.
+sentence-transformers==5.1.2
+transformers==4.51.3
+lightgbm==4.7.0
+usearch==2.26.5
+numpy<=1.26.4

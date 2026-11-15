@@ -50,6 +50,7 @@ install(DIRECTORY include/
 
 # Install Python scripts
 install(PROGRAMS
+  scripts/cmd_vel_mux.py
   scripts/ps4_imu_node.py
   scripts/ps4_touchpad_node.py
   DESTINATION lib/${PROJECT_NAME}
@@ -59,6 +60,12 @@ install(PROGRAMS
 install(DIRECTORY
   launch/
   DESTINATION share/${PROJECT_NAME}/launch
+)
+
+# Install config files
+install(DIRECTORY
+  config/
+  DESTINATION share/${PROJECT_NAME}/config
 )
 
 ament_package()

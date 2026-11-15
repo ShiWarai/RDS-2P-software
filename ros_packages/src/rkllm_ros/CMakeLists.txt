@@ -24,7 +24,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
-find_package(rkllm_ros_msgs REQUIRED)
+find_package(llm_msgs_ros REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
@@ -61,9 +61,9 @@ ament_target_dependencies(rkllm_node
   cv_bridge
 )
 
-# rkllm_ros_msgs — внешний пакет: rosidl_get_typesupport_target работает только
+# llm_msgs_ros — внешний пакет: rosidl_get_typesupport_target работает только
 # для целей того же пакета; сюда линкуем импортированные цели из find_package.
-target_link_libraries(rkllm_node ${rkllm_ros_msgs_TARGETS})
+target_link_libraries(rkllm_node ${llm_msgs_ros_TARGETS})
 
 # Исполняемый файл: lib/<pkg>/rkllm_node, .so: lib/<pkg>/vendor/lib → $ORIGIN/vendor/lib
 set_target_properties(rkllm_node PROPERTIES

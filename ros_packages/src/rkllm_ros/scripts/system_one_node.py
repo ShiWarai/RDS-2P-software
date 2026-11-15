@@ -2,7 +2,7 @@
 """Тонкая ROS 2 обёртка system-one-rknn: POST /v1/systemone как сервис ~/systemone.
 
   ros2 launch rkllm_ros system_one.launch.py
-  ros2 service call /system_one/systemone rkllm_ros_msgs/srv/SystemOne \
+  ros2 service call /system_one/systemone llm_msgs_ros/srv/SystemOne \
     "{model: kev-0.8b, type: choice, state: '…', labels: [a, b], descriptions: ['', '']}"
 
 Нода — только HTTP-клиент (stdlib); сам сервис инференса поднимается отдельным
@@ -20,7 +20,7 @@ import urllib.request
 import rclpy
 from rclpy.node import Node
 
-from rkllm_ros_msgs.srv import SystemOne
+from llm_msgs_ros.srv import SystemOne
 
 
 class SystemOneNode(Node):

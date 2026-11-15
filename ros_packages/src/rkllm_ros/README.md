@@ -53,7 +53,7 @@ ros2 topic echo /rkllm_ros/text --once
 
 ### Что вызывается под капотом
 
-- Action-сервер: **`/rkllm_ros/complete`**, тип **`rkllm_ros_msgs/action/ChatCompletion`**.
+- Action-сервер: **`/rkllm_ros/complete`**, тип **`llm_msgs_ros/action/ChatCompletion`**.
 - В goal всегда нужен **`user_message`**; поле **`image`** можно не заполнять (только текст) или заполнить для VLM.
 
 Дальше — таблица интерфейсов и **примеры `ros2 run`** для `scripts/`.
@@ -62,16 +62,18 @@ ros2 topic echo /rkllm_ros/text --once
 
 | Интерфейс | Тип | Описание |
 |-----------|-----|----------|
-| `~/complete` | `rkllm_ros_msgs/action/ChatCompletion` | **Goal:** `user_message` (перед infer санитизируется: trim и снятие ведущих префиксов `user:` / `robot:`); **`image`** опционально (multimodal: к промпту добавляется `<image>`). **`keep_history`**: при **`persist_session_kv:=true`** на ноде поле **не управляет** накоплением KV в RKLLM (infer всегда с «памятью»); сброс только **`~/clear_kv_cache`**. При **`persist_session_kv:=false`** — прежняя семантика: очистка KV и флаг infer берутся из goal. `max_new_tokens` в goal (>0) переопределяет лимит на один запрос (`RKLLMInferParam.max_new_tokens`); 0 — значение init-time. Фидбек/result — поток и итоговый текст + метрики. |
+| `~/complete` | `llm_msgs_ros/action/ChatCompletion` | **Goal:** `user_message` (перед infer санитизируется: trim и снятие ведущих префиксов `user:` / `robot:`); **`image`** опционально (multimodal: к промпту добавляется `<image>`). **`keep_history`**: при **`persist_session_kv:=true`** на ноде поле **не управляет** накоплением KV в RKLLM (infer всегда с «памятью»); сброс только **`~/clear_kv_cache`**. При **`persist_session_kv:=false`** — прежняя семантика: очистка KV и флаг infer берутся из goal. `max_new_tokens` в goal (>0) переопределяет лимит на один запрос (`RKLLMInferParam.max_new_tokens`); 0 — значение init-time. Фидбек/result — поток и итоговый текст + метрики. |
 | `~/clear_kv_cache` | `std_srvs/Trigger` | Сброс KV на стороне RKLLM (простой диалог без наследия контекста прошлого клиента). Отказ, если нода занята goal. CLI: `ros2 run rkllm_ros clear_kv_cache.py`. |
 | `~/text_chunks` | `std_msgs/String` | Чанки генерации |
 | `~/text` | `std_msgs/String` | Полный ответ после успешного goal |
 
 Полноценный OpenAI-массив `messages[]` в ROS 2 потребовал бы своих `.msg`; здесь **один user-turn за goal**. Клиент **`example_chat.py`** по умолчанию шлёт **одну реплику за раз** с **`keep_history=true`** (согласовано с **`persist_session_kv:=true`** на ноде). Режим **`--replay`** восстанавливает повтор всего диалога в **`user_message`** и **`keep_history=false`** — совместим с **`persist_session_kv:=false`**.
 
+**`system_prompt` в goal** (опционально): пусто — текущий шаблон/история не меняются. При **`apply_chat_template:=false`** (нативный шаблон) промпт один раз встраивается в первый user-turn (`system\n\nuser`), при смене промпта KV сбрасывается; повтор того же промпта в следующих goal не дублируется — **delta prefill**, поведение встроенного шаблона (включая `enable_thinking=false`) сохраняется. **`~/clear_kv_cache`** сбрасывает и встроенный промпт; следующий goal с тем же `system_prompt` встроит его снова. При **`apply_chat_template:=true`** промпт задаётся как настоящая system-часть ручного ChatML через **`rkllm_set_chat_template`**, смена промпта очищает KV полностью; **`~/clear_kv_cache`** сохраняет system (`keep_system_prompt=1`), поэтому после сброса истории system не пересчитывается. В ручном режиме авто-обработка `enable_thinking` отключена — thinking зависит от модели и промпта. Клиенты: **`example_chat.py --system '...'`**, **`example_vision.py --system '...'`**. `max_context_len` по умолчанию **16384** — максимум для Qwen3.5-2B RKLLM.
+
 Параметры **`top_k`**, **`top_p`**, **`temperature`**, **`repeat_penalty`** (и при необходимости **`frequency_penalty`**, **`presence_penalty`**) задаются как у **`RKLLMParam`** и применяются в **`rkllm_init`**. Дефолты launch/ноды выровнены под **`generation_config.json`** веса **Qwen3-VL-2B-Instruct** на Hugging Face (`top_k=20`, `top_p=0.8`, `temperature=0.7`, `repeat_penalty=1.0`; на плате после квантования может понадобиться подстройка — актуально и для **Qwen3.5-2B**). **`persist_session_kv`** (по умолчанию **true**): режим как в demo — **`RKLLMInferParam.keep_history = 1`** всегда, из обработчика goal не вызывается **`rkllm_clear_kv_cache`** в зависимости от goal; сброс только сервисом **`~/clear_kv_cache`**. Значение **`false`** — legacy: **`keep_history`** и очистка KV по полю goal.
 
-Параметр **`apply_chat_template`** (по умолчанию **false**): при **true** вызывается **`rkllm_set_chat_template`**, что по предупреждению RKLLM **отключает встроенный разбор шаблона** из экспортированной модели (`enable_thinking` и т.д.). Для **Qwen3-VL**, собранной по [multimodal_model_demo](https://github.com/airockchip/rknn-llm/tree/main/examples/multimodal_model_demo), C++ `main.cpp` держит этот вызов **закомментированным** и опирается на авто-шаблон; включайте ручной шаблон только осознанно (см. обсуждения вроде [#377](https://github.com/airockchip/rknn-llm/issues/377)). Системная роль в шаблоне задаётся параметром **`chat_template_system`** (в **`rkllm.launch.py`** — аргумент **`system_prompt`**); на модель это влияет только при **`apply_chat_template:=true`**. Пустой **`system_prompt`** оставляет встроенный текст по умолчанию ноды.
+Параметр **`apply_chat_template`** (по умолчанию **false**): при **true** вызывается **`rkllm_set_chat_template`**, что по предупреждению RKLLM **отключает встроенный разбор шаблона** из экспортированной модели (`enable_thinking` и т.д.). Для **Qwen3-VL**, собранной по [multimodal_model_demo](https://github.com/airockchip/rknn-llm/tree/main/examples/multimodal_model_demo), C++ `main.cpp` держит этот вызов **закомментированным** и опирается на авто-шаблон; включайте ручной шаблон только осознанно (см. обсуждения вроде [#377](https://github.com/airockchip/rknn-llm/issues/377)). Системная роль в шаблоне задаётся параметром **`chat_template_system`** (в **`rkllm.launch.py`** — аргумент **`system_prompt`**) или опциональным **`goal.system_prompt`** (лениво включает ручной шаблон); на модель это влияет только при ручном шаблоне. Пустой **`system_prompt`** оставляет встроенный текст по умолчанию ноды.
 
 Параметр **`clear_kv_after_idle_sec`** (по умолчанию **0**): если **> 0**, после **каждого завершённого** goal таймер отсчитывает простой; пока нода не занята новым goal и прошло больше **N** секунд с момента последнего завершения, вызывается **`rkllm_clear_kv_cache`** (как сервис **`~/clear_kv_cache`**). Тик проверки — **5 с**. **0** — авто-сброс отключён.
 
@@ -124,7 +126,7 @@ ros2 launch rkllm_ros rkllm.launch.py \
 ## Просмотр интерфейса
 
 ```bash
-ros2 interface show rkllm_ros_msgs/action/ChatCompletion
+ros2 interface show llm_msgs_ros/action/ChatCompletion
 ```
 
 ## Примеры вызова
@@ -235,7 +237,7 @@ ros2 service call /rkllm_ros/clear_kv_cache std_srvs/srv/Trigger
 
 ## System One (опционально): решения Kev-0.8B
 
-Отдельный **необязательный** узел **`system_one`** — тонкая HTTP-обёртка над сервисом [system-one-rknn](https://github.com/ShiWarai/system-one-rknn) (контейнер из GHCR, HTTP API на порту 8080). Один вопрос — один вызов сервиса **`rkllm_ros_msgs/srv/SystemOne`**: робот получает *решение* Kev-0.8B (`choice` / `noul` / `score`, вероятности/уверенность) без генерации текста. Если узел не запущен, остальной пакет работает как обычно.
+Отдельный **необязательный** узел **`system_one`** — тонкая HTTP-обёртка над сервисом [system-one-rknn](https://github.com/ShiWarai/system-one-rknn) (контейнер из GHCR, HTTP API на порту 8080). Один вопрос — один вызов сервиса **`llm_msgs_ros/srv/SystemOne`**: робот получает *решение* Kev-0.8B (`choice` / `noul` / `score`, вероятности/уверенность) без генерации текста. Если узел не запущен, остальной пакет работает как обычно.
 
 ### Контейнер (docker, образ с гитхаба)
 
@@ -253,13 +255,13 @@ ros2 run rkllm_ros system_one_docker.sh stop
 
 ```bash
 ros2 launch rkllm_ros system_one.launch.py      # server_url:=http://127.0.0.1:8080
-ros2 interface show rkllm_ros_msgs/srv/SystemOne
+ros2 interface show llm_msgs_ros/srv/SystemOne
 ```
 
 Пример (choice: какая команда из рубрики панды подходит):
 
 ```bash
-ros2 service call /system_one/systemone rkllm_ros_msgs/srv/SystemOne \
+ros2 service call /system_one/systemone llm_msgs_ros/srv/SystemOne \
   "{model: 'kev-0.8b', type: choice, state: 'Панда, дай лапу', \
     labels: [give_paw, sit, dance], \
     descriptions: ['протянуть лапу', 'сесть на задние лапы', 'станцевать']}"

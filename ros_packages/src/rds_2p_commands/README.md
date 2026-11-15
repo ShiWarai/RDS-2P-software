@@ -146,6 +146,38 @@ ros2 topic echo /audio/command_transcription --field text   # 'Встаю!' в �
 ros2 topic pub --once /audio/transcription vosk_ros/msg/Transcription "{text: 'стоп'}"  # прервать
 ```
 
+### 8. Полный пресет «Команды Панды» (`panda_commands`)
+
+Нода **`panda_commands`** (launch: **`rds_2p_commands/panda_commands.launch.py`**) реализует пресет `COMMANDS_EXAMPLE`: один choice-вопрос `q_commands_full` с 12 вариантами из [`config/panda_commands.yaml`](src/rds_2p_commands/config/panda_commands.yaml). Классификация — через **`system_one_ros`** (`llm_msgs_ros/srv/Ask`, HTTP-порт **18477**), без `command_parser`.
+
+```bash
+# контейнер system-one-rknn уже поднят на 18477
+ros2 launch rds_2p_commands panda_commands.launch.py
+
+# если system_one client и unified_action_server уже запущены отдельно:
+ros2 launch rds_2p_commands panda_commands.launch.py \
+  include_system_one:=false include_action_server:=false
+```
+
+Что запускает launch:
+
+- `system_one_ros/system_one.launch.py` — клиент `/system_one_client/ask`;
+- `unified_action_server` — исполнитель `PandaCommand`;
+- `panda_commands` — подписка на `/audio/transcription`, классификация и выполнение `command` / `wait` / `say`.
+
+`command` с `routine_id` уходит в `/robot/panda_command`; `step_forward`, `stop_running` и другие `motion_commands` — в `/cmd_vel/voice` (вход `cmd_vel_mux`, нужен `rds_2p_inference`); `say` — в `/paroli_ros/speak`. Ответ классификатора публикуется в `/panda_commands/decision` (JSON). `dry_run:=true` — только классификация без действий.
+
+Проверка без микрофона:
+
+```bash
+ros2 topic pub --once /audio/transcription rds_2p_audio/msg/Transcription "{text: 'дай лапу'}"
+ros2 topic echo /panda_commands/decision --qos-durability transient_local --once
+```
+
+`dry_run:=true` не отключает классификацию: запрос в system_one_rknn выполняется, решение публикуется в `/panda_commands/decision`, но `command`/`wait`/`say` не исполняются.
+
+Ключевые аргументы: `config_file`, `input_topic`, `system_one_service`, `model`, `min_confidence`, `dry_run`, `include_system_one`, `include_action_server`, `say_enabled`, `publish_cmd_vel`, `interrupt_keywords`. `rotate_right` пока отсутствует в `commands.yaml` — команда классифицируется, но action вернёт «Неизвестный routine_id».
+
 ---
 
 ## Конфигурация
@@ -153,6 +185,7 @@ ros2 topic pub --once /audio/transcription vosk_ros/msg/Transcription "{text: '�
 | Место | Назначение |
 |------|------------|
 | [config/commands.yaml](src/rds_2p_commands/config/commands.yaml) | **`commands`**: ключ = `routine_id`, **`keywords`**, звук/морда. Вне **`commands`**: **`panda_dialog_interrupt`** — **`keywords`** фраз прерывания диалога LLM («хватит» и др.), всегда обрабатываются первыми. |
+| [config/panda_commands.yaml](src/rds_2p_commands/config/panda_commands.yaml) | Дерево пресета «Команды Панды»: question/choice, options/examples/then, motion_commands. |
 | [config/panda_poses.yaml](src/rds_2p_commands/config/panda_poses.yaml) | Позы: секция **`poses`**, каждая — список из **12** нормализованных долей (как `voice_control.py`). |
 | [rds_2p_commands/servo_constants.py](src/rds_2p_commands/rds_2p_commands/servo_constants.py) | Только константа **`SERVO_IDS`** (1..12). |
 | [rds_2p_commands/llm_commands.py](src/rds_2p_commands/rds_2p_commands/llm_commands.py) | rkllm + очередь `/speak` Paroli, прерывание диалога. |

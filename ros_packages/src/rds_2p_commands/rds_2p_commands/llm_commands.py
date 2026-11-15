@@ -10,7 +10,7 @@ from typing import List, Optional, Tuple
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from rds_2p_audio.srv import Speak
-from rkllm_ros_msgs.action import ChatCompletion
+from llm_msgs_ros.action import ChatCompletion
 from std_srvs.srv import Trigger
 
 
@@ -380,7 +380,7 @@ class LlmCommands:
         goal.keep_history = bool(self._rkllm_keep_history)
         goal.max_new_tokens = int(self._rkllm_max_new_tokens)
         if self._system_prompt:
-            goal.user_message = f'{self._system_prompt}\n\n{goal.user_message}'
+            goal.system_prompt = self._system_prompt
         if image is not None:
             goal.image = image
             self._node.get_logger().info('rkllm: goal с изображением (мультимодальный запрос)')

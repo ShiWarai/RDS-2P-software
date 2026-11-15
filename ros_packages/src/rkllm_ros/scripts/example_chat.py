@@ -25,7 +25,7 @@ import rclpy
 from rclpy.action import ActionClient
 from rclpy.node import Node
 
-from rkllm_ros_msgs.action import ChatCompletion
+from llm_msgs_ros.action import ChatCompletion
 
 
 def _try_clear_kv(node: Node, action_name: str) -> None:
@@ -54,11 +54,13 @@ def _send_goal(
     *,
     user_message: str,
     keep_history: bool,
+    system_prompt: str = '',
 ) -> tuple[bool, str]:
     goal = ChatCompletion.Goal()
     goal.user_message = user_message
     goal.keep_history = keep_history
     goal.max_new_tokens = 0
+    goal.system_prompt = system_prompt
 
     def feedback_cb(msg):
         t = msg.feedback.token
@@ -126,6 +128,11 @@ def main() -> None:
         action='store_true',
         help='Не вызывать clear_kv_cache перед чатом (оставить KV от других клиентов)',
     )
+    parser.add_argument(
+        '--system',
+        default='',
+        help='Системный промпт (goal.system_prompt); пусто — текущий шаблон ноды',
+    )
     args = parser.parse_args()
 
     if args.replay and args.no_history:
@@ -153,6 +160,7 @@ def main() -> None:
                 client,
                 user_message=one_shot_text,
                 keep_history=keep,
+                system_prompt=args.system,
             )
             sys.exit(0 if ok else 1)
 
@@ -206,6 +214,7 @@ def main() -> None:
                 client,
                 user_message=prompt,
                 keep_history=keep_kv,
+                system_prompt=args.system,
             )
             if not ok:
                 continue

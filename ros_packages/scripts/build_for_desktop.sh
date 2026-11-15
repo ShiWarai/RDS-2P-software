@@ -169,7 +169,7 @@ VOSK_ROS_PATH="src/vosk_ros"
 if [ ! -d "$VOSK_ROS_PATH" ]; then
     echo "📥 Клонируем vosk_ros..."
     cd src
-    git clone -b dev https://github.com/ShiWarai/vosk_ros.git
+    git clone https://github.com/ShiWarai/vosk_ros.git
     cd ..
     echo "✅ vosk_ros клонирован"
 else
