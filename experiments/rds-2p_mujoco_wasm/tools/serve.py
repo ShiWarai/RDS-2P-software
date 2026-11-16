@@ -113,9 +113,11 @@ class Handler(SimpleHTTPRequestHandler):
         path = self.path.split("?", 1)[0]
         fs_path = self.translate_path(path)
         if path.startswith("/assets/scenes/meshes/") and path.endswith(".obj"):
-            canonical = CANONICAL_MESH_DIR / os.path.basename(path)
-            if canonical.is_file():
-                fs_path = str(canonical)
+            rel = path[len("/assets/scenes/meshes/"):]
+            if ".." not in rel.split("/"):
+                canonical = CANONICAL_MESH_DIR / rel
+                if canonical.is_file():
+                    fs_path = str(canonical)
         if path.startswith("/models/policy/"):
             canonical = POLICY_DIR / os.path.basename(path)
             if canonical.is_file():

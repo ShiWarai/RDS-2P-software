@@ -85,13 +85,13 @@ export class MotionPlayer {
       if (name.startsWith("passive_fold_")) this.passiveFoldTendons.push(i);
     }
     this.floorGeom = -1;
-    this.torsoGeom = -1;
+    this.torsoGeoms = [];
     this.footGeoms = [];
     for (let i = 0; i < model.ngeom; i++) {
       const start = model.name_geomadr[i];
       const name = decoder.decode(model.names.subarray(start, model.names.indexOf(0, start)));
       if (name === "floor") this.floorGeom = i;
-      if (name === "base_link_collision") this.torsoGeom = i;
+      if (/^base_link_collision(_\d+)?$/.test(name)) this.torsoGeoms.push(i);
       if (/^foot_(fl|fr|bl|br)_link_collision$/.test(name)) this.footGeoms.push(i);
     }
     this.waitingForRest = false;
@@ -316,25 +316,26 @@ export class MotionPlayer {
    * Only the passive lie-down uses it; powered commands retain the model settings.
    */
   beginLyingContact() {
-    if (this.lyingContactBackup || this.floorGeom < 0 || this.torsoGeom < 0) return;
+    if (this.lyingContactBackup || this.floorGeom < 0 || this.torsoGeoms.length === 0) return;
     const m = this.model;
     this.lyingContactBackup = {
-      margin: m.geom_margin[this.torsoGeom],
+      margins: this.torsoGeoms.map((g) => m.geom_margin[g]),
       noslip: m.opt.noslip_iterations,
     };
-    m.geom_margin[this.torsoGeom] = Math.max(this.lyingContactBackup.margin, 0.0025);
+    for (const g of this.torsoGeoms) m.geom_margin[g] = Math.max(m.geom_margin[g], 0.0025);
   }
 
   torsoSupportCount() {
-    if (this.floorGeom < 0 || this.torsoGeom < 0) return 0;
+    if (this.floorGeom < 0 || this.torsoGeoms.length === 0) return 0;
     const m = this.model, d = this.data;
-    const margin = Math.max(m.geom_margin[this.floorGeom], m.geom_margin[this.torsoGeom]);
+    const margin = Math.max(m.geom_margin[this.floorGeom], ...this.torsoGeoms.map((g) => m.geom_margin[g]));
+    const torso = new Set(this.torsoGeoms);
     let supports = 0;
     for (let i = 0; i < d.ncon; i++) {
       const c = d.contact.get(i);
       // With a margin, a supporting constraint starts before geometric overlap.
-      if (c.dist < margin && ((c.geom1 === this.floorGeom && c.geom2 === this.torsoGeom) ||
-          (c.geom2 === this.floorGeom && c.geom1 === this.torsoGeom))) supports++;
+      if (c.dist < margin && ((c.geom1 === this.floorGeom && torso.has(c.geom2)) ||
+          (c.geom2 === this.floorGeom && torso.has(c.geom1)))) supports++;
     }
     return supports;
   }
@@ -349,7 +350,7 @@ export class MotionPlayer {
 
   restoreLyingContact() {
     if (!this.lyingContactBackup) return;
-    this.model.geom_margin[this.torsoGeom] = this.lyingContactBackup.margin;
+    this.torsoGeoms.forEach((g, i) => { this.model.geom_margin[g] = this.lyingContactBackup.margins[i]; });
     this.model.opt.noslip_iterations = this.lyingContactBackup.noslip;
     this.lyingContactBackup = null;
   }
@@ -357,7 +358,7 @@ export class MotionPlayer {
   /** Physical completion, not a fixed delay or a forced final pose. */
   isSupportedAndStill() {
     const m = this.model, d = this.data;
-    if (this.floorGeom < 0 || this.torsoGeom < 0 || this.footGeoms.length !== 4) return false;
+    if (this.floorGeom < 0 || this.torsoGeoms.length === 0 || this.footGeoms.length !== 4) return false;
     const v = d.qvel;
     if (Math.hypot(v[0], v[1], v[2]) > 0.0002 || Math.hypot(v[3], v[4], v[5]) > 0.01) return false;
     for (let i = 6; i < v.length; i++) if (Math.abs(v[i]) > 0.015) return false;
