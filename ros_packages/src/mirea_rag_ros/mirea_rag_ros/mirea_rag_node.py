@@ -423,16 +423,29 @@ class MireaRagNode(Node):
                 self._speak_chunk(chunk)
                 spoken_any = True
 
+        timings: dict = {}
         try:
             answer, _rag_ctx, hist_user = ask_gated(
                 question, self.history, on_token=on_token,
-                backend=self._backend, force_rag=self._force_rag)
+                backend=self._backend, force_rag=self._force_rag,
+                timings_out=timings)
         except Exception as e:  # noqa: BLE001
             if spoken_any:
                 self._speech_end = time.monotonic()
             self._busy = False
             self.get_logger().error(f"RAG не ответил на «{question}»: {e}")
             return
+        if timings:
+            # Разбивка по этапам в секундах: retrieval (embed/search) живёт в
+            # контейнере на CPU, prefill/decode — на LLM-сервере. Это то, чего
+            # не было видно в логах: где именно теряется время ответа.
+            self.get_logger().info(
+                f"RAG тайминги (с): "
+                f"embed={timings.get('embed', '—')} "
+                f"search={timings.get('search', '—')} "
+                f"prefill={timings.get('llm_ttft', '—')} "
+                f"decode={timings.get('llm_decode', '—')} "
+                f"всего={timings.get('total', timings.get('llm_total', '—'))}")
 
         if chunker is not None:
             for chunk in chunker.flush():

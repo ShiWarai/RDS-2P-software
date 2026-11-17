@@ -186,7 +186,7 @@ def _post_event_stream(url, payload, timeout):
 
 def _log_turn(question: str, osm, branch: str, history: list, answer: str,
               chunks=None, sr=None, stats=None, done=None,
-              osm_ms=None, osm_err=None) -> None:
+              osm_ms=None, osm_err=None, timings_out=None) -> None:
     """Один читаемый текстовый блок на ход → ``RAG_CHAT_LOG``.
 
     Видно: решение OSM, какая ветка сработала, что вернул поиск (чанки +
@@ -260,6 +260,35 @@ def _log_turn(question: str, osm, branch: str, history: list, answer: str,
                                ("total", "всего")):
                 if isinstance(tm.get(key), (int, float)):
                     tparts.append(f"{label} {_fmt_dur(tm[key])}")
+    # Сводный словарь таймингов (с) для вызывающего: нода пишет его в ROS-лог,
+    # чтобы разбивка по этапам видна без RAG_CHAT_LOG. retrieval-этапы берём из
+    # sr (ответ /search), LLM-этапы — из done; в direct-ветке LLM-цифры из stats.
+    if timings_out is not None:
+        merged: dict = {}
+        if isinstance(sr, dict):
+            stm = sr.get("timings")
+            if isinstance(stm, dict):
+                for k in ("preprocess", "embed", "search"):
+                    v = stm.get(k)
+                    if isinstance(v, (int, float)):
+                        merged[k] = round(v, 3)
+        if isinstance(done, dict):
+            dtm = done.get("timings")
+            if isinstance(dtm, dict):
+                for k in ("preprocess", "embed", "search", "prompt",
+                          "llm_ttft", "llm_decode", "llm_total", "total"):
+                    v = dtm.get(k)
+                    if isinstance(v, (int, float)) and k not in merged:
+                        merged[k] = round(v, 3)
+        if isinstance(stats, dict):
+            if isinstance(stats.get("ttft"), (int, float)):
+                merged.setdefault("llm_ttft", round(stats["ttft"], 3))
+            if isinstance(stats.get("total"), (int, float)):
+                merged.setdefault("llm_total", round(stats["total"], 3))
+            if stats.get("n_tokens"):
+                merged["n_tokens"] = stats["n_tokens"]
+        if merged:
+            timings_out.update(merged)
     if tparts:
         lines.append("  ⏱ " + " · ".join(tparts))
     # Реальные JSON-тела, ушедшие на сервера.
@@ -832,8 +861,8 @@ def _emit_rag_two_stage(q: str, history: list, sr: dict,
 
 
 def ask_gated(q: str, history: list, on_token=None,
-              backend=None, force_rag: bool = False
-              ) -> tuple[str, list | None, str | None]:
+              backend=None, force_rag: bool = False,
+              timings_out=None) -> tuple[str, list | None, str | None]:
     """RAG-поток сквозь OSM-гат, двухэтапный: OSM и /search (только ретривал,
     CPU) гонятся ПАРАЛЛЕЛЬНО, но LLM-запрос уходит ТОЛЬКО если OSM ответил
     «да» (LLM-ветка по найденным чанкам). При «нет» — direct-чат, а слот модели
@@ -917,7 +946,8 @@ def ask_gated(q: str, history: list, on_token=None,
         print(dim("      ⏱ " + " · ".join(parts)))
         print(dim("─" * min(width(), 72)))
         _log_turn(q, res, branch, history, answer,
-                  stats=stats, osm_ms=osm_ms, done=done_ev)
+                  stats=stats, osm_ms=osm_ms, done=done_ev,
+                  timings_out=timings_out)
         # direct-чат получает голый вопрос без нормализации, поэтому в
         # историю — дословно q.
         return answer, None, q
@@ -945,7 +975,8 @@ def ask_gated(q: str, history: list, on_token=None,
                 llm_stream=backend.ask_llm_stream)
             _log_turn(q, res, f"RAG двухэтапный ({backend.name})",
                       history, answer, sr=sr,
-                      done=done_state or None, osm_ms=osm_state.get("ms"))
+                      done=done_state or None, osm_ms=osm_state.get("ms"),
+                      timings_out=timings_out)
             if sr.get("refuse") or done_state.get("type") == "refused":
                 # LLM не вызывался — сервер свою историю не менял, значит и
                 # клиент не должен её дополнять: иначе на следующем ходе
@@ -989,7 +1020,8 @@ def ask_gated(q: str, history: list, on_token=None,
     answer = emit(events, ctx_out, on_token)
     _log_turn(q, res, f"полный пайплайн /ask_stream ({backend.name})", history,
               answer, chunks=ctx_out or None, done=done_state or None,
-              osm_ms=osm_state.get("ms"), osm_err=osm_state.get("err"))
+              osm_ms=osm_state.get("ms"), osm_err=osm_state.get("err"),
+              timings_out=timings_out)
     if done_state.get("type") == "refused":
         return answer, (ctx_out or None), None
     return (answer, (ctx_out or None),
