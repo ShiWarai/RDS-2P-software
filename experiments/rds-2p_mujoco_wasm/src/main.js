@@ -6,6 +6,7 @@ import { LayaBrowserBackend } from "./nlu/laya_browser.js";
 import { SpeechListener, speechSupported } from "./speech/recognizer.js";
 import { VoskStt, voskSupported, voskWarmup, voskWarmupError, voskModelReady, isSecure } from "./speech/vosk_stt.js";
 import { MANUAL_BUTTONS, programForCommand, commandLabel } from "./robot/motions.js";
+import { BALL_COLORS } from "./vision/blue-ball.js";
 import { PoseManager } from "./sim/poseManager.js";
 import {
   initBlocks,
@@ -960,6 +961,65 @@ async function boot() {
 
   // Кнопки ручных команд
   buildCommandButtons($("command-buttons"), MANUAL_BUTTONS, runCommand);
+
+  // Группа «следование»: кнопка преследования + раскрывающийся выбор цвета в стиле чипов.
+  const followGroup = document.createElement("div");
+  followGroup.className = "cmd-group";
+  followGroup.innerHTML = '<span class="cmd-group-label">следование</span>';
+  const followBtn = $("btn-follow-blue");
+  followBtn.hidden = false;
+  followGroup.appendChild(followBtn);
+
+  const colorWrap = document.createElement("span");
+  colorWrap.className = "ball-color-wrap";
+  const colorBtn = document.createElement("button");
+  colorBtn.type = "button";
+  colorBtn.className = "btn ball-color-btn";
+  colorBtn.id = "ball-color-btn";
+  colorBtn.setAttribute("aria-haspopup", "listbox");
+  colorBtn.setAttribute("aria-expanded", "false");
+  colorBtn.title = "Цвет преследуемого шара";
+  const colorMenu = document.createElement("div");
+  colorMenu.className = "ball-color-menu";
+  colorMenu.setAttribute("role", "listbox");
+  colorMenu.hidden = true;
+  const closeColorMenu = () => {
+    colorMenu.hidden = true;
+    colorBtn.setAttribute("aria-expanded", "false");
+  };
+  const refreshColorBtn = () => {
+    const c = BALL_COLORS[app.sim.ballFollower?.color || "blue"];
+    colorBtn.innerHTML =
+      `<span class="dot" style="background:${c.hex}"></span>${c.ru}<span class="caret">▾</span>`;
+  };
+  for (const [key, c] of Object.entries(BALL_COLORS)) {
+    const opt = document.createElement("button");
+    opt.type = "button";
+    opt.className = "btn ball-color-opt";
+    opt.setAttribute("role", "option");
+    opt.innerHTML = `<span class="dot" style="background:${c.hex}"></span>${c.ru}`;
+    opt.onclick = () => {
+      app.sim.ballFollower?.setColor(key);
+      refreshColorBtn();
+      closeColorMenu();
+    };
+    colorMenu.appendChild(opt);
+  }
+  colorBtn.onclick = (e) => {
+    e.stopPropagation();
+    colorMenu.hidden = !colorMenu.hidden;
+    colorBtn.setAttribute("aria-expanded", String(!colorMenu.hidden));
+  };
+  document.addEventListener("click", (e) => {
+    if (!colorWrap.contains(e.target)) closeColorMenu();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeColorMenu();
+  });
+  colorWrap.append(colorBtn, colorMenu);
+  followGroup.appendChild(colorWrap);
+  $("command-buttons").appendChild(followGroup);
+  refreshColorBtn();
 
   // Редактор поз — единственный набор слайдеров в drawer
   app.sliders.pose = buildSliderPanel($("pose-sliders"), {

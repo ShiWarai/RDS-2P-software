@@ -1,4 +1,4 @@
-import { selectBlueBall, blueBallCommand } from "./blue-ball.js";
+import { selectBlueBall, blueBallCommand, BALL_COLORS } from "./blue-ball.js";
 import { RosBallFollow } from "./ros-ball-follow.js";
 
 /** Follow only YOLO detections, from the simulated camera or the real ROS node. */
@@ -11,8 +11,9 @@ export class BallFollower {
     this.starting = false;
     this.generation = 0;
     this.remote = null;
+    this.color = "blue";
     this.button = document.getElementById("btn-follow-blue");
-    this.status = document.getElementById("ball-status");
+    this.status = document.getElementById("hud-status");
     this.button.disabled = false;
     this.button.onclick = () => {
       if (this.active || this.starting) this.stop();
@@ -124,11 +125,20 @@ export class BallFollower {
 
   receiveDetections(detections, width, height, capturedAt) {
     if (this.remote || capturedAt < this.capturedAt) return;
-    this.detection = selectBlueBall(detections, width, height);
+    this.detection = selectBlueBall(detections, width, height, this.color);
     this.capturedAt = capturedAt;
     if (!this.active && !this.starting) {
-      this.setStatus(this.detection ? "YOLO видит синий шарик" : "YOLO: синий шарик не найден");
+      const ru = BALL_COLORS[this.color].ru;
+      this.setStatus(this.detection ? `YOLO видит ${ru} шарик` : `YOLO: ${ru} шарик не найден`);
     }
+  }
+
+  setColor(color) {
+    if (!BALL_COLORS[color] || color === this.color) return;
+    this.color = color;
+    this.detection = null;
+    this.capturedAt = -Infinity;
+    this.updateUI();
   }
 
   stop({ keepPolicy = false } = {}) {
@@ -145,12 +155,14 @@ export class BallFollower {
   setStatus(text) { if (this.status.textContent !== text) this.status.textContent = text; }
 
   updateUI() {
+    const color = BALL_COLORS[this.color];
+    this.button.style.setProperty("--ball-color", color.hex);
     this.button.setAttribute("aria-pressed", String(this.active || this.starting));
     this.button.classList.toggle("accent", this.active || this.starting);
-    this.button.textContent = this.starting ? "Отменить запуск" : this.active ? "Стоп преследование"
-      : this.remote ? "Робот: следовать за синим" : "Следовать за синим";
+    this.button.textContent = this.starting ? "⏳ запуск" : this.active ? "🛑 стоп"
+      : this.remote ? "🤖 следовать" : "🎯 следовать";
     this.setStatus(this.starting ? "Готовлю YOLO и ходьбу…" : this.active
-      ? "Ищу синий шарик через YOLO…" : "Цель определяет YOLO по изображению камеры");
+      ? `Ищу ${color.ru} шарик через YOLO…` : "Цель определяет YOLO по изображению камеры");
   }
 
   tick(now) {
@@ -164,8 +176,9 @@ export class BallFollower {
       this.sim.player.setPolicyCmd(blueBallCommand(this.detection, now, this.capturedAt));
     }
     const visible = this.detection && (this.remote || now-this.capturedAt<=700);
-    this.setStatus(!visible ? "YOLO: синий не виден — стою и жду"
-      : this.detection.relativeWidth>=.18 ? "YOLO: синий рядом — жду его движения" : "YOLO: вижу синий — следую за ним");
+    const ru = BALL_COLORS[this.color].ru;
+    this.setStatus(!visible ? `YOLO: ${ru} не виден — стою и жду`
+      : this.detection.relativeWidth>=.18 ? `YOLO: ${ru} рядом — жду его движения` : `YOLO: вижу ${ru} — следую за ним`);
   }
 
   dispose() {

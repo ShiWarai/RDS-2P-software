@@ -64,12 +64,27 @@ export function toast(html, { kind = "", timeout = 4200 } = {}) {
 
 export function buildCommandButtons(container, commands, onClick) {
   container.replaceChildren();
+  const groups = new Map();
   for (const c of commands) {
-    const b = document.createElement("button");
-    b.className = "btn";
-    b.textContent = c.text;
-    b.title = `Панда выполнит: ${c.text.replace("*", "")}`;
-    b.onclick = () => onClick(c.id);
-    container.appendChild(b);
+    const g = c.group || "команды";
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(c);
+  }
+  for (const [label, cmds] of groups) {
+    const wrap = document.createElement("div");
+    wrap.className = "cmd-group";
+    const lab = document.createElement("span");
+    lab.className = "cmd-group-label";
+    lab.textContent = label;
+    wrap.appendChild(lab);
+    for (const c of cmds) {
+      const b = document.createElement("button");
+      b.className = "btn";
+      b.textContent = c.text;
+      b.title = `Панда выполнит: ${c.text.replace("*", "")}`;
+      b.onclick = () => onClick(c.id);
+      wrap.appendChild(b);
+    }
+    container.appendChild(wrap);
   }
 }
