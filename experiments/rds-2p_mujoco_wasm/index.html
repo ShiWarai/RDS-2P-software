@@ -120,7 +120,16 @@
             <button id="btn-reset" class="btn icon-btn" title="Поставить панду на место (базовая стойка)">↺</button>
             <button id="btn-frame" class="btn icon-btn" title="Показать фактические углы суставов (для снятия кадра на паузе)">📐</button>
             <span class="grow"></span>
+            <button id="btn-follow-blue" class="btn follow-blue" aria-pressed="false" aria-describedby="ball-status" disabled>Следовать за синим</button>
           </div>
+          <div id="ball-status" role="status" aria-live="polite">Загружаю сцену с шариками…</div>
+          <details id="robot-connection">
+            <summary>Реальная панда · ROS 2</summary>
+            <label for="robot-rosbridge-url">Адрес rosbridge</label>
+            <input id="robot-rosbridge-url" type="url" placeholder="ws://192.168.1.40:9090" autocomplete="off">
+            <button id="btn-robot-connect" class="btn" type="button">Подключить робота</button>
+            <div id="robot-connection-status" role="status">Управление симулятором</div>
+          </details>
           <div id="frame-readout" class="hidden"></div>
         </div>
       </section>

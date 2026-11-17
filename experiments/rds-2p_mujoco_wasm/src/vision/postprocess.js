@@ -4,6 +4,9 @@ export const MODEL_LABELS = [
   "bush",
   "rock",
   "flower",
+  "blue_ball",
+  "red_ball",
+  "green_ball",
 ];
 
 export function boxIoU(a, b) {

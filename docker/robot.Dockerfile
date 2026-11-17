@@ -82,7 +82,8 @@ RUN cd /opt/rds2p/ros-ws \
          -r src/vosk_ros/requirements.txt \
          -r src/rds_2p_telegram_bot/requirements.txt \
          -r src/rds_2p_inference/requirements.txt \
-         -r src/rds_2p_joystick/requirements.txt
+         -r src/rds_2p_joystick/requirements.txt \
+         -r src/rds_2p_vision/requirements.txt
 
 # gigaam_ros — отдельным pip-вызовом: его requirements подключают CPU-индекс
 # PyTorch, чтобы не тянуть CUDA/nvidia-*; остальные пакеты этот индекс не видят.
@@ -150,6 +151,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ros-humble-compressed-image-transport ros-humble-compressed-depth-image-transport \
       ros-humble-tf2-ros ros-humble-teleop-twist-keyboard \
       ros-humble-joy ros-humble-teleop-twist-joy \
+      ros-humble-rosbridge-suite \
     && rm -rf /var/lib/apt/lists/*
 RUN apt-get update \
     && (apt-get install -y --no-install-recommends ros-humble-orbbec-camera \

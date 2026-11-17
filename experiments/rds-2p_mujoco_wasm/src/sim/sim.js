@@ -13,6 +13,7 @@ import { MotionPlayer } from "./motionPlayer.js";
 import { PolicyRunner } from "./policyRunner.js";
 import { DragStateManager } from "./utils/DragStateManager.js";
 import { toMujocoPos } from "./mujocoUtils.js";
+import { BallFollower } from "../vision/ball-follower.js";
 
 const SCENE_FILE = "rds2p_feetonly_scene.xml";
 const HOME_KEYFRAME = 0; // keyframe «home» в rds-2p_feetonly.mjcf
@@ -58,7 +59,7 @@ export class Simulator {
     const w = container.clientWidth || 640;
     const h = container.clientHeight || 480;
     this.camera = new THREE.PerspectiveCamera(45, w / h, 0.001, 100);
-    this.camera.position.set(0.6, 0.4, 0.6);
+    this.camera.position.set(1.25, 0.85, 1.3);
     this.scene.add(this.camera);
 
     // Небо/земля — мягкая цветная подложка (уличное освещение «зоопарка»).
@@ -93,7 +94,7 @@ export class Simulator {
     container.appendChild(this.renderer.domElement);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.controls.target.set(0, 0.15, 0);
+    this.controls.target.set(0.25, 0.1, 0);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.1;
     this.controls.screenSpacePanning = true;
@@ -132,6 +133,7 @@ export class Simulator {
 
     this.buildZoo();
     this.improveShadows();
+    this.ballFollower = new BallFollower(this);
 
     this.renderer.setAnimationLoop((timeMS) => this.render(timeMS));
   }
@@ -250,11 +252,10 @@ export class Simulator {
 
   resetToHome() {
     try {
+      this.ballFollower?.stop();
       this.hideSay();
       if (this.drag) {
-        this.drag.physicsObject = null;
-        this.drag.active = false;
-        if (this.drag.arrow) { this.drag.arrow.visible = false; }
+        this.drag.end();
       }
       this.mujoco.mj_resetData(this.model, this.data);
       if (this.model.nkey > HOME_KEYFRAME) {
@@ -262,6 +263,13 @@ export class Simulator {
         const nu = this.model.nu;
         this.data.qpos.set(this.model.key_qpos.slice(HOME_KEYFRAME * nq, (HOME_KEYFRAME + 1) * nq));
         this.data.ctrl.set(this.model.key_ctrl.slice(HOME_KEYFRAME * nu, (HOME_KEYFRAME + 1) * nu));
+      }
+      // Robot keyframes predate scene props: MuJoCo pads their free joints
+      // with zeros. Restore props from XML defaults instead of stacking at origin.
+      for (let j = 1; j < this.model.njnt; j++) {
+        if (this.model.jnt_type[j] !== this.mujoco.mjtJoint.mjJNT_FREE.value) continue;
+        const addr = this.model.jnt_qposadr[j];
+        this.data.qpos.set(this.model.qpos0.subarray(addr, addr + 7), addr);
       }
       this.data.qvel.fill(0);
       this.data.qfrc_applied.fill(0);
@@ -277,6 +285,7 @@ export class Simulator {
   }
 
   setPaused(v) {
+    if (v) this.ballFollower?.stop();
     this.paused = v;
   }
 
@@ -318,11 +327,13 @@ export class Simulator {
   /** Исполнить программу (массив шагов). */
   play(steps) {
     if (!this.paused && steps && steps.length) {
+      this.ballFollower?.stop();
       this.player.play(steps);
     }
   }
 
   stopProgram() {
+    this.ballFollower?.stop();
     this.player?.stop();
   }
 
@@ -330,6 +341,7 @@ export class Simulator {
    *  Возвращает зажатый target (для обновления слайдеров редактора). */
   setLiveAngles(angles) {
     if (!this.poseManager || !angles) { return null; }
+    this.ballFollower?.stop();
     const noLimit = this.poseManager.anglesOutOfRange(angles);
     const target = this.poseManager.clampToCtrl(angles, { noLimit });
     this.player.stop();
@@ -349,6 +361,7 @@ export class Simulator {
   /** Живая постановка позы из слайдеров: короткое сглаживание, без очереди. */
   setLivePose(normArr) {
     if (!this.poseManager) { return; }
+    this.ballFollower?.stop();
     const target = this.poseManager.normToCtrl(normArr);
     this.player.stop();
     this.player.enableTorque();
@@ -438,7 +451,12 @@ export class Simulator {
 
   applyDragForce() {
     const dragged = this.drag?.physicsObject;
-    if (!dragged || dragged.bodyID !== 1) { return; }
+    if (!dragged) { return; }
+    const root = this.model.body_rootid[dragged.bodyID];
+    const joint = this.model.body_jntadr[root];
+    if (joint < 0 || this.model.jnt_type[joint] !== this.mujoco.mjtJoint.mjJNT_FREE.value) return;
+    const addr = this.model.jnt_qposadr[joint];
+    const dof = this.model.jnt_dofadr[joint];
     for (let b = 0; b < this.model.nbody; b++) {
       if (this.bodies[b]) {
         getPosition(this.data.xpos, b, this.bodies[b].position);
@@ -452,12 +470,12 @@ export class Simulator {
     // ведём корпус за мышью телепортом, а ноги продолжают жить в физике.
     const delta = toMujocoPos(this.drag.currentWorld.clone().sub(this.drag.worldHit));
     const k = 0.25;
-    this.data.qpos[0] += delta.x * k;
-    this.data.qpos[1] += delta.y * k;
-    this.data.qpos[2] = Math.max(this.data.qpos[2] + delta.z * k, 0.02);
-    this.data.qvel[0] = 0;
-    this.data.qvel[1] = 0;
-    this.data.qvel[2] = 0;
+    this.data.qpos[addr] += delta.x * k;
+    this.data.qpos[addr + 1] += delta.y * k;
+    this.data.qpos[addr + 2] = Math.max(this.data.qpos[addr + 2] + delta.z * k, 0.02);
+    this.data.qvel[dof] = 0;
+    this.data.qvel[dof + 1] = 0;
+    this.data.qvel[dof + 2] = 0;
   }
 
   applyPausedDrag() {
@@ -474,7 +492,9 @@ export class Simulator {
       pos[addr] += offset.x; pos[addr + 1] += offset.y; pos[addr + 2] += offset.z;
     } else {
       const root = this.model.body_rootid[b];
-      addr = this.model.jnt_qposadr[this.model.body_jntadr[root]];
+      const joint = this.model.body_jntadr[root];
+      if (joint < 0 || this.model.jnt_type[joint] !== this.mujoco.mjtJoint.mjJNT_FREE.value) return;
+      addr = this.model.jnt_qposadr[joint];
       const pos = this.data.qpos;
       pos[addr] += offset.x; pos[addr + 1] += offset.y; pos[addr + 2] += offset.z;
     }
@@ -487,6 +507,7 @@ export class Simulator {
 
     const mujoco = this.mujoco;
     const timestep = this.model.opt.timestep;
+    this.ballFollower?.tick(performance.now());
 
     if (!this.paused) {
       // Если вкладка долго была в фоне — не догоняем всё время разом,

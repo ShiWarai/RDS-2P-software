@@ -23,5 +23,25 @@
   <worldbody>
     <geom name="floor" size="0 0 0.01" type="plane" material="groundplane" contype="1" conaffinity="0" priority="1"
       friction="0.6" condim="3"/>
+    <!-- Movable props: position, radius, mass, colour and contacts live here.
+         contype/conaffinity=1 enables ball/floor, ball/robot and ball/ball contacts. -->
+    <body name="ball_blue" pos="0.75 0 0.065">
+      <freejoint name="ball_blue_joint"/>
+      <geom name="ball_blue_geom" type="sphere" size="0.065" mass="0.08"
+        rgba="0.04 0.18 0.95 1" contype="1" conaffinity="1"
+        condim="6" friction="0.6 0.01 0.002" solref="0.01 1"/>
+    </body>
+    <body name="ball_red" pos="0.55 0.32 0.065">
+      <freejoint name="ball_red_joint"/>
+      <geom name="ball_red_geom" type="sphere" size="0.065" mass="0.08"
+        rgba="0.95 0.08 0.06 1" contype="1" conaffinity="1"
+        condim="6" friction="0.6 0.01 0.002" solref="0.01 1"/>
+    </body>
+    <body name="ball_green" pos="0.55 -0.32 0.065">
+      <freejoint name="ball_green_joint"/>
+      <geom name="ball_green_geom" type="sphere" size="0.065" mass="0.08"
+        rgba="0.08 0.85 0.16 1" contype="1" conaffinity="1"
+        condim="6" friction="0.6 0.01 0.002" solref="0.01 1"/>
+    </body>
   </worldbody>
 </mujoco>

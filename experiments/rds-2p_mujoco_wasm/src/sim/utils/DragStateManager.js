@@ -53,7 +53,7 @@ export class DragStateManager {
             let obj = intersects[i].object;
             if (obj.bodyID && obj.bodyID > 0) {
                 this.physicsObject = obj;
-                this.grabDistance = intersects[0].distance;
+                this.grabDistance = intersects[i].distance;
                 let hit = this.raycaster.ray.origin.clone();
                 hit.addScaledVector(this.raycaster.ray.direction, this.grabDistance);
                 this.arrow.position.copy(hit);
@@ -103,6 +103,7 @@ export class DragStateManager {
     }
     onPointer(evt) {
         if (evt.type == "pointerdown") {
+            if (evt.button !== 0 || evt.target !== this.renderer.domElement) return;
             this.start(evt.clientX, evt.clientY);
             this.mouseDown = true;
         } else if (evt.type == "pointermove" && this.mouseDown) {

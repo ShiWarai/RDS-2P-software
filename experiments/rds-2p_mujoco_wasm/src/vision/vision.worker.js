@@ -144,14 +144,14 @@ async function processFrame(frame) {
     rgba,
     frame.width,
     frame.height,
-    640
+    320
   );
   const preprocessMs = performance.now() - tPreStart;
 
   const tensor = new ort.Tensor(
     "float32",
     prepared.data,
-    [1, 3, 640, 640]
+    [1, 3, 320, 320]
   );
 
   const tInferenceStart = performance.now();

@@ -60,7 +60,8 @@ RUN cd /opt/rds2p/ros-ws \
     && python3 -m pip install --no-cache-dir \
          -c constraints.txt \
          -r src/rds_2p_telegram_bot/requirements.txt \
-         -r src/rds_2p_inference/requirements.txt
+         -r src/rds_2p_inference/requirements.txt \
+         -r src/rds_2p_vision/requirements.txt
 
 RUN mkdir -p /opt/rds2p/ros-ws/deps/mujoco_playground; \
     if [ -z "$(ls -A /opt/rds2p/ros-ws/deps/mujoco_playground)" ]; then \

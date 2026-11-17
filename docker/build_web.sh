@@ -79,10 +79,8 @@ tar -C "$APP_DIR" \
     --exclude='./tools/__pycache__' \
     --exclude='./.playwright-mcp' \
     --exclude='*.map' \
-    --exclude='./node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep*' \
     --exclude='./node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jspi*' \
     --exclude='./node_modules/onnxruntime-web/dist/ort.all*' \
-    --exclude='./node_modules/onnxruntime-web/dist/ort.webgl*' \
     --exclude='./node_modules/onnxruntime-web/dist/ort.jspi*' \
     --exclude='./node_modules/onnxruntime-web/dist/ort.min.*' \
     --exclude='./node_modules/three' \
@@ -110,6 +108,8 @@ cp -a "$APP_DIR/node_modules/blockly/media" "$STAGE/experiments/$NM/blockly/medi
 
 cp -a "$ROOT_DIR/urdf_src/export/rds-2p/meshes/obj/." "$STAGE/urdf_src/export/rds-2p/meshes/obj/"
 cp -a "$ROOT_DIR/ros_packages/src/rds_2p_inference/models/." "$STAGE/ros_packages/src/rds_2p_inference/models/"
+mkdir -p "$STAGE/ros_packages/src/rds_2p_vision/models"
+cp -a "$ROOT_DIR/ros_packages/src/rds_2p_vision/models/." "$STAGE/ros_packages/src/rds_2p_vision/models/"
 
 echo "==> контекст: $(du -sh "$STAGE" | cut -f1)"
 
