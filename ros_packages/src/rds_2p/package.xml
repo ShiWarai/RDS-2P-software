@@ -26,16 +26,14 @@
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>rds_2p_audio</exec_depend>
-  <exec_depend>vosk_ros</exec_depend>
-  <exec_depend>gigaam_ros</exec_depend>
   <exec_depend>audio_filters</exec_depend>
-  <exec_depend>paroli_ros</exec_depend>
-  <exec_depend>rds_2p_face</exec_depend>
   <exec_depend>rds_2p_commands</exec_depend>
-  <exec_depend>rds_2p_joystick</exec_depend>
   <exec_depend>mirea_rag_ros</exec_depend>
-  <exec_depend>rkllm_ros</exec_depend>
   <exec_depend>system_one_ros</exec_depend>
+  <!-- Железные/robot-only пакеты (vosk/gigaam/paroli/face/joystick/rkllm) запускаются
+       launch'ем по имени и собираются на роботе отдельно. Как exec_depend они ломали
+       сборку rds_2p в CI на десктопе/NPU=0, где эти пакеты скипаются/игнорятся,
+       а без установленного rds_2p не стартует десктоп-виртуальный двойник. -->
 
 
   <test_depend>ament_lint_auto</test_depend>

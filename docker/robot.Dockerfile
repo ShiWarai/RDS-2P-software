@@ -114,7 +114,6 @@ RUN set -ex; \
       echo "ERROR: NPU=1 запрошен, но vendor RK-рантайм отсутствует. Положите .so/заголовки по rkllm_ros/vendor/README.md."; \
       exit 1; \
     fi; \
-    if echo "$SKIP" | grep -q rkllm_ros; then SKIP="$SKIP rds_2p"; fi; \
     if [ -f /tmp/orbbec-apt-ok ]; then SKIP="$SKIP orbbec_camera orbbec_camera_msgs orbbec_description"; fi; \
     if [ -f /tmp/rnnoise-skip ] || [ ! -f deps/rnnoise_install/lib/librnnoise.a ]; then \
       SKIP="$SKIP audio_filters"; \
