@@ -68,6 +68,7 @@ COPY urdf_src/export/rds-2p/meshes/obj/ /app/urdf_src/export/rds-2p/meshes/obj/
 
 # ONNX-политика ходьбы из rospkg rds_2p_inference: /models/policy/*.
 COPY ros_packages/src/rds_2p_inference/models/ /app/ros_packages/src/rds_2p_inference/models/
+COPY ros_packages/src/rds_2p_vision/models/ /app/ros_packages/src/rds_2p_vision/models/
 
 WORKDIR /app/experiments/rds-2p_mujoco_wasm
 

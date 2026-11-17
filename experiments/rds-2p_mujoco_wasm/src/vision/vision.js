@@ -2,8 +2,8 @@
 import * as THREE from "three";
 import { createRobotVisionCamera } from "./robot-camera.js";
 
-const WIDTH = 640;
-const HEIGHT = 480;
+const WIDTH = 320;
+const HEIGHT = 240;
 const FPS_LIMIT = 15;
 const FRAME_INTERVAL = 1000 / FPS_LIMIT;
 
@@ -12,6 +12,9 @@ const CLASS_DEFINITIONS = [
   { key: "bush", singular: "Куст", plural: "Кусты" },
   { key: "rock", singular: "Камень", plural: "Камни" },
   { key: "flower", singular: "Цветок", plural: "Цветы" },
+  { key: "blue_ball", singular: "Синий шарик", plural: "Синие шарики" },
+  { key: "red_ball", singular: "Красный шарик", plural: "Красные шарики" },
+  { key: "green_ball", singular: "Зелёный шарик", plural: "Зелёные шарики" },
 ];
 
 function getClassIndex(box) {
@@ -23,42 +26,38 @@ function getClassIndex(box) {
 }
 
 function drawDetections(ctx, detections) {
-  ctx.lineWidth = 2;
-  ctx.font = "bold 15px Arial";
-
-  for (const box of detections || []) {
-    const width = box.x2 - box.x1;
-    const height = box.y2 - box.y1;
-
-    if (width <= 0 || height <= 0) continue;
-
-    ctx.strokeStyle = "#00ff80";
-    ctx.fillStyle = "#00ff80";
-    ctx.strokeRect(box.x1, box.y1, width, height);
-
-    const index = getClassIndex(box);
-    const className = index >= 0
-      ? CLASS_DEFINITIONS[index].singular
-      : "Объект";
-
-    const label =
-      `${className} ${(box.confidence * 100).toFixed(0)}%`;
-
-    const textWidth = ctx.measureText(label).width;
-    const textY = Math.max(15, box.y1 - 5);
-
-    ctx.fillRect(
-      box.x1,
-      textY - 15,
-      textWidth + 8,
-      19
-    );
-
-    ctx.fillStyle = "#030608";
-    ctx.fillText(label, box.x1 + 4, textY - 1);
-    ctx.fillStyle = "#00ff80";
+  const fontSize = ctx.canvas.width <= 320 ? 9 : 15;
+  const labelHeight = fontSize + 5;
+  const colors = { blue_ball: "#174bc4", red_ball: "#b62424", green_ball: "#087a34" };
+  const boxes = (detections || []).filter(box => box.x2 > box.x1 && box.y2 > box.y1);
+  ctx.lineWidth = 1;
+  ctx.font = `bold ${fontSize}px Arial`;
+  for (const box of boxes) {
+    ctx.strokeStyle = colors[box.label] || "#00ff80";
+    ctx.strokeRect(box.x1, box.y1, box.x2-box.x1, box.y2-box.y1);
   }
-}export class VisionPipeline {
+  const placed = [];
+  // Keep target labels readable before laying out the surrounding scenery labels.
+  const ordered = [...boxes].sort((a,b) => Number(b.label.endsWith("_ball"))-Number(a.label.endsWith("_ball")) || b.confidence-a.confidence);
+  for (const box of ordered) {
+    const index = getClassIndex(box);
+    const name = index >= 0 ? CLASS_DEFINITIONS[index].singular : "Объект";
+    const label = `${name} ${(box.confidence*100).toFixed(0)}%`;
+    const width = Math.min(ctx.canvas.width,ctx.measureText(label).width+6);
+    const x = Math.max(0,Math.min(ctx.canvas.width-width,box.x1));
+    const positions = [box.y1-labelHeight-2,box.y2+2,box.y1+2];
+    const y = positions.map(value=>Math.max(0,Math.min(ctx.canvas.height-labelHeight,value)))
+      .find(value=>!placed.some(r=>x<r.x+r.width+2 && x+width+2>r.x && value<r.y+labelHeight+2 && value+labelHeight+2>r.y));
+    if (y === undefined) continue;
+    placed.push({x,y,width});
+    ctx.fillStyle = colors[box.label] || "#00ff80";
+    ctx.fillRect(x,y,width,labelHeight);
+    ctx.fillStyle = colors[box.label] ? "#ffffff" : "#030608";
+    ctx.fillText(label,x+3,y+fontSize+1);
+  }
+}
+
+export class VisionPipeline {
   constructor(sim) {
     this.sim = sim;
 
@@ -79,6 +78,9 @@ function drawDetections(ctx, detections) {
     this.displayPixels = null;
 
     this.latestDetections = [];
+    this.ready = false;
+    this.modelError = null;
+    this.readyWaiters = new Set();
 
     this.lastError = null;
     this.errors = [];
@@ -147,7 +149,7 @@ function drawDetections(ctx, detections) {
     };
 
     const modelUrl = new URL(
-      "../../models/vision/yolov8n_final.onnx",
+      "../../models/vision/yolov8n_balls.onnx",
       import.meta.url
     ).href;
 
@@ -167,7 +169,7 @@ function drawDetections(ctx, detections) {
       <div class="vision-panel-heading">
         <div class="vision-heading-main">
           <span class="vision-title">ЗРЕНИЕ РОБОТА</span>
-          <span class="vision-subtitle">YOLO · 640 × 480</span>
+          <span class="vision-subtitle">YOLO · 7 классов · вход 320 × 320</span>
         </div>
 
         <div
@@ -194,8 +196,8 @@ function drawDetections(ctx, detections) {
           <div class="vision-preview-viewport">
             <canvas
               id="vision-preview"
-              width="640"
-              height="480"
+              width="${WIDTH}"
+              height="${HEIGHT}"
             ></canvas>
           </div>
         </section>
@@ -251,6 +253,11 @@ function drawDetections(ctx, detections) {
   handleWorkerMessage(message) {
     switch (message.type) {
       case "status":
+        if (message.state === "ready") {
+          this.ready = true;
+          for (const waiter of this.readyWaiters) waiter.resolve();
+          this.readyWaiters.clear();
+        }
         if (message.backend && message.backend !== "initializing") {
           this.backend = message.backend;
         }
@@ -274,6 +281,7 @@ function drawDetections(ctx, detections) {
       case "result":
         this.backend = message.backend;
         this.latestDetections = message.detections || [];
+        this.sim.ballFollower?.receiveDetections(this.latestDetections, WIDTH, HEIGHT, message.timestamp);
 
         this.metrics.preprocessMs = message.metrics.preprocessMs;
         this.metrics.inferenceMs = message.metrics.inferenceMs;
@@ -289,10 +297,15 @@ function drawDetections(ctx, detections) {
         break;
 
       case "frame-error":
+        this.sim.ballFollower?.receiveDetections([], WIDTH, HEIGHT, performance.now());
         this.recordError(message.error);
         break;
 
       case "fatal":
+        this.modelError = new Error(message.error);
+        for (const waiter of this.readyWaiters) waiter.reject(this.modelError);
+        this.readyWaiters.clear();
+        this.sim.ballFollower?.receiveDetections([], WIDTH, HEIGHT, performance.now());
         this.recordError(message.error);
         break;
 
@@ -312,6 +325,7 @@ function drawDetections(ctx, detections) {
 
   /** Ставит захват кадров на паузу (вкладка ЗРения скрыта). */
   pause() {
+    if (!this.sim.ballFollower?.remote && (this.sim.ballFollower?.active || this.sim.ballFollower?.starting)) return;
     if (!this.running || this.disposed || this.paused) return;
     this.paused = true;
     if (this.captureTimer) {
@@ -325,6 +339,22 @@ function drawDetections(ctx, detections) {
     if (!this.running || this.disposed || !this.paused) return;
     this.paused = false;
     this.scheduleCapture();
+  }
+
+  waitUntilReady() {
+    if (this.ready) return Promise.resolve();
+    if (this.modelError) return Promise.reject(this.modelError);
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.readyWaiters.delete(waiter);
+        reject(new Error("YOLO не запустилась за 60 секунд"));
+      }, 60000);
+      const waiter = {
+        resolve: () => { clearTimeout(timer); resolve(); },
+        reject: error => { clearTimeout(timer); reject(error); },
+      };
+      this.readyWaiters.add(waiter);
+    });
   }
 
   async captureFrame() {
@@ -457,7 +487,7 @@ function drawDetections(ctx, detections) {
     if (!this.hudNode) return;
 
     const m = this.metrics;
-    const counts = [0, 0, 0, 0];
+    const counts = CLASS_DEFINITIONS.map(() => 0);
 
     for (const box of this.latestDetections || []) {
       const index = getClassIndex(box);
@@ -483,10 +513,7 @@ function drawDetections(ctx, detections) {
       `Частота распознавания: ${m.inferenceFps.toFixed(1)} кадр/с`,
       `Всего обнаружено: ${m.detections}`,
       "",
-      `${CLASS_DEFINITIONS[0].plural}: ${counts[0]}`,
-      `${CLASS_DEFINITIONS[1].plural}: ${counts[1]}`,
-      `${CLASS_DEFINITIONS[2].plural}: ${counts[2]}`,
-      `${CLASS_DEFINITIONS[3].plural}: ${counts[3]}`,
+      ...CLASS_DEFINITIONS.map((item, index) => `${item.plural}: ${counts[index]}`),
     ];
 
     if (new URLSearchParams(location.search).get("debug") === "1") {
@@ -541,7 +568,7 @@ function drawDetections(ctx, detections) {
       webgpuAdapter: adapterInfo,
       requestedBackend: this.backendRequested,
       actualBackend: this.backend,
-      model: "models/vision/yolov8n_final.onnx",
+      model: "models/vision/yolov8n_balls.onnx",
       resolution: `${WIDTH}x${HEIGHT}`,
       metrics: { ...this.metrics },
       detections: this.latestDetections,
@@ -570,6 +597,8 @@ function drawDetections(ctx, detections) {
     if (this.disposed) return;
 
     this.disposed = true;
+    for (const waiter of this.readyWaiters) waiter.reject(new Error("Камера закрыта"));
+    this.readyWaiters.clear();
     this.running = false;
 
     if (this.captureTimer) {

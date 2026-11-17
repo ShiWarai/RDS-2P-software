@@ -609,6 +609,7 @@ function hintOnce(msg) {
 async function applyDriving() {
   const p = app.sim?.player;
   if (!p) { return; }
+  app.sim.ballFollower?.stop({ keepPolicy: true });
   // Управление — только когда работает режим «Ходьба» (политика активна).
   if (!p.policyOn) {
     const cmd = currentCmd();
@@ -629,6 +630,7 @@ function initDriving() {
     if (e.button === 0) { enableDriving(); }
   });
   document.addEventListener("keydown", (e) => {
+    if (e.code === "Escape") app.sim?.ballFollower?.stop();
     if (!driving) { return; }
     const t = e.target;
     if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) { return; }
@@ -946,8 +948,10 @@ async function boot() {
   initPanelTabs({
     onSwitch: (id) => {
       if (id === "cv") {
-        window.__vision?.ensureStarted();
-        window.__vision?.resume();
+        if (app.sim?.ballFollower?.remote) { app.sim.ballFollower.showRemotePreview(); return; }
+        window.__vision?.ensureStarted().then(pipeline => pipeline.resume()).catch(error => {
+          toast(`Камера: ${error.message}`, { kind: "err" });
+        });
       } else {
         window.__vision?.pause();
       }
@@ -992,7 +996,7 @@ async function boot() {
   $("btn-check").onclick = () => {
     const p = app.sim?.player;
     if (p && p.active) {
-      p.stop();
+      app.sim.stopProgram();
       setRunMode(false);
       $("hud-status").textContent = "🛑 Остановила";
       return;

@@ -65,14 +65,15 @@ class CmdVelMuxNode(Node):
         self.declare_parameter('publish_rate', 20.0)
         self.declare_parameter('state_rate', 2.0)
         self.declare_parameter('zero_epsilon', 1.0e-6)
-        self.declare_parameter('source_names', ['joy', 'keyboard', 'voice'])
+        self.declare_parameter('source_names', ['joy', 'keyboard', 'voice', 'ball_follow'])
         self.declare_parameter('source_topics', [
             '/cmd_vel/joy',
             '/cmd_vel/keyboard',
             '/cmd_vel/voice',
+            '/cmd_vel/ball_follow',
         ])
-        self.declare_parameter('source_timeouts', [0.5, 0.5, 2.5])
-        self.declare_parameter('source_priorities', [100, 90, 50])
+        self.declare_parameter('source_timeouts', [0.5, 0.5, 2.5, 0.5])
+        self.declare_parameter('source_priorities', [100, 90, 50, 40])
 
         self._output_topic = self._param_str('output_topic')
         self._zero_epsilon = max(0.0, self._param_double('zero_epsilon'))

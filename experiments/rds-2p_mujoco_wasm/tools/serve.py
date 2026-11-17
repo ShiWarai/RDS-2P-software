@@ -39,6 +39,7 @@ CANONICAL_MESH_DIR = Path(__file__).resolve().parents[3] / "urdf_src" / "export"
 
 # Нейросетевая политика ходьбы (rospkg rds_2p_inference) — тоже без копий.
 POLICY_DIR = Path(__file__).resolve().parents[3] / "ros_packages" / "src" / "rds_2p_inference" / "models"
+VISION_DIR = Path(__file__).resolve().parents[3] / "ros_packages" / "src" / "rds_2p_vision" / "models"
 
 mimetypes.add_type("application/wasm", ".wasm")
 mimetypes.add_type("text/javascript", ".mjs")
@@ -120,6 +121,10 @@ class Handler(SimpleHTTPRequestHandler):
                     fs_path = str(canonical)
         if path.startswith("/models/policy/"):
             canonical = POLICY_DIR / os.path.basename(path)
+            if canonical.is_file():
+                fs_path = str(canonical)
+        if path.startswith("/models/vision/"):
+            canonical = VISION_DIR / os.path.basename(path)
             if canonical.is_file():
                 fs_path = str(canonical)
         if os.path.isdir(fs_path):
