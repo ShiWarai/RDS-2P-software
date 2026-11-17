@@ -17,7 +17,6 @@ find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
-find_package(rds_2p REQUIRED)
 
 # Generate interfaces
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -74,7 +73,6 @@ ament_target_dependencies(inference_node
   sensor_msgs
   geometry_msgs
   nav_msgs
-  rds_2p
 )
 
 # Link OnnxRuntime

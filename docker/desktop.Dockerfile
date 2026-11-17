@@ -71,7 +71,7 @@ RUN cd /opt/rds2p/ros-ws \
     && . /opt/ros/humble/setup.sh \
     && colcon build --parallel-workers "$(nproc)" \
          --install-base /opt/rds2p/install --build-base /tmp/colcon-build \
-         --packages-skip mpu6500_ros rds_2p_joystick orbbec_camera mtf02p_ros rkllm_ros gigaam_ros \
+         --packages-skip mpu6500_ros rds_2p_joystick orbbec_camera mtf02p_ros rkllm_ros gigaam_ros rds_2p \
          --packages-ignore rds_2p_face vosk_ros paroli_ros
 
 RUN for d in /opt/rds2p/install/*/lib; do \

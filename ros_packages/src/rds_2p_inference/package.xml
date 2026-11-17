@@ -14,7 +14,6 @@
   <depend>sensor_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>
-  <depend>rds_2p</depend>
   <depend>std_msgs</depend>
 
   <member_of_group>rosidl_interface_packages</member_of_group>
