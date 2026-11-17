@@ -1,8 +1,9 @@
 
 import * as THREE from "three";
 
-const CAMERA_CONFIG = {
+export const CAMERA_CONFIG = {
   name: "camera",
+  // MJCF/URDF: <camera name="camera" resolution="640 480"> (480p).
   width: 640,
   height: 480,
   fov: 90,

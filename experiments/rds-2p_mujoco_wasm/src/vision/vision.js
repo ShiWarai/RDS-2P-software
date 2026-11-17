@@ -1,9 +1,10 @@
 
 import * as THREE from "three";
-import { createRobotVisionCamera } from "./robot-camera.js";
+import { createRobotVisionCamera, CAMERA_CONFIG } from "./robot-camera.js";
 
-const WIDTH = 320;
-const HEIGHT = 240;
+// Видеовыход камеры панды — 480p, как в MJCF/URDF (resolution="640 480").
+const WIDTH = CAMERA_CONFIG.width;
+const HEIGHT = CAMERA_CONFIG.height;
 const FPS_LIMIT = 15;
 const FRAME_INTERVAL = 1000 / FPS_LIMIT;
 
@@ -169,7 +170,7 @@ export class VisionPipeline {
       <div class="vision-panel-heading">
         <div class="vision-heading-main">
           <span class="vision-title">ЗРЕНИЕ РОБОТА</span>
-          <span class="vision-subtitle">YOLO · 7 классов · вход 320 × 320</span>
+          <span class="vision-subtitle">YOLO · 7 классов · камера ${WIDTH}×${HEIGHT} (480p) · вход 320×320</span>
         </div>
 
         <div

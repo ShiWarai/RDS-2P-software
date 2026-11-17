@@ -122,19 +122,19 @@ export function commandLabel(id) {
 
 /** Кнопки панели ручных команд (правая половина). */
 export const MANUAL_BUTTONS = [
-  { id: "give_paw", text: "🐾 лапу" },
-  { id: "stand_at_attention", text: "🫡 равняйся" },
-  { id: "dismiss", text: "🙌 отставить" },
-  { id: "lie_down", text: "🛏️ лежать" },
-  { id: "pray", text: "🙏 служить" },
-  { id: "rotate", text: "🤸 Кувырок влево" },
-  { id: "rotate_right", text: "🤸 Кувырок вправо" },
-  { id: "run", text: "🚶 ходьба" },
-  { id: "step_forward", text: "⬆️ шаг вперёд" },
-  { id: "step_back", text: "⬇️ шаг назад" },
-  { id: "step_left", text: "⬅️ шаг влево" },
-  { id: "step_right", text: "➡️ шаг вправо" },
-  { id: "stop_running", text: "🛑 стой" },
+  { id: "give_paw", text: "🐾 лапу", group: "команды" },
+  { id: "stand_at_attention", text: "🫡 равняйся", group: "команды" },
+  { id: "dismiss", text: "🙌 отставить", group: "команды" },
+  { id: "lie_down", text: "🛏️ лежать", group: "команды" },
+  { id: "pray", text: "🙏 служить", group: "команды" },
+  { id: "rotate", text: "🤸 кувырок влево", group: "команды" },
+  { id: "rotate_right", text: "🤸 кувырок вправо", group: "команды" },
+  { id: "run", text: "🚶 ходьба", group: "движение" },
+  { id: "step_forward", text: "⬆️ шаг вперёд", group: "движение" },
+  { id: "step_back", text: "⬇️ шаг назад", group: "движение" },
+  { id: "step_left", text: "⬅️ шаг влево", group: "движение" },
+  { id: "step_right", text: "➡️ шаг вправо", group: "движение" },
+  { id: "stop_running", text: "🛑 стой", group: "движение" },
 ];
 
 
