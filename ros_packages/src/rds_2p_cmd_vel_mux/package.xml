@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>rds_2p_cmd_vel_mux</name>
+  <version>1.0.0</version>
+  <description>Мультиплексор cmd_vel для RDS-2P: явный выбор источника (/cmd_vel/joy, /cmd_vel/keyboard, /cmd_vel/voice) и публикация в /cmd_vel</description>
+  <maintainer email="zhuravliov.pav@yandex.ru">ShiWarai</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclpy</depend>
+  <depend>geometry_msgs</depend>
+  <depend>std_msgs</depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

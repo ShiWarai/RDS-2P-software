@@ -2,6 +2,7 @@
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -57,6 +58,12 @@ def generate_launch_description():
         default_value=rds_2p_offsets_config_file,
         description='Путь к файлу конфигурации смещений суставов'
     )
+
+    include_cmd_vel_mux_arg = DeclareLaunchArgument(
+        'include_cmd_vel_mux',
+        default_value='true',
+        description='Поднимать мультиплексор cmd_vel (rds_2p_cmd_vel_mux)'
+    )
     
     # Включение launch файла контроллера моторов
     motor_controller_launch = IncludeLaunchDescription(
@@ -103,6 +110,21 @@ def generate_launch_description():
         }.items()
     )
     
+    # Мультиплексор cmd_vel: отдельный пакет, не зависит от джойстика
+    cmd_vel_mux_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([
+            PathJoinSubstitution([
+                FindPackageShare('rds_2p_cmd_vel_mux'),
+                'launch',
+                'cmd_vel_mux.launch.py'
+            ])
+        ]),
+        launch_arguments={
+            'log_level': LaunchConfiguration('log_level'),
+        }.items(),
+        condition=IfCondition(LaunchConfiguration('include_cmd_vel_mux')),
+    )
+
     return LaunchDescription([
         # Аргументы
         interface_arg,
@@ -110,11 +132,13 @@ def generate_launch_description():
         is_sim_arg,
         log_level_arg,
         offsets_config_file_arg,
+        include_cmd_vel_mux_arg,
         
         # Launch файлы
         motor_controller_launch,
         bridge_motors_to_joints_launch,
         bridge_joints_to_motors_launch,
+        cmd_vel_mux_launch,
     ])
 
 

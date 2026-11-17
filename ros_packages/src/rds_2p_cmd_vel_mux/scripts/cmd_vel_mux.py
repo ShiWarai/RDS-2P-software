@@ -1,29 +1,30 @@
 #!/usr/bin/env python3
 """
-Мультиплексор команд скорости RDS-2P.
+Мультиплексор команд скорости RDS-2P с явным выбором источника.
 
 Принимает geometry_msgs/msg/Twist от нескольких независимых источников
-(джойстик, клавиатура, голосовые команды, ...) и публикует в /cmd_vel только
-одну выбранную команду.
+(джойстик, клавиатура, голосовые команды, ...), но публикует в /cmd_vel
+только команды выбранного источника.
 
-Каждый источник задаётся именем, топиком, таймаутом и приоритетом.
-Источник считается свежим, пока от него приходят сообщения. Ненулевая
-команда удерживается до прихода нулевой Twist или до истечения таймаута.
+Текущий источник задаётся именем через топик /cmd_vel_mux/select
+(std_msgs/msg/String): например, "joy", "keyboard" или "voice". Пустая
+строка или "none" отключает передачу команд (в /cmd_vel идёт нулевая Twist).
 
-Правила выбора:
-- среди свежих источников с ненулевой командой выбирается источник с
-  наибольшим приоритетом (при равенстве — более свежий);
-- нулевая Twist от источника немедленно снимает его команду;
-- если ненулевых команд нет, в /cmd_vel публикуется нулевая Twist;
-- если свежих источников нет совсем, /cmd_vel_mux/active = false.
+Каждый источник задаётся именем, топиком и таймаутом. Источник считается
+свежим, пока от него приходят сообщения. Если выбранный источник перестал
+присылать сообщения дольше таймаута, публикуется нулевая Twist, а
+/cmd_vel_mux/active = false.
 
+Состояние публикуется в /cmd_vel_mux/state (JSON, TRANSIENT_LOCAL).
 Топик /cmd_vel_mux/active (std_msgs/Bool, TRANSIENT_LOCAL) нужен watchdog'у
-inference: без активного источника политика не запускается.
-Состояние источников публикуется в /cmd_vel_mux/state (JSON, TRANSIENT_LOCAL).
+inference: без активного выбранного источника политика не запускается.
 
 Пример запуска:
     ros2 run rds_2p_joystick cmd_vel_mux.py \
         --ros-args --params-file config/cmd_vel_mux.yaml
+
+Пример выбора источника:
+    ros2 topic pub --once /cmd_vel_mux/select std_msgs/msg/String "{data: joy}"
 """
 
 import json
@@ -45,16 +46,14 @@ class CmdVelSource:
     name: str
     topic: str
     timeout_sec: float
-    priority: int
     last_twist: Twist = field(default_factory=Twist)
     last_msg_time: Optional[float] = None
-    command_active: bool = False
     fresh: bool = False
     subscription: Any = None
 
 
 class CmdVelMuxNode(Node):
-    """Выбирает одну ненулевую команду из N источников и публикует в /cmd_vel."""
+    """Пропускает в /cmd_vel команды только выбранного источника."""
 
     def __init__(self) -> None:
         super().__init__('cmd_vel_mux')
@@ -62,6 +61,7 @@ class CmdVelMuxNode(Node):
         self.declare_parameter('output_topic', '/cmd_vel')
         self.declare_parameter('active_topic', '/cmd_vel_mux/active')
         self.declare_parameter('state_topic', '/cmd_vel_mux/state')
+        self.declare_parameter('select_topic', '/cmd_vel_mux/select')
         self.declare_parameter('publish_rate', 20.0)
         self.declare_parameter('state_rate', 2.0)
         self.declare_parameter('zero_epsilon', 1.0e-6)
@@ -73,7 +73,7 @@ class CmdVelMuxNode(Node):
             '/cmd_vel/ball_follow',
         ])
         self.declare_parameter('source_timeouts', [0.5, 0.5, 2.5, 0.5])
-        self.declare_parameter('source_priorities', [100, 90, 50, 40])
+        self.declare_parameter('default_source', 'joy')
 
         self._output_topic = self._param_str('output_topic')
         self._zero_epsilon = max(0.0, self._param_double('zero_epsilon'))
@@ -84,8 +84,7 @@ class CmdVelMuxNode(Node):
         names = self._param_str_array('source_names')
         topics = self._param_str_array('source_topics')
         timeouts = self._param_double_array('source_timeouts')
-        priorities = self._param_int_array('source_priorities')
-        self._validate_sources(names, topics, timeouts, priorities)
+        self._validate_sources(names, topics, timeouts)
 
         state_qos = QoSProfile(depth=1)
         state_qos.reliability = ReliabilityPolicy.RELIABLE
@@ -98,13 +97,11 @@ class CmdVelMuxNode(Node):
             String, self._param_str('state_topic'), state_qos)
 
         self._sources = []
-        for name, topic, timeout_sec, priority in zip(
-                names, topics, timeouts, priorities):
+        for name, topic, timeout_sec in zip(names, topics, timeouts):
             source = CmdVelSource(
                 name=name,
                 topic=topic,
                 timeout_sec=timeout_sec,
-                priority=priority,
             )
             source.subscription = self.create_subscription(
                 Twist,
@@ -114,23 +111,34 @@ class CmdVelMuxNode(Node):
             )
             self._sources.append(source)
 
+        self._selected: Optional[CmdVelSource] = None
         self._active = False
-        self._selected_name = ''
+        self._selected_stale_logged = False
         self._next_state_time = 0.0
-        self._no_source_logged = False
-        self._last_active_published = False
+        self._last_active_published: Optional[bool] = None
 
+        self.create_subscription(
+            String,
+            self._param_str('select_topic'),
+            self._on_select,
+            10,
+        )
         self._timer = self.create_timer(1.0 / publish_rate, self._tick)
 
         sources_text = ', '.join(
-            f'{source.name}({source.topic}, timeout={source.timeout_sec:g}s, '
-            f'priority={source.priority})'
+            f'{source.name}({source.topic}, timeout={source.timeout_sec:g}s)'
             for source in self._sources
         )
         self.get_logger().info(
             f'cmd_vel mux: {len(self._sources)} источников -> '
-            f'{self._output_topic}; {sources_text}'
+            f'{self._output_topic}; выбор: '
+            f'{self._param_str("select_topic")} (String); {sources_text}'
         )
+
+        default_source = self._param_str('default_source')
+        if default_source:
+            self._select_source(
+                default_source, f'параметр default_source', reset=False)
         self._publish_active(False)
         self._publish_state()
 
@@ -148,17 +156,13 @@ class CmdVelMuxNode(Node):
         value = self.get_parameter(name).get_parameter_value()
         return list(value.double_array_value)
 
-    def _param_int_array(self, name: str) -> list:
-        value = self.get_parameter(name).get_parameter_value()
-        return [int(item) for item in value.integer_array_value]
-
-    def _validate_sources(self, names, topics, timeouts, priorities) -> None:
+    def _validate_sources(self, names, topics, timeouts) -> None:
         if not names:
             raise ValueError('cmd_vel_mux: список source_names пуст')
-        if not (len(names) == len(topics) == len(timeouts) == len(priorities)):
+        if not (len(names) == len(topics) == len(timeouts)):
             raise ValueError(
-                'cmd_vel_mux: source_names, source_topics, source_timeouts и '
-                'source_priorities должны быть одинаковой длины')
+                'cmd_vel_mux: source_names, source_topics и source_timeouts '
+                'должны быть одинаковой длины')
         seen = set()
         for name, topic, timeout_sec in zip(names, topics, timeouts):
             if not name or not topic:
@@ -170,51 +174,80 @@ class CmdVelMuxNode(Node):
                 raise ValueError(f'cmd_vel_mux: повторяющееся имя источника {name}')
             seen.add(name)
 
-    def _is_zero(self, twist: Twist) -> bool:
-        eps = self._zero_epsilon
+    def _find_source(self, value: str) -> Optional[CmdVelSource]:
+        for source in self._sources:
+            if value == source.name or value == source.topic:
+                return source
+        return None
+
+    def _on_select(self, msg: String) -> None:
+        self._select_source(msg.data, f'топик {self.get_parameter("select_topic").value}')
+
+    def _select_source(self, value: str, source: str, reset: bool = True) -> None:
+        name = (value or '').strip()
+        if name.startswith('/cmd_vel/'):
+            name = name[len('/cmd_vel/'):]
+
+        if not name or name.lower() in ('none', 'off', 'stop'):
+            if self._selected is None:
+                return
+            self._selected = None
+            self._active = False
+            self._cmd_pub.publish(Twist())
+            self._publish_active(False)
+            self.get_logger().warn(
+                f'cmd_vel mux: источник снят ({source}) — публикуется нулевая Twist')
+            self._publish_state()
+            return
+
+        selected = self._find_source(name)
+        if selected is None:
+            known = ', '.join(src.name for src in self._sources)
+            self.get_logger().warn(
+                f'cmd_vel mux: неизвестный источник "{value}" ({source}); '
+                f'доступны: {known}')
+            return
+        if selected is self._selected:
+            return
+
+        self._selected = selected
+        self._active = False
+        self._selected_stale_logged = False
+        if reset:
+            selected.last_twist = Twist()
+            selected.last_msg_time = None
+            selected.fresh = False
+        self._cmd_pub.publish(Twist())
+        self._publish_active(False)
+        self.get_logger().info(
+            f'cmd_vel mux: выбран источник {selected.name} '
+            f'({selected.topic}) ({source})')
+        self._publish_state()
+
+    def _is_fresh(self, source: CmdVelSource, now: float) -> bool:
         return (
-            abs(twist.linear.x) < eps
-            and abs(twist.linear.y) < eps
-            and abs(twist.linear.z) < eps
-            and abs(twist.angular.x) < eps
-            and abs(twist.angular.y) < eps
-            and abs(twist.angular.z) < eps
+            source.last_msg_time is not None
+            and (now - source.last_msg_time) <= source.timeout_sec
         )
 
     def _on_twist(self, source: CmdVelSource, msg: Twist) -> None:
         source.last_twist = msg
         source.last_msg_time = time.monotonic()
-        source.command_active = not self._is_zero(msg)
         source.fresh = True
 
     def _tick(self) -> None:
         now = time.monotonic()
-        active_sources = []
-        commanding_sources = []
 
         for source in self._sources:
-            source.fresh = (
-                source.last_msg_time is not None
-                and (now - source.last_msg_time) <= source.timeout_sec
-            )
-            if not source.fresh:
-                continue
-            active_sources.append(source)
-            if source.command_active:
-                commanding_sources.append(source)
+            source.fresh = self._is_fresh(source, now)
 
-        selected: Optional[CmdVelSource] = None
-        if commanding_sources:
-            selected = max(
-                commanding_sources,
-                key=lambda source: (source.priority, source.last_msg_time),
-            )
+        selected = self._selected
+        selected_fresh = selected is not None and selected.fresh
 
         self._cmd_pub.publish(
-            selected.last_twist if selected is not None else Twist())
+            selected.last_twist if selected_fresh else Twist())
 
-        active = bool(active_sources)
-        selected_name = selected.name if selected is not None else ''
+        active = selected_fresh
         self._active = active
 
         if active != self._last_active_published:
@@ -224,26 +257,18 @@ class CmdVelMuxNode(Node):
         # свежее состояние, а не только переход.
         self._publish_active(active)
 
-        if selected_name != self._selected_name:
-            if selected is not None:
-                self.get_logger().info(
-                    f'cmd_vel: управление от {selected.name} ({selected.topic}), '
-                    f'priority={selected.priority}')
-            else:
-                self.get_logger().info(
-                    'cmd_vel: ненулевых команд нет — публикуется нулевая Twist')
-            self._selected_name = selected_name
-
-        if not active_sources and not self._no_source_logged:
-            self.get_logger().warn(
-                'Нет свежих источников cmd_vel — публикуется нулевая Twist, '
-                'active=false')
-            self._no_source_logged = True
-        elif active_sources:
-            self._no_source_logged = False
+        if selected is not None and not selected_fresh:
+            if not self._selected_stale_logged:
+                self.get_logger().warn(
+                    f'cmd_vel mux: источник {selected.name} не присылает '
+                    f'команды дольше {selected.timeout_sec:g} с — '
+                    f'публикуется нулевая Twist')
+                self._selected_stale_logged = True
+        else:
+            self._selected_stale_logged = False
 
         if now >= self._next_state_time:
-            self._publish_state(now, active, selected)
+            self._publish_state(now, active)
             self._next_state_time = now + self._state_period
 
     def _publish_active(self, active: bool) -> None:
@@ -255,18 +280,11 @@ class CmdVelMuxNode(Node):
         self,
         now: Optional[float] = None,
         active: Optional[bool] = None,
-        selected: Optional[CmdVelSource] = None,
     ) -> None:
         if now is None:
             now = time.monotonic()
         if active is None:
             active = self._active
-        if selected is None:
-            selected = next(
-                (source for source in self._sources
-                 if source.name == self._selected_name),
-                None,
-            )
 
         sources_state = {}
         for source in self._sources:
@@ -276,15 +294,14 @@ class CmdVelMuxNode(Node):
             sources_state[source.name] = {
                 'topic': source.topic,
                 'fresh': source.fresh,
-                'command_active': source.command_active,
-                'priority': source.priority,
                 'timeout_sec': source.timeout_sec,
                 'age_sec': age_sec,
             }
 
         state = {
             'active': active,
-            'selected_source': selected.name if selected is not None else '',
+            'selected_source': (
+                self._selected.name if self._selected is not None else ''),
             'output_topic': self._output_topic,
             'sources': sources_state,
         }

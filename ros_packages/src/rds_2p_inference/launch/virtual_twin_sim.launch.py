@@ -7,13 +7,15 @@ Launch файл для запуска виртуального двойника 
 2. Мост суставов к моторам (rds_2p)
 3. Одометрию MTF-02P с слиянием IMU (mtf02p_ros: публикует /odom/raw и /odom)
 4. MuJoCo симуляцию в headless режиме (virtual_twin_node.py из пакета rds_2p_inference)
-5. Систему отображения лица с тачпадом PS4 (rds_2p_face)
-6. Dance action server (rds_2p_dance)
-7. Dance joy controller (rds_2p_dance) - управление танцами через джойстик
+5. Мультиплексор cmd_vel (rds_2p_cmd_vel_mux) — независимо от джойстика
+6. Систему отображения лица с тачпадом PS4 (rds_2p_face)
+7. Dance action server (rds_2p_dance)
+8. Dance joy controller (rds_2p_dance) - управление танцами через джойстик
 """
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, ExecuteProcess
+from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
@@ -79,6 +81,12 @@ def generate_launch_description():
         description='Путь к файлу конфигурации смещений суставов'
     )
     
+    include_cmd_vel_mux_arg = DeclareLaunchArgument(
+        'include_cmd_vel_mux',
+        default_value='true',
+        description='Поднимать мультиплексор cmd_vel (rds_2p_cmd_vel_mux)'
+    )
+
     # Аргументы для mtf02p_odom_with_fusion (опционально, можно настроить)
     mtf02p_log_level_arg = DeclareLaunchArgument(
         'mtf02p_log_level',
@@ -164,6 +172,21 @@ def generate_launch_description():
         shell=False
     )
     
+    # Мультиплексор cmd_vel: отдельный пакет, не зависит от джойстика
+    cmd_vel_mux_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([
+            PathJoinSubstitution([
+                FindPackageShare('rds_2p_cmd_vel_mux'),
+                'launch',
+                'cmd_vel_mux.launch.py'
+            ])
+        ]),
+        launch_arguments={
+            'log_level': LaunchConfiguration('log_level'),
+        }.items(),
+        condition=IfCondition(LaunchConfiguration('include_cmd_vel_mux')),
+    )
+
     # Включение launch файла face_with_touchpad для управления через PS4 джойстик и отображения лица
     face_with_touchpad_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
@@ -206,6 +229,7 @@ def generate_launch_description():
         is_sim_arg,
         log_level_arg,
         offsets_config_file_arg,
+        include_cmd_vel_mux_arg,
         mtf02p_log_level_arg,
         face_log_level_arg,
         dance_joy_log_level_arg,
@@ -215,6 +239,9 @@ def generate_launch_description():
         bridge_joints_to_motors_launch,
         mtf02p_odom_with_fusion_launch,  # Одометрия MTF-02P с слиянием IMU (публикует /odom/raw и /odom)
         virtual_twin_node,
+        
+        # Мультиплексор cmd_vel (отдельно от джойстика)
+        cmd_vel_mux_launch,
         
         # Face with touchpad (заменяет teleop_twist_joy)
         # Включает ps4_joystick, touchpad_drawer, image_processor и display_face

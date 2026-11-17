@@ -16,6 +16,8 @@
   <depend>nav_msgs</depend>
   <depend>std_msgs</depend>
 
+  <exec_depend>rds_2p_cmd_vel_mux</exec_depend>
+
   <member_of_group>rosidl_interface_packages</member_of_group>
 
   <test_depend>ament_lint_auto</test_depend>

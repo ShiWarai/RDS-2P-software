@@ -28,6 +28,7 @@
   <exec_depend>rds_2p_audio</exec_depend>
   <exec_depend>audio_filters</exec_depend>
   <exec_depend>rds_2p_commands</exec_depend>
+  <exec_depend>rds_2p_cmd_vel_mux</exec_depend>
   <exec_depend>mirea_rag_ros</exec_depend>
   <exec_depend>system_one_ros</exec_depend>
   <!-- Железные/robot-only пакеты (vosk/gigaam/paroli/face/joystick/rkllm) запускаются

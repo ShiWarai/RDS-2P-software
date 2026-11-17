@@ -5,8 +5,10 @@ Launch файл для управления RDS-2P через PS4 джойсти
 Этот launch файл запускает:
 1. joy_node - чтение базовых данных джойстика (оси, кнопки)
 2. teleop_twist_joy_node - преобразование команд джойстика в /cmd_vel/joy
-3. cmd_vel_mux - выбор одной команды из нескольких источников в /cmd_vel
-4. ps4_imu_node - чтение данных акселерометра и гироскопа PS4 контроллера
+3. ps4_imu_node - чтение данных акселерометра и гироскопа PS4 контроллера
+
+Мультиплексор cmd_vel запускается отдельно из пакета rds_2p_cmd_vel_mux
+(ros2 launch rds_2p_cmd_vel_mux cmd_vel_mux.launch.py).
 """
 
 from launch import LaunchDescription
@@ -20,7 +22,6 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description():
     # Получаем пути к пакетам
     teleop_twist_joy_pkg = FindPackageShare('teleop_twist_joy')
-    rds_2p_joystick_pkg = FindPackageShare('rds_2p_joystick')
 
     # Получаем путь к конфигурационному файлу teleop_twist_joy
     teleop_config_file = PathJoinSubstitution([
@@ -96,22 +97,6 @@ def generate_launch_description():
         description='Топик, куда teleop_twist_joy публикует команды стиков'
     )
 
-    start_cmd_vel_mux_arg = DeclareLaunchArgument(
-        'start_cmd_vel_mux',
-        default_value='true',
-        description='Запустить мультиплексор cmd_vel'
-    )
-
-    cmd_vel_mux_config_arg = DeclareLaunchArgument(
-        'cmd_vel_mux_config',
-        default_value=PathJoinSubstitution([
-            rds_2p_joystick_pkg,
-            'config',
-            'cmd_vel_mux.yaml',
-        ]),
-        description='YAML с источниками, таймаутами и приоритетами cmd_vel_mux'
-    )
-
     # Joy node для чтения данных с джойстика
     # Устройство определяется автоматически joy_node (обычно /dev/input/js0)
     joy_node = Node(
@@ -156,16 +141,6 @@ def generate_launch_description():
         arguments=['--ros-args', '--log-level', 'WARN'],
         remappings=[('cmd_vel', LaunchConfiguration('cmd_vel_joy_topic'))],
         condition=IfCondition(LaunchConfiguration('enable_teleop')),
-        output='screen'
-    )
-
-    # Мультиплексор: собирает N источников и публикует один выбранный в /cmd_vel
-    cmd_vel_mux_node = Node(
-        package='rds_2p_joystick',
-        executable='cmd_vel_mux.py',
-        name='cmd_vel_mux',
-        parameters=[LaunchConfiguration('cmd_vel_mux_config')],
-        condition=IfCondition(LaunchConfiguration('start_cmd_vel_mux')),
         output='screen'
     )
 
@@ -214,13 +189,10 @@ def generate_launch_description():
         touchpad_publish_rate_arg,
         debug_touchpad_arg,
         cmd_vel_joy_topic_arg,
-        start_cmd_vel_mux_arg,
-        cmd_vel_mux_config_arg,
 
         # Узлы
         joy_node,
         teleop_twist_joy_node,
-        cmd_vel_mux_node,
         ps4_imu_node,
         ps4_touchpad_node,
     ])

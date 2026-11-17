@@ -6,7 +6,6 @@ ROS2 пакет для управления RDS-2P роботом через PS4
 
 Этот пакет предоставляет единый интерфейс для работы с PS4 контроллером:
 - **Базовое управление** через `teleop_twist_joy` (стики, кнопки → `/cmd_vel/joy`)
-- **Мультиплексор `cmd_vel_mux`** — выбор одной команды из N источников → `/cmd_vel`
 - **IMU данные** (акселерометр и гироскоп) → `/joy/imu`
 - **Данные тачпада** (координаты касания) → `/joy/touchpad`
 
@@ -91,8 +90,6 @@ ros2 launch rds_2p_joystick ps4_joystick.launch.py \
 - `touchpad_publish_rate` (по умолчанию: `50.0`) - частота публикации данных тачпада (Гц)
 - `debug_touchpad` (по умолчанию: `false`) - включить отладочное логирование для тачпада
 - `cmd_vel_joy_topic` (по умолчанию: `/cmd_vel/joy`) - топик команд стиков
-- `start_cmd_vel_mux` (по умолчанию: `true`) - запустить мультиплексор `cmd_vel_mux`
-- `cmd_vel_mux_config` (по умолчанию: `share/rds_2p_joystick/config/cmd_vel_mux.yaml`) - YAML с источниками, таймаутами и приоритетами
 
 **Примечание:** Устройства (`joy_dev`, `event_dev`, `hidraw_dev`) определяются автоматически. Ручное указание устройств не требуется.
 
@@ -136,17 +133,7 @@ ros2 topic hz /joy/imu
 
 - `/cmd_vel/joy` (`geometry_msgs/msg/Twist`) - команды стиков от `teleop_twist_joy`
   - Публикуется узлом `teleop_twist_joy_node`
-  - В `/cmd_vel` попадает только через `cmd_vel_mux`
-
-- `/cmd_vel` (`geometry_msgs/msg/Twist`) - итоговые команды движения робота
-  - Публикуется узлом `cmd_vel_mux` с частотой `publish_rate` (по умолчанию 20 Гц)
-  - При отсутствии активной команды публикуется нулевая `Twist`
-
-- `/cmd_vel_mux/active` (`std_msgs/msg/Bool`) - есть ли свежий источник управления
-  - `TRANSIENT_LOCAL`; watchdog `rds_2p_inference` не запускает походку при `false`
-
-- `/cmd_vel_mux/state` (`std_msgs/msg/String`, JSON) - состояние источников
-  - `TRANSIENT_LOCAL`; содержит `active`, `selected_source` и возраст каждого источника
+  - В `/cmd_vel` попадает только через `cmd_vel_mux` из пакета `rds_2p_cmd_vel_mux`
 
 ### Публикуемые топики (создаются стандартным joy_node)
 
@@ -165,42 +152,16 @@ ros2 topic hz /joy/imu
 
 ## Мультиплексор cmd_vel
 
-`cmd_vel_mux` принимает `geometry_msgs/msg/Twist` от N источников и публикует
-в `/cmd_vel` только одну команду:
-
-- источник считается **свежим**, пока от него приходят сообщения (таймаут
-  задаётся отдельно для каждого источника);
-- ненулевая команда удерживается до прихода нулевой `Twist` или до истечения
-  таймаута;
-- среди свежих ненулевых команд побеждает источник с большим `priority`;
-- если ненулевых команд нет, публикуется нулевая `Twist`;
-- если свежих источников нет, `/cmd_vel_mux/active = false`.
-
-Стандартная конфигурация `config/cmd_vel_mux.yaml`:
-
-| Источник | Топик | Таймаут | Приоритет |
-|----------|-------|---------|-----------|
-| `joy` | `/cmd_vel/joy` | 0.5 с | 100 |
-| `keyboard` | `/cmd_vel/keyboard` | 0.5 с | 90 |
-| `voice` | `/cmd_vel/voice` | 2.5 с | 50 |
-
-Приоритеты означают, что движение стиком перебивает голосовую команду, а
- idle-джойстик (нулевые `Twist`) не мешает голосовым шагам. Для нового
-устройства добавьте запись в четыре списка `source_*` в YAML.
-
-Клавиатура подключается remap'ом:
+`cmd_vel_mux` вынесен в отдельный пакет `rds_2p_cmd_vel_mux` и запускается
+независимо от джойстика:
 
 ```bash
-ros2 run teleop_twist_keyboard teleop_twist_keyboard --ros-args \
-    -r cmd_vel:=/cmd_vel/keyboard
+ros2 launch rds_2p_cmd_vel_mux cmd_vel_mux.launch.py
 ```
 
-Проверка состояния:
-
-```bash
-ros2 topic echo /cmd_vel_mux/state --once
-ros2 topic echo /cmd_vel_mux/active --once
-```
+Пакет подписан на `/cmd_vel/joy`, `/cmd_vel/keyboard`, `/cmd_vel/voice` и
+публикует в `/cmd_vel` только выбранный через `/cmd_vel_mux/select` источник.
+Подробности — в README пакета `rds_2p_cmd_vel_mux`.
 
 ## Автоматическое определение устройств
 
