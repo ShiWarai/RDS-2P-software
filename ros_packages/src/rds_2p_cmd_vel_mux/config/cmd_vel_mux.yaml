@@ -44,3 +44,8 @@ cmd_vel_mux:
       - 0.5
       - 2.5
       - 0.5
+    source_status_topics:
+      - /joy/status
+      - ''
+      - ''
+      - ''

@@ -36,6 +36,7 @@ import rclpy
 from geometry_msgs.msg import Twist
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
+from diagnostic_msgs.msg import DiagnosticStatus
 from std_msgs.msg import Bool, String
 
 
@@ -50,6 +51,8 @@ class CmdVelSource:
     last_msg_time: Optional[float] = None
     fresh: bool = False
     subscription: Any = None
+    present: bool = True  # «жив» по DiagnosticStatus (level==OK); fail-open
+    status_subscription: Any = None
 
 
 class CmdVelMuxNode(Node):
@@ -73,6 +76,7 @@ class CmdVelMuxNode(Node):
             '/cmd_vel/ball_follow',
         ])
         self.declare_parameter('source_timeouts', [0.5, 0.5, 2.5, 0.5])
+        self.declare_parameter('source_status_topics', ['/joy/status', '', '', ''])
         self.declare_parameter('default_source', 'joy')
 
         self._output_topic = self._param_str('output_topic')
@@ -84,6 +88,9 @@ class CmdVelMuxNode(Node):
         names = self._param_str_array('source_names')
         topics = self._param_str_array('source_topics')
         timeouts = self._param_double_array('source_timeouts')
+        status_topics = self._param_str_array('source_status_topics')
+        if len(status_topics) < len(names):
+            status_topics += [''] * (len(names) - len(status_topics))
         self._validate_sources(names, topics, timeouts)
 
         state_qos = QoSProfile(depth=1)
@@ -97,7 +104,8 @@ class CmdVelMuxNode(Node):
             String, self._param_str('state_topic'), state_qos)
 
         self._sources = []
-        for name, topic, timeout_sec in zip(names, topics, timeouts):
+        for name, topic, timeout_sec, status_topic in zip(
+                names, topics, timeouts, status_topics):
             source = CmdVelSource(
                 name=name,
                 topic=topic,
@@ -109,6 +117,13 @@ class CmdVelMuxNode(Node):
                 lambda msg, src=source: self._on_twist(src, msg),
                 10,
             )
+            if status_topic:
+                source.status_subscription = self.create_subscription(
+                    DiagnosticStatus,
+                    status_topic,
+                    lambda msg, src=source: self._on_status(src, msg),
+                    10,
+                )
             self._sources.append(source)
 
         self._selected: Optional[CmdVelSource] = None
@@ -235,11 +250,19 @@ class CmdVelMuxNode(Node):
         source.last_msg_time = time.monotonic()
         source.fresh = True
 
+    def _on_status(self, source: CmdVelSource, msg: DiagnosticStatus) -> None:
+        present = (msg.level == DiagnosticStatus.OK)
+        if present != source.present:
+            self.get_logger().info(
+                f'cmd_vel mux: источник {source.name} '
+                f'{"доступен" if present else "недоступен"} ({msg.message})')
+        source.present = present
+
     def _tick(self) -> None:
         now = time.monotonic()
 
         for source in self._sources:
-            source.fresh = self._is_fresh(source, now)
+            source.fresh = self._is_fresh(source, now) and source.present
 
         selected = self._selected
         selected_fresh = selected is not None and selected.fresh

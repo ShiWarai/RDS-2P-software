@@ -113,6 +113,19 @@ def generate_launch_description():
         output='screen'
     )
 
+    # Состояние джойстика по Bluetooth -> /joy/status (DiagnosticStatus).
+    joy_status_monitor = Node(
+        package='rds_2p_joystick',
+        executable='joy_status_monitor.py',
+        name='joy_status_monitor',
+        parameters=[{
+            'status_topic': '/joy/status',
+            'poll_rate': 1.0,
+        }],
+        arguments=['--ros-args', '--log-level', 'WARN'],
+        output='screen'
+    )
+
     # Teleop twist joy node для преобразования команд джойстика в cmd_vel
     teleop_twist_joy_node = Node(
         package='teleop_twist_joy',
@@ -192,6 +205,7 @@ def generate_launch_description():
 
         # Узлы
         joy_node,
+        joy_status_monitor,
         teleop_twist_joy_node,
         ps4_imu_node,
         ps4_touchpad_node,

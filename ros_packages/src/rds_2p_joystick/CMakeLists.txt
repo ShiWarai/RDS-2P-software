@@ -52,6 +52,7 @@ install(DIRECTORY include/
 install(PROGRAMS
   scripts/ps4_imu_node.py
   scripts/ps4_touchpad_node.py
+  scripts/joy_status_monitor.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
