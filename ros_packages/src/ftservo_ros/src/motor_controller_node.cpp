@@ -291,7 +291,9 @@ private:
             }
             
             motor_ids.push_back(controller->getMotorId());
-            positions.push_back(controller->radiansToMotorUnits(cmd.target_position));
+            positions.push_back(cmd.ignore_limits
+                ? controller->radiansToMotorUnitsUnclamped(cmd.target_position)
+                : controller->radiansToMotorUnits(cmd.target_position));
             speeds.push_back(controller->radiansPerSecToMotorUnits(cmd.target_velocity));
             accelerations.push_back(static_cast<uint8_t>(controller->accelerationToMotorUnits(cmd.target_acceleration)));
         }
@@ -322,7 +324,7 @@ private:
                                 continue;
                             }
                             
-                            controller->setTargetPosition(cmd.target_position);
+                            controller->setTargetPosition(cmd.target_position, cmd.ignore_limits);
                             controller->setTargetVelocity(cmd.target_velocity);
                             controller->setTargetAcceleration(cmd.target_acceleration);
                         }

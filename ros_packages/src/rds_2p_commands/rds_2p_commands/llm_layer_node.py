@@ -3,7 +3,7 @@
 
 Схема:
 
-  /audio/transcription (rds_2p_audio/Transcription)
+  /audio/input/transcription (rds_2p_audio/Transcription)
         → choice-классификатор /system_one/systemone (kev-0.8b, критерии classifier_json)
         ├─ метка из classifier.actions:
         │    объявление classifier.say через Paroli /speak (например «Встаю!»),
@@ -73,7 +73,7 @@ class LlmLayerNode(Node):
     def __init__(self) -> None:
         super().__init__('llm_layer')
 
-        self.declare_parameter('input_topic', '/audio/transcription')
+        self.declare_parameter('input_topic', '/audio/input/transcription')
         self.declare_parameter('command_topic', '/audio/command_transcription')
         self.declare_parameter('system_one_service', '/system_one/systemone')
         self.declare_parameter('system_one_model', 'kev-0.8b')

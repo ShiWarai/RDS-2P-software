@@ -22,10 +22,10 @@
   что вендорит `rkllm_ros`). Нода грузит его по имени (`rknn_lib` пусто → `librknnrt.so`);
   альтернативу задают параметром `rknn_lib` или `RKNN_LIB`.
 - ROS 2: `rclpy`, `std_msgs`, `audio_common_msgs`, `rosidl_default_generators`, `vosk_ros`
-  (общий топик `/audio/transcription` несёт `vosk_ros/msg/Transcription`).
+  (общий топик `/audio/input/transcription` несёт `vosk_ros/msg/Transcription`).
 
 ### Тип на общем топике
-В стеке `/audio/transcription` — это `vosk_ros/msg/Transcription` (его слушают `llm_layer`,
+В стеке `/audio/input/transcription` — это `vosk_ros/msg/Transcription` (его слушают `llm_layer`,
 `command_parser`, `telegram_bot`). `gigaam_node` по умолчанию публикует **тот же тип** (auto-detect;
 fallback на собственный `gigaam_ros/msg/Transcription`, если `vosk_ros` нет). Поэтому gigaam
 вставляется на место vosk без правок в downstream.
@@ -76,7 +76,7 @@ ros2 launch rds_2p llm_layer.launch.py stt:=gigaam vad_enabled:=true \
 ```
 
 ## Проверено (RK3588, ROS 2 Humble, domain 1)
-Живой тракт `audio_capturer(/audio/input) → vad_node → gigaam_node → /audio/transcription`
+Живой тракт `audio_capturer(/audio/input) → vad_node → gigaam_node → /audio/input/transcription`
 при параллельно работающем `paroli_ros`. `ros2 topic pub --once /speak_text std_msgs/msg/String
 "{data: 'привет как дела'}"` → робот произносит → микрофон слышит самоэхо →
 распознано (`…как дело`, вторая фраза «ты меня слышишь» — точно). `librknnrt` из `/usr/lib`.
@@ -91,7 +91,7 @@ ros2 launch rds_2p llm_layer.launch.py stt:=gigaam vad_enabled:=true \
 | `vocab_path` | `multilingual_vocab.txt` (пусто — рядом с `.rknn`) |
 | `rknn_lib` | путь к `librknnrt.so` (пусто — `RKNN_LIB` или системная) |
 | `audio_topic` | вход аудио (по умолчанию `/audio/input`; с VAD — `/audio/vad`) |
-| `transcription_topic` | топик результатов (по умолчанию `/audio/transcription`) |
+| `transcription_topic` | топик результатов (по умолчанию `/audio/input/transcription`) |
 | `max_audio_time` | макс. длительность фразы, с (30.0) |
 
 ## VAD (`vad_node`)

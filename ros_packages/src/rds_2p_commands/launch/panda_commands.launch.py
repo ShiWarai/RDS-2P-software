@@ -36,7 +36,7 @@ def generate_launch_description():
             'config_file', default_value='panda_commands.yaml',
             description='Сценарий в share/rds_2p_commands/config/'),
         DeclareLaunchArgument(
-            'input_topic', default_value='/audio/transcription',
+            'input_topic', default_value='/audio/input/transcription',
             description='Топик rds_2p_audio/Transcription'),
         DeclareLaunchArgument(
             'system_one_service', default_value='/system_one_client/ask',

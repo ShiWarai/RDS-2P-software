@@ -82,7 +82,7 @@ class UnifiedActionServer(Node):
                 'display_name': 'Команды Panda',
                 'parser': 'routine_id',
                 'class': 'motors',
-                'keywords': ['лапу', 'лежать', 'равняйсь', 'смирно', 'служить'],
+                'keywords': ['лапу', 'лежать', 'равняйсь', 'встать', 'служить'],
                 'parameters': {'type': 'string', 'name': 'routine_id', 'description': 'give_paw, lie_down, ...'},
             }
         )

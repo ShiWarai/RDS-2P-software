@@ -159,7 +159,7 @@ bool MotorController::readState(MotorState& state) {
     return true;
 }
 
-bool MotorController::setTargetPosition(double position) {
+bool MotorController::setTargetPosition(double position, bool ignore_limits) {
     if (is_sim_) {
         // ЗАЩИТА ПО ГРАНИЦАМ В СИМУЛЯЦИИ
         // Вычисляем границы в радианах
@@ -174,7 +174,7 @@ bool MotorController::setTargetPosition(double position) {
         }
         
         // Ограничиваем целевую позицию в допустимых пределах
-        target_position_ = std::clamp(position, min_rad, max_rad);
+        target_position_ = ignore_limits ? position : std::clamp(position, min_rad, max_rad);
         
         return true;
     }
@@ -183,7 +183,9 @@ bool MotorController::setTargetPosition(double position) {
     std::lock_guard<std::mutex> lock(serial_mutex_);
     
     // Преобразуем в единицы мотора
-    int motor_units = radiansToMotorUnits(position);
+    int motor_units = ignore_limits
+        ? radiansToMotorUnitsUnclamped(position)
+        : radiansToMotorUnits(position);
     
     // Отправляем команду используя метод базового класса
     if (WritePos(config_.id, motor_units, 0, 0, 0) == -1) {
@@ -435,6 +437,17 @@ int MotorController::radiansToMotorUnits(double radians) const {
     // Валидация units с учетом индивидуальных ограничений мотора
     units = std::clamp(units, config_.min_position_units, config_.max_position_units);
     return units;
+}
+
+int MotorController::radiansToMotorUnitsUnclamped(double radians) const {
+    // Применяем reversed для инвертирования направления
+    double adjusted_radians = config_.reversed ? -radians : radians;
+    
+    // Округление, а не отбрасывание дробной части: иначе обратный пересчёт
+    // pos → rad → pos может уходить на 1 unit.
+    long units = std::lround(
+        adjusted_radians * config_.type_config.conversion.motor_units_per_radian);
+    return static_cast<int>(units + config_.zero_offset_units);
 }
 
 double MotorController::motorUnitsToRadians(int motor_units) const {

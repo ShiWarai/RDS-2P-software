@@ -45,10 +45,13 @@ class CommandParserNode(Node):
         self.declare_parameter('allow_parallel_same_class', False)
         self.allow_parallel_same_class = self.get_parameter('allow_parallel_same_class').get_parameter_value().bool_value
 
-        self.declare_parameter('transcription_topics', ['/audio/transcription'])
+        self.declare_parameter(
+            'transcription_topics',
+            ['/audio/input/transcription'],
+        )
         transcription_topics_param = self.get_parameter('transcription_topics').get_parameter_value().string_array_value
         if not transcription_topics_param:
-            transcription_topics_param = ['/audio/transcription']
+            transcription_topics_param = ['/audio/input/transcription']
 
         self.telegram_sub = self.create_subscription(
             String,

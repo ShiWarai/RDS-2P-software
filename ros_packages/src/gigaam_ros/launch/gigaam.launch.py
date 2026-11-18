@@ -42,7 +42,7 @@ def generate_launch_description():
             'audio_topic', default_value='/audio/input',
             description='Топик для подписки на аудио (AudioStamped)'),
         DeclareLaunchArgument(
-            'transcription_topic', default_value='/audio/transcription',
+            'transcription_topic', default_value='/audio/input/transcription',
             description='Топик результатов распознавания'),
         DeclareLaunchArgument(
             'max_audio_time', default_value='30.0',

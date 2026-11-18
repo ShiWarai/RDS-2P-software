@@ -105,7 +105,7 @@ def generate_launch_description():
             description='HTTP API контейнера system-one-rknn',
         ),
         DeclareLaunchArgument(
-            'input_topic', default_value='/audio/transcription',
+            'input_topic', default_value='/audio/input/transcription',
             description='Топик rds_2p_audio/Transcription (вход прослойки)',
         ),
         DeclareLaunchArgument(

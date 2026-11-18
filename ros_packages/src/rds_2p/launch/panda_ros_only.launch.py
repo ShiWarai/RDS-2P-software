@@ -11,7 +11,7 @@
   * inference_node — политика ходьбы (как rds_2p_inference_node.service);
   * rds_2p voice_system — audio + GigaAM + Paroli + lip_sync;
   * rkllm_ros — локальная LLM; system_one_ros — локальный OSM;
-  * rds_2p_commands commands_system — команды всегда, на /audio/transcription;
+  * rds_2p_commands commands_system — команды всегда, на /audio/input/transcription;
   * mirea_rag_ros — RAG+LLM на том же топике, но команды он игнорирует.
 
 RAG можно временно заблокировать/разблокировать сервисом::
@@ -152,7 +152,7 @@ def generate_launch_description():
                     FindPackageShare("rds_2p_commands"), "launch",
                     "commands_system.launch.py"])]),
             launch_arguments={
-                "transcription_topics": "['/audio/transcription']",
+                "transcription_topics": "['/audio/input/transcription']",
                 "command_debounce_sec": "3.0",
                 "panda_llm_tts_enabled": "false",
             }.items(),
@@ -166,7 +166,7 @@ def generate_launch_description():
                     "mirea_rag.launch.py"])]),
             launch_arguments={
                 "backend": "local",
-                "transcription_topic": "/audio/transcription",
+                "transcription_topic": "/audio/input/transcription",
                 "rag_enabled": LaunchConfiguration("rag_enabled"),
                 "enable_service": "/mirea_rag/enable",
                 "ignore_command_keywords": "true",

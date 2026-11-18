@@ -19,13 +19,13 @@ commands:
     face_init: false
 
   stand_at_attention:
-    keywords: ["равняйсь"]
+    keywords: ["равняйсь", "равняйся"]
     sound: idle6.wav
     face: smile240x280.png
     face_init: false
 
   dismiss:
-    keywords: ["отставить", "вставай"]
+    keywords: ["отставить", "вставай", "встать", "встань"]
     sound: idle3.wav
     face: smileW.png
 
@@ -38,20 +38,6 @@ commands:
     keywords: ["кувырок", "вращайся"]
     sound: death1.wav
     face: smileW.png
-
-  run:
-    keywords: ["бегать", "пошли"]
-    sound: idle1.wav
-    face: null
-    # В ROS-only политика уже поднята panda_ros_only.launch.py; не дублируем
-    # systemd-сервисом. Для старого voice_control «бегать» работает отдельно.
-    allow_real_systemd: false
-
-  stop_running:
-    keywords: ["смирно"]
-    sound: bleat2.wav
-    face: null
-    allow_real_systemd: false
 
   pray:
     keywords: ["служить"]

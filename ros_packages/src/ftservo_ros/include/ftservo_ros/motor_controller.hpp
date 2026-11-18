@@ -55,9 +55,10 @@ public:
     /**
      * @brief Установка целевой позиции
      * @param position Позиция в радианах
+     * @param ignore_limits Не обрезать позицию по min/max (режим no_limit)
      * @return true если команда отправлена успешно
      */
-    bool setTargetPosition(double position);
+    bool setTargetPosition(double position, bool ignore_limits = false);
 
     /**
      * @brief Установка целевой скорости
@@ -128,6 +129,13 @@ public:
      * @return Единицы мотора
      */
     int radiansToMotorUnits(double radians) const;
+
+    /**
+     * @brief Преобразование радиан в единицы мотора без ограничения min/max
+     * @param radians Позиция в радианах
+     * @return Единицы мотора
+     */
+    int radiansToMotorUnitsUnclamped(double radians) const;
     
     /**
      * @brief Преобразование позиции из единиц мотора в радианы

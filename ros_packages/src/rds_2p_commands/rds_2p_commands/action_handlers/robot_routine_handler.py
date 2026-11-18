@@ -1,10 +1,11 @@
-"""Сценарии PandaCommand: звук (AudioStamped), морда (sensor_msgs Image), моторы — лог pos по calibrate.json."""
+"""Сценарии PandaCommand: звук (AudioStamped), морда (sensor_msgs Image), моторы — позиции в /motors/commands."""
 
 from __future__ import annotations
 
 import array
 import subprocess
 import sys
+import threading
 import time
 import wave
 from pathlib import Path
@@ -26,7 +27,13 @@ from rclpy.qos import (
 
 from sensor_msgs.msg import Image
 from audio_common_msgs.msg import AudioStamped
-from ftservo_ros.msg import MotorParam, MotorParams
+from ftservo_ros.msg import (
+    MotorCommand,
+    MotorCommands,
+    MotorParam,
+    MotorParams,
+    MotorStates,
+)
 
 from rds_2p_commands.action import PandaCommand
 from rds_2p_commands.face_assets import resolve_face_png
@@ -109,13 +116,15 @@ class RobotRoutineHandler:
         self.node.declare_parameter("audio_output_force_stereo", True)
         self.node.declare_parameter("face_image_topic", "/face/image")
         self.node.declare_parameter("motor_params_topic", "/motors/params")
+        self.node.declare_parameter("motor_commands_topic", "/motors/commands")
+        self.node.declare_parameter("motor_states_topic", "/motors/states")
+        self.node.declare_parameter("motor_config_file", "")
+        self.node.declare_parameter("publish_motor_positions", True)
         self.node.declare_parameter("face_output_width", 280)
         self.node.declare_parameter("face_output_height", 240)
         self.node.declare_parameter("playback_volume_percent", 100.0)
         # Подогнать уровень тихих WAV под полный float [-1,1] до умножения на volume (как «громче» TTS).
         self.node.declare_parameter("wav_peak_normalize", True)
-        self.node.declare_parameter("allow_real_systemd", False)
-        self.node.declare_parameter("run_manage_sim_service", True)
         self.node.declare_parameter("allow_real_joystick_script", False)
         self.node.declare_parameter(
             "joystick_script_path",
@@ -144,6 +153,12 @@ class RobotRoutineHandler:
             history=HistoryPolicy.KEEP_LAST,
             durability=DurabilityPolicy.VOLATILE,
         )
+        state_qos = QoSProfile(
+            depth=10,
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            history=HistoryPolicy.KEEP_LAST,
+            durability=DurabilityPolicy.VOLATILE,
+        )
 
         self._audio_pub = self.node.create_publisher(
             AudioStamped,
@@ -163,6 +178,22 @@ class RobotRoutineHandler:
             .get_parameter_value()
             .string_value,
             10,
+        )
+        self._motor_commands_pub = self.node.create_publisher(
+            MotorCommands,
+            self.node.get_parameter("motor_commands_topic")
+            .get_parameter_value()
+            .string_value,
+            10,
+        )
+        self._motor_states: Dict[int, tuple[bool, float]] = {}
+        self._motor_states_sub = self.node.create_subscription(
+            MotorStates,
+            self.node.get_parameter("motor_states_topic")
+            .get_parameter_value()
+            .string_value,
+            self._on_motor_states,
+            state_qos,
         )
 
         self._share = Path(get_package_share_directory("rds_2p_commands"))
@@ -193,6 +224,14 @@ class RobotRoutineHandler:
         self._calib_params: Optional[Dict[str, Any]] = None
         self._calib_load_attempted = False
 
+        self._publish_motor_positions = (
+            self.node.get_parameter("publish_motor_positions")
+            .get_parameter_value()
+            .bool_value
+        )
+        self._motor_units: Dict[int, Dict[str, Any]] = {}
+        self._load_motor_conversion()
+
         self.node.get_logger().info(
             f"RobotRoutineHandler: загружено {len(self._routines)} сценариев из {cfg_path}, "
             f"{len(self._poses)} поз из {poses_path}"
@@ -203,6 +242,152 @@ class RobotRoutineHandler:
         if p is None:
             raise KeyError(f"pose '{name}' не найдена в panda_poses.yaml")
         return p
+
+    def _load_motor_conversion(self) -> None:
+        """Загрузить zero_offset/reversed/units-per-radian из конфига ftservo_ros."""
+        raw = (
+            self.node.get_parameter("motor_config_file")
+            .get_parameter_value()
+            .string_value.strip()
+        )
+        if raw:
+            path = Path(raw).expanduser()
+        else:
+            path = (
+                Path(get_package_share_directory("ftservo_ros"))
+                / "config"
+                / "config_example.yaml"
+            )
+
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                doc = yaml.safe_load(f) or {}
+            types = doc.get("motor_types") or {}
+            for motor in (doc.get("motors") or {}).values():
+                if not isinstance(motor, dict):
+                    continue
+                motor_id = int(motor.get("id", -1))
+                type_cfg = types.get(str(motor.get("type", ""))) or {}
+                if motor_id < 0 or not isinstance(type_cfg, dict):
+                    continue
+                per_rad = float(type_cfg.get("motor_units_per_radian", 0.0))
+                if per_rad == 0.0:
+                    continue
+                per_rad_s = float(
+                    type_cfg.get("motor_units_per_rad_per_sec", per_rad)
+                ) or per_rad
+                per_rad_s2 = float(
+                    type_cfg.get("motor_units_per_rad_per_sec_sq", per_rad)
+                ) or per_rad
+                self._motor_units[motor_id] = {
+                    "zero": float(motor.get("zero_offset_units", 0.0)),
+                    "per_rad": per_rad,
+                    "per_rad_s": per_rad_s,
+                    "per_rad_s2": per_rad_s2,
+                    "reversed": bool(motor.get("reversed", False)),
+                }
+            self.node.get_logger().info(
+                f"RobotRoutineHandler: конверсия units→rad из {path} "
+                f"({len(self._motor_units)} моторов)"
+            )
+        except Exception as exc:  # noqa: BLE001
+            self.node.get_logger().warn(
+                f"RobotRoutineHandler: не удалось загрузить {path}: {exc} — "
+                "позиции моторов публиковаться не будут"
+            )
+
+    def _on_motor_states(self, msg: MotorStates) -> None:
+        for state in msg.states:
+            self._motor_states[int(state.motor_id)] = (
+                bool(state.enabled),
+                float(state.position),
+            )
+
+    def _wait_motors_enabled(self, timeout_sec: float = 3.0) -> bool:
+        deadline = time.monotonic() + max(0.0, timeout_sec)
+        while time.monotonic() < deadline:
+            if all(
+                self._motor_states.get(mid, (False, 0.0))[0] for mid in SERVO_IDS
+            ):
+                return True
+            time.sleep(0.02)
+        missing = [
+            mid
+            for mid in SERVO_IDS
+            if not self._motor_states.get(mid, (False, 0.0))[0]
+        ]
+        self.node.get_logger().warn(
+            f"Моторы не подтвердили enabled в /motors/states: {missing}"
+        )
+        return False
+
+    def _motor_position_rad(self, motor_id: int) -> float:
+        return self._motor_states.get(int(motor_id), (False, 0.0))[1]
+
+    def _set_motor_enabled(
+        self, motor_id: int, enabled: bool, feedback=None
+    ) -> None:
+        msg = MotorParams()
+        msg.header.stamp = self.node.get_clock().now().to_msg()
+        msg.header.frame_id = "base_link"
+        param = MotorParam()
+        param.motor_id = int(motor_id)
+        param.enabled = bool(enabled)
+        msg.params.append(param)
+        self._motor_params_pub.publish(msg)
+        self.node.get_logger().info(
+            f"[MOTORS] enable={int(bool(enabled))} motor {motor_id} "
+            f"-> {self._motor_params_pub.topic_name}"
+        )
+        if feedback:
+            feedback(f"motor: torque {'on' if enabled else 'off'} {motor_id}")
+
+    def _publish_motor_targets(
+        self,
+        pos: Sequence[int],
+        speeds: Optional[Sequence[int]],
+        accs: Optional[Sequence[int]],
+        no_limit: bool = False,
+    ) -> None:
+        """pos из calibrate.json → MotorCommands в радианах для motor_controller."""
+        if not self._publish_motor_positions or not self._motor_units:
+            return
+        msg = MotorCommands()
+        msg.header.stamp = self.node.get_clock().now().to_msg()
+        msg.header.frame_id = "scripted_pose"
+        for index, motor_id in enumerate(SERVO_IDS):
+            cfg = self._motor_units.get(motor_id)
+            if cfg is None or index >= len(pos):
+                continue
+            radians = (float(pos[index]) - float(cfg["zero"])) / float(
+                cfg["per_rad"]
+            )
+            if bool(cfg["reversed"]):
+                radians = -radians
+            speed_units = (
+                float(speeds[index])
+                if speeds is not None and index < len(speeds)
+                else 0.0
+            )
+            acc_units = (
+                float(accs[index])
+                if accs is not None and index < len(accs)
+                else 5.0
+            )
+            command = MotorCommand()
+            command.motor_id = int(motor_id)
+            command.target_position = float(radians)
+            command.target_velocity = speed_units / float(cfg["per_rad_s"])
+            command.target_acceleration = acc_units / float(cfg["per_rad_s2"])
+            command.ignore_limits = bool(no_limit)
+            msg.commands.append(command)
+        if msg.commands:
+            self._motor_commands_pub.publish(msg)
+            self.node.get_logger().info(
+                f"[MOTORS] target position -> "
+                f"{self._motor_commands_pub.topic_name} "
+                f"({len(msg.commands)} моторов, no_limit={int(bool(no_limit))})"
+            )
 
     def _get_calib(self) -> Optional[Dict[str, Any]]:
         if self._calib_load_attempted:
@@ -259,6 +444,8 @@ class RobotRoutineHandler:
         if pos is not None:
             line += f" pos={pos}"
         self.node.get_logger().info(line[:900])
+        if pos is not None:
+            self._publish_motor_targets(pos, speeds, accs, no_limit=no_limit)
         if feedback:
             feedback(f"motor: {label}")
 
@@ -285,29 +472,49 @@ class RobotRoutineHandler:
 
         def canceled() -> bool:
             try:
-                return bool(goal_handle.is_cancel_requested)
+                return bool(goal_handle.is_cancel_requested) or not bool(
+                    goal_handle.is_active
+                )
             except Exception:
                 return False
 
         try:
             self._publish_face_if_any(cfg_r, canceled, feedback, source, rid)
 
+            audio_thread = None
             wav_name = cfg_r.get("sound")
             if wav_name:
                 wav_path = self._share / "data" / "sounds" / str(wav_name)
                 feedback(f"sound: {wav_name}")
-                self._play_wav_blocking(wav_path, canceled, rid)
+                # Как voice_control: звук играет параллельно с движением моторов.
+                audio_thread = threading.Thread(
+                    target=self._play_wav_blocking,
+                    args=(wav_path, canceled, rid),
+                    daemon=True,
+                    name=f"routine_audio_{rid}",
+                )
+                audio_thread.start()
 
             self._run_motor_program(rid, source, canceled, feedback)
 
             self._side_effect(rid, cfg_r, canceled, feedback)
+
+            if audio_thread is not None:
+                audio_thread.join(timeout=10.0)
+
+            if canceled():
+                result.success = False
+                result.message = f"{rid}: canceled"
+                if goal_handle.is_active and goal_handle.is_cancel_requested:
+                    goal_handle.canceled()
+                return result
 
             result.success = True
             result.message = f"{rid}: ok"
             goal_handle.succeed()
             return result
         except Exception as exc:  # noqa: BLE001
-            self.node.get_logger().exception(f"{rid}: ошибка выполнения: {exc}")
+            self.node.get_logger().error(f"{rid}: ошибка выполнения: {exc}")
             result.success = False
             result.message = str(exc)
             goal_handle.abort()
@@ -320,7 +527,7 @@ class RobotRoutineHandler:
         canceled_fn,
         feedback,
     ) -> None:
-        """Логика моторов из voice_control.py (без ftservo — только лог исполнителя)."""
+        """Логика моторов из voice_control.py: torque + целевые позиции через MotorCommands."""
         dispatch = {
             "give_paw": self._motor_give_paw,
             "stand_at_attention": self._motor_stand_at_attention,
@@ -332,6 +539,10 @@ class RobotRoutineHandler:
         fn = dispatch.get(rid)
         if fn is None:
             return
+        self._set_motors_enabled(True, feedback=feedback)
+        self._wait_motors_enabled()
+        if canceled_fn():
+            return
         fn(source, canceled_fn, feedback)
 
     def _motor_give_paw(self, source: str, canceled_fn, feedback) -> None:
@@ -340,17 +551,35 @@ class RobotRoutineHandler:
         time.sleep(0.5)
         if canceled_fn():
             return
+        base_pos = self._motor_position_rad(3)
+        self._set_motor_enabled(3, False, feedback=feedback)
+        cfg3 = self._motor_units.get(3)
+        threshold = (50.0 / float(cfg3["per_rad"])) if cfg3 else 0.25
         note = (
             f"[MOTORS:{rid}:{source}] EnableTorque(3,0); ожидание движения лапой "
-            "(аппаратная петля ReadPos пропущена — нет ftservo)"
+            f"(порог {threshold:.3f} рад)"
         )
         self.node.get_logger().info(note)
-        feedback("motor: skip paw torque loop (simulation)")
-        time.sleep(0.2)
+        deadline = time.monotonic() + 10.0
+        moved = False
+        while time.monotonic() < deadline:
+            if canceled_fn():
+                return
+            if abs(self._motor_position_rad(3) - base_pos) > threshold:
+                moved = True
+                time.sleep(2.0)
+                break
+            time.sleep(0.05)
+        if not moved:
+            self.node.get_logger().warn(
+                f"[MOTORS:{rid}:{source}] лапа не изменила положение за 10 с — продолжаю"
+            )
         if canceled_fn():
             return
         note2 = f"[MOTORS:{rid}:{source}] EnableTorque(3,1)"
         self.node.get_logger().info(note2)
+        self._set_motor_enabled(3, True, feedback=feedback)
+        self._wait_motors_enabled()
         self._log_motor(rid, source, "position_2", self._pose("position_2"), feedback=feedback)
         time.sleep(0.5)
         self._log_motor(rid, source, "position_1", self._pose("position_1"), feedback=feedback)
@@ -385,7 +614,6 @@ class RobotRoutineHandler:
 
     def _motor_dismiss(self, source: str, canceled_fn, feedback) -> None:
         _ = canceled_fn
-        self._set_motors_enabled(True, feedback=feedback)
         self._log_motor(
             "dismiss",
             source,
@@ -396,7 +624,6 @@ class RobotRoutineHandler:
 
     def _motor_lie_down(self, source: str, canceled_fn, feedback) -> None:
         rid = "lie_down"
-        self._set_motors_enabled(True, feedback=feedback)
         self._log_motor(rid, source, "set_position position_0", self._pose("position_0"), feedback=feedback)
         for _ in range(10):
             if canceled_fn():
@@ -431,7 +658,10 @@ class RobotRoutineHandler:
             return
         note = f"[MOTORS:{rid}:{source}] stop_drivers (все); sleep 0.5; start_drivers"
         self.node.get_logger().info(note)
+        self._set_motors_enabled(False, feedback=feedback)
         time.sleep(0.5)
+        self._set_motors_enabled(True, feedback=feedback)
+        self._wait_motors_enabled()
         self._log_motor(
             rid,
             source,
@@ -823,69 +1053,12 @@ class RobotRoutineHandler:
         canceled_fn,
         feedback,
     ) -> None:
-        allow_sys = cfg_r.get("allow_real_systemd")
-        if allow_sys is None:
-            allow_sys = (
-                self.node.get_parameter("allow_real_systemd")
-                .get_parameter_value()
-                .bool_value
-            )
         allow_JOY = cfg_r.get("allow_real_joystick_script")
         if allow_JOY is None:
             allow_JOY = (
                 self.node.get_parameter("allow_real_joystick_script")
                 .get_parameter_value()
                 .bool_value
-            )
-        manage_sim = cfg_r.get("run_manage_sim_service")
-        if manage_sim is None:
-            manage_sim = (
-                self.node.get_parameter("run_manage_sim_service")
-                .get_parameter_value()
-                .bool_value
-            )
-        run_services = ["rds_2p_inference_node.service"]
-        if manage_sim:
-            run_services.insert(0, "rds_2p_inference_sim.service")
-
-        if rid == "run" and allow_sys:
-            feedback("systemd start inference")
-            for svc in run_services:
-                subprocess.run(
-                    ["sudo", "-n", "systemctl", "start", svc],
-                    capture_output=True,
-                    text=True,
-                    timeout=8,
-                    check=False,
-                )
-        elif rid == "run" and not allow_sys:
-            self.node.get_logger().info(
-                "[RUN] симуляция: systemctl start rds_2p_inference_sim.node "
-                "(allow_real_systemd=false)"
-            )
-
-        if rid == "stop_running" and allow_sys:
-            feedback("systemd stop inference")
-            for svc in run_services:
-                subprocess.run(
-                    ["sudo", "-n", "systemctl", "stop", svc],
-                    capture_output=True,
-                    text=True,
-                    timeout=8,
-                    check=False,
-                )
-            if manage_sim:
-                subprocess.run(
-                    ["sudo", "-n", "pkill", "-9", "-f", "virtual_twin_sim.launch.py"],
-                    capture_output=True,
-                    text=True,
-                    timeout=8,
-                    check=False,
-                )
-        elif rid == "stop_running" and not allow_sys:
-            self.node.get_logger().info(
-                "[STOP_RUNNING] симуляция systemctl stop + pkill virtual_twin_sim "
-                "(allow_real_systemd=false)"
             )
 
         if rid == "reconnect_joystick" and allow_JOY:

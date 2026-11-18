@@ -88,6 +88,16 @@ def generate_launch_description():
         default_value='true',
         description='Перед volume: масштабировать mono до пика ±1 (тише master TTS/других источников).',
     )
+    publish_motor_positions_arg = DeclareLaunchArgument(
+        'publish_motor_positions',
+        default_value='true',
+        description='Публиковать целевые позы routine в /motors/commands',
+    )
+    motor_config_file_arg = DeclareLaunchArgument(
+        'motor_config_file',
+        default_value='',
+        description='YAML ftservo_ros для пересчёта units→rad; пусто — config_example.yaml пакета',
+    )
 
     # Unified action server node
     unified_action_server_node = Node(
@@ -116,6 +126,10 @@ def generate_launch_description():
             'wav_peak_normalize': ParameterValue(
                 LaunchConfiguration('wav_peak_normalize'), value_type=bool
             ),
+            'publish_motor_positions': ParameterValue(
+                LaunchConfiguration('publish_motor_positions'), value_type=bool
+            ),
+            'motor_config_file': LaunchConfiguration('motor_config_file'),
         }],
         arguments=['--ros-args', '--log-level', LaunchConfiguration('log_level')],
         emulate_tty=True
@@ -133,6 +147,8 @@ def generate_launch_description():
         audio_qos_depth_arg,
         playback_volume_arg,
         wav_peak_norm_arg,
+        publish_motor_positions_arg,
+        motor_config_file_arg,
         unified_action_server_node,
     ])
 

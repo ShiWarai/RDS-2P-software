@@ -26,7 +26,7 @@ def generate_launch_description():
     
     transcription_topics_arg = DeclareLaunchArgument(
         'transcription_topics',
-        default_value="['/audio/transcription', '/telegram/audio/transcription']",
+        default_value="['/audio/input/transcription', '/telegram/audio/transcription']",
         description='Список топиков транскрипции для подписки (YAML массив)'
     )
 
@@ -71,6 +71,17 @@ def generate_launch_description():
     )
     rkllm_max_tok_arg = DeclareLaunchArgument('rkllm_max_new_tokens', default_value='0')
 
+    publish_motor_positions_arg = DeclareLaunchArgument(
+        'publish_motor_positions',
+        default_value='true',
+        description='Публиковать позы routine в /motors/commands',
+    )
+    motor_config_file_arg = DeclareLaunchArgument(
+        'motor_config_file',
+        default_value='',
+        description='YAML ftservo_ros для units→rad; пусто — config_example.yaml пакета',
+    )
+
     # Unified Action Server
     unified_action_server_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
@@ -79,6 +90,8 @@ def generate_launch_description():
         ]),
         launch_arguments={
             'log_level': LaunchConfiguration('log_level'),
+            'publish_motor_positions': LaunchConfiguration('publish_motor_positions'),
+            'motor_config_file': LaunchConfiguration('motor_config_file'),
         }.items()
     )
     
@@ -122,6 +135,8 @@ def generate_launch_description():
         rkllm_keep_hist_arg,
         rkllm_clear_before_arg,
         rkllm_max_tok_arg,
+        publish_motor_positions_arg,
+        motor_config_file_arg,
         unified_action_server_launch,
         command_parser_launch,
     ])

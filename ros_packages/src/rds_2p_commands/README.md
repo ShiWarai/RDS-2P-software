@@ -1,6 +1,6 @@
 # rds_2p_commands
 
-ROS 2 пакет для текстовых/голосовых команд из нескольких источников (топики, Telegram, расширяемо под Алису/Сбер и др.) и универсального Action сервера. Реализованы **`PandaCommand`**: звук из `share/.../data/sounds/`, морда через топик **`/face/image`** под ноду `rds_2p_face/display_face`. **Нормализованные позы** задаются в [`config/panda_poses.yaml`](src/rds_2p_commands/config/panda_poses.yaml); в лог выводятся **доли** (`norm`) и **pos** из `calibrate.json` (параметр `motor_calibrate_path`; без файла — только `norm`).
+ROS 2 пакет для текстовых/голосовых команд из нескольких источников (топики, Telegram, расширяемо под Алису/Сбер и др.) и универсального Action сервера. Реализованы **`PandaCommand`**: звук из `share/.../data/sounds/`, морда через топик **`/face/image`** под ноду `rds_2p_face/display_face`. **Нормализованные позы** задаются в [`config/panda_poses.yaml`](src/rds_2p_commands/config/panda_poses.yaml); **позы** пересчитываются через `calibrate.json` (параметр `motor_calibrate_path`) и публикуются в **`/motors/commands`** (`no_limit` через `MotorCommand.ignore_limits`), а `norm`/`pos` дублируются в лог.
 
 Зависимости Python декларируются в `package.xml` / `rosdep`; отдельный `requirements.txt` не используется.
 
@@ -48,7 +48,7 @@ ros2 launch rds_2p_audio audio.launch.py \
 Пример («лежать»):
 
 ```bash
-ros2 topic pub --once /audio/transcription vosk_ros/msg/Transcription \
+ros2 topic pub --once /audio/input/transcription rds_2p_audio/msg/Transcription \
   "{text: 'лежать', audio_time: 0.0, transcription_time: 0.0}"
 ```
 
@@ -141,9 +141,9 @@ ros2 launch rds_2p_commands commands_system.launch.py \
 Отладка без микрофона:
 
 ```bash
-ros2 topic pub --once /audio/transcription vosk_ros/msg/Transcription "{text: 'встань, пожалуйста'}"
+ros2 topic pub --once /audio/input/transcription rds_2p_audio/msg/Transcription "{text: 'встань, пожалуйста'}"
 ros2 topic echo /audio/command_transcription --field text   # 'Встаю!' в динамик, затем 'вставай' в топик
-ros2 topic pub --once /audio/transcription vosk_ros/msg/Transcription "{text: 'стоп'}"  # прервать
+ros2 topic pub --once /audio/input/transcription rds_2p_audio/msg/Transcription "{text: 'стоп'}"  # прервать
 ```
 
 ### 8. Полный пресет «Команды Панды» (`panda_commands`)
@@ -163,14 +163,14 @@ ros2 launch rds_2p_commands panda_commands.launch.py \
 
 - `system_one_ros/system_one.launch.py` — клиент `/system_one_client/ask`;
 - `unified_action_server` — исполнитель `PandaCommand`;
-- `panda_commands` — подписка на `/audio/transcription`, классификация и выполнение `command` / `wait` / `say`.
+- `panda_commands` — подписка на `/audio/input/transcription`, классификация и выполнение `command` / `wait` / `say`.
 
 `command` с `routine_id` уходит в `/robot/panda_command`; `step_forward`, `stop_running` и другие `motion_commands` — в `/cmd_vel/voice` (вход `cmd_vel_mux`, нужен `rds_2p_inference`); `say` — в `/paroli_ros/speak`. Ответ классификатора публикуется в `/panda_commands/decision` (JSON). `dry_run:=true` — только классификация без действий.
 
 Проверка без микрофона:
 
 ```bash
-ros2 topic pub --once /audio/transcription rds_2p_audio/msg/Transcription "{text: 'дай лапу'}"
+ros2 topic pub --once /audio/input/transcription rds_2p_audio/msg/Transcription "{text: 'дай лапу'}"
 ros2 topic echo /panda_commands/decision --qos-durability transient_local --once
 ```
 
@@ -208,8 +208,11 @@ ros2 topic echo /panda_commands/decision --qos-durability transient_local --once
 - `wav_peak_normalize` (default **true**) — перед `playback_volume_percent` нормализует mono по пику до ±1, чтобы тихо сведённые WAV не проигрывались заметно тише TTS/других источников (**`false`**, если мастер уже «в ноль» и не нужен автогейн)
 - `playback_volume_percent` (default **100**, допускается до **200**) — множитель после нормализации; в `unified_action_server.launch.py`: аргументы **`playback_volume_percent`**, **`wav_peak_normalize`**
 - `face_image_topic` (default **`/face/image`**)
-- `allow_real_systemd` (default **false**) — включать **только осознанно** (`systemctl` для inference)
-- `allow_real_joystick_script` (default **false**)
+- `publish_motor_positions` (default **`true`**) — публиковать позы в `/motors/commands`
+- `motor_commands_topic` (default **`/motors/commands`**)
+- `motor_states_topic` (default **`/motors/states`**) — подтверждение `enabled` и позиция лапы для `give_paw`
+- `motor_config_file` (пусто — `ftservo_ros/config/config_example.yaml`) — `zero_offset_units`, `reversed`, `motor_units_per_radian` для пересчёта units→rad
+- `allow_real_joystick_script` (default **`false`**)
 - `joystick_script_path` — путь к `reconnect_joystick.sh`
 - `motor_calibrate_path` (default **`/home/orangepi/rtulab_feetech/calibrate.json`**) — калибровка для перевода долей в **pos** (как `leg/utils.calculate_position`). Если файл недоступен, логируются только доли.
 
@@ -242,7 +245,7 @@ ros2 topic echo /panda_commands/decision --qos-durability transient_local --once
 
 ```bash
 ros2 launch rds_2p_commands commands_system.launch.py \
-    transcription_topics:="['/audio/transcription', '/telegram/audio/transcription', '/custom/transcription']" \
+    transcription_topics:="['/audio/input/transcription', '/telegram/audio/transcription', '/custom/transcription']" \
     command_debounce_sec:=3.0
 ```
 

@@ -57,7 +57,7 @@ def generate_launch_description():
 
     return LaunchDescription([
         DeclareLaunchArgument("transcription_topic",
-                              default_value="/audio/transcription"),
+                              default_value="/audio/input/transcription"),
         DeclareLaunchArgument("speak_service",
                               default_value="/paroli_ros/speak"),
         DeclareLaunchArgument("speak_echo_seconds", default_value="3.0"),

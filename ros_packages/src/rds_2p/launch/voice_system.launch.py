@@ -280,7 +280,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "vosk_transcription_topic",
-                default_value="/audio/transcription",
+                default_value="/audio/input/transcription",
                 description="Выход выбранного STT",
             ),
             DeclareLaunchArgument(

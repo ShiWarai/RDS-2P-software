@@ -69,7 +69,7 @@ class GigaamNode(Node):
         self.declare_parameter('vocab_path', "")
         self.declare_parameter('rknn_lib', "")
         self.declare_parameter('audio_topic', '/audio/input')
-        self.declare_parameter('transcription_topic', '/audio/transcription')
+        self.declare_parameter('transcription_topic', '/audio/input/transcription')
         self.declare_parameter('max_audio_time', 30.0)
         self.declare_parameter('torch_threads', 4)
         self.declare_parameter('speech_pause_enabled', False)

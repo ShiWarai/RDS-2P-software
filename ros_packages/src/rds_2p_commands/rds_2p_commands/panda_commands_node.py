@@ -52,7 +52,7 @@ class PandaCommandsNode(Node):
         super().__init__('panda_commands')
 
         self.declare_parameter('config_file', 'panda_commands.yaml')
-        self.declare_parameter('input_topic', '/audio/transcription')
+        self.declare_parameter('input_topic', '/audio/input/transcription')
         self.declare_parameter('system_one_service', '/system_one_client/ask')
         self.declare_parameter('model', 'kev-0.8b')
         self.declare_parameter('min_confidence', 0.0)

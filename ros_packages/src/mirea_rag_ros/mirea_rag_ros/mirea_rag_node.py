@@ -2,7 +2,7 @@
 """ROS2-нода-мост: микрофонная транскрипция → RAG-ответ робота → TTS.
 
 Цепочка (конвенции взяты из rds_2p_commands/llm_layer_node.py):
-    /audio/transcription (rds_2p_audio/Transcription, поле .text)  — текст с микрофона
+    /audio/input/transcription (rds_2p_audio/Transcription, поле .text)  — текст с микрофона
                      │  (наш узел)
                      ▼
     mirea_rag_ros.rag_client.ask_gated(..., on_token=…)  — та же ветка RAG + OSM-гат
@@ -165,7 +165,7 @@ class MireaRagNode(Node):
     def __init__(self) -> None:
         super().__init__("mirea_rag")
 
-        self.declare_parameter("transcription_topic", "/audio/transcription")
+        self.declare_parameter("transcription_topic", "/audio/input/transcription")
         self.declare_parameter("speak_service", "/paroli_ros/speak")
         self.declare_parameter("speak_echo_seconds", 3.0)
         self.declare_parameter("tts_volume", 3.0)

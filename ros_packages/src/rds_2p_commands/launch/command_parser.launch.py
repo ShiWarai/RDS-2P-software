@@ -34,7 +34,7 @@ def generate_launch_description():
     
     transcription_topics_arg = DeclareLaunchArgument(
         'transcription_topics',
-        default_value="['/audio/transcription', '/telegram/audio/transcription']",
+        default_value="['/audio/input/transcription', '/telegram/audio/transcription']",
         description='Список топиков транскрипции для подписки (YAML массив)'
     )
 
