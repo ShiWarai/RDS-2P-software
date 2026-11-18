@@ -1,0 +1,125 @@
+{
+  "checks": [
+    "independent GPU fixture",
+    "map works before YOLO initialization",
+    "real scene contains measurable surfaces",
+    "separate central camera parameters",
+    "20 reopen cycles retain one camera",
+    "closed window stops capture",
+    "close returns keyboard focus",
+    "Escape closes focused depth window",
+    "depth camera follows position and rotation on pause",
+    "paused object movement updates depth",
+    "reset invalidates old image immediately",
+    "narrow viewport preserves window and 4:3 image",
+    "hidden document stops measurements",
+    "readback failure shows recoverable error",
+    "context loss does not open closed window",
+    "pagehide disposes depth component",
+    "pageshow recreates closed depth controller",
+    "depth survives YOLO model download failure",
+    "real YOLO ready for performance run",
+    "depth and RGB/YOLO work together without changing RGB range",
+    "no uncaught browser errors: []",
+    "depth >=10Hz with yolo=False",
+    "FPS degradation <=20% with yolo=False",
+    "depth >=10Hz with yolo=True",
+    "FPS degradation <=20% with yolo=True"
+  ],
+  "gpu": {
+    "passed": true,
+    "checks": [
+      "center depth 0.5m (0.499990314245224)",
+      "axial edge depth 0.5m",
+      "center depth 1m (0.9999725818634033)",
+      "axial edge depth 1m",
+      "center depth 1.5m (1.5000362396240234)",
+      "axial edge depth 1.5m",
+      "center depth 2m (1.9997938871383667)",
+      "axial edge depth 2m",
+      "2.01m neutral",
+      "empty sky is missing depth",
+      "top-left near occluder orientation",
+      "bottom-right far background orientation",
+      "renderer state restored on success",
+      "renderer state restored on failure",
+      "active target viewport/scissor restored",
+      "target failure propagated",
+      "active target state restored on failure",
+      "20 cycles one camera",
+      "closed map captures nothing",
+      "idempotent disposal removes camera"
+    ]
+  },
+  "environment": {
+    "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36",
+    "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 Ti (0x00002482) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "viewport": [
+      1440,
+      1000
+    ],
+    "hardwareConcurrency": 12
+  },
+  "performance": [
+    {
+      "seconds": 30.00405999999959,
+      "medianFps": 200,
+      "p95FrameMs": 4.0150000005960464,
+      "medianCaptureMs": null,
+      "p95CaptureMs": null,
+      "medianColorizeMs": null,
+      "depthHz": 0,
+      "resolution": [
+        320,
+        240
+      ],
+      "yolo": false,
+      "depth": false
+    },
+    {
+      "seconds": 30.00178000000026,
+      "medianFps": 200,
+      "p95FrameMs": 5.445000000298023,
+      "medianCaptureMs": 1.6749999998137355,
+      "p95CaptureMs": 3.1600000001490116,
+      "medianColorizeMs": 3.3849999997764826,
+      "depthHz": 11.999288042242723,
+      "resolution": [
+        320,
+        240
+      ],
+      "yolo": false,
+      "depth": true
+    },
+    {
+      "seconds": 30.002660000000148,
+      "medianFps": 200,
+      "p95FrameMs": 2.6550000002607703,
+      "medianCaptureMs": null,
+      "p95CaptureMs": null,
+      "medianColorizeMs": null,
+      "depthHz": 0,
+      "resolution": [
+        320,
+        240
+      ],
+      "yolo": true,
+      "depth": false
+    },
+    {
+      "seconds": 30.00319000000041,
+      "medianFps": 200,
+      "p95FrameMs": 4.714999999850988,
+      "medianCaptureMs": 1.4950000001117587,
+      "p95CaptureMs": 2.8449999997392297,
+      "medianColorizeMs": 2.559999999590218,
+      "depthHz": 11.998724135666743,
+      "resolution": [
+        320,
+        240
+      ],
+      "yolo": true,
+      "depth": true
+    }
+  ]
+}

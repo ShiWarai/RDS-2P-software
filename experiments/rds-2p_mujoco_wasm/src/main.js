@@ -7,6 +7,7 @@ import { SpeechListener, speechSupported } from "./speech/recognizer.js";
 import { VoskStt, voskSupported, voskWarmup, voskWarmupError, voskModelReady, isSecure } from "./speech/vosk_stt.js";
 import { MANUAL_BUTTONS, programForCommand, commandLabel } from "./robot/motions.js";
 import { BALL_COLORS } from "./vision/blue-ball.js";
+import { DepthMap } from "./vision/depth-map.js";
 import { PoseManager } from "./sim/poseManager.js";
 import {
   initBlocks,
@@ -896,6 +897,22 @@ async function boot() {
   window.__panda = app;
   try {
     await app.sim.init($("sim"));
+    const createDepthMap = () => {
+      app.depthMap = new DepthMap(app.sim, $("depth-canvas"), {
+        panel: $("depth-window"), button: $("btn-depth-map"),
+      });
+      app.sim.onDepthFrame = timeMS => app.depthMap.update(timeMS);
+      $("btn-depth-map").disabled = false;
+      $("btn-depth-map").title = "Показать расстояния до поверхностей в симуляторе";
+    };
+    createDepthMap();
+    window.addEventListener("pagehide", () => {
+      app.sim.onDepthFrame = null;
+      app.depthMap.dispose();
+    });
+    window.addEventListener("pageshow", event => {
+      if (event.persisted && app.depthMap.state === "disposed") createDepthMap();
+    });
   } catch (err) {
     console.error("Симулятор не поднялся:", err);
     toast("Симулятор не удалось загрузить. Проверь сервер.", { kind: "err" });
@@ -1034,6 +1051,7 @@ async function boot() {
   };
   $("btn-reset").onclick = () => {
     app.sim.resetToHome();
+    app.depthMap?.invalidate();
     $("hud-status").textContent = "🏠 Панда дома";
   };
   $("btn-frame").onclick = (e) => {

@@ -29,8 +29,8 @@ let finishLoad,starts=0,stops=0;
 globalThis.window={__vision:{ensureStarted:async()=>({resume(){},waitUntilReady:async()=>{}}),pause(){}}};
 globalThis.document={getElementById:()=>null};
 const follower=Object.assign(Object.create(BallFollower.prototype),{
-  generation:0,active:false,starting:false,
-  button:{setAttribute(){},classList:{toggle(){}}},status:{textContent:""},
+  generation:0,active:false,starting:false,color:"blue",
+  button:{style:{setProperty(){}},setAttribute(){},classList:{toggle(){}}},status:{textContent:""},
   sim:{paused:false,policy:{load:()=>new Promise(resolve=>{finishLoad=resolve;})},
     player:{stop(){},startPolicy(){starts++;},stopPolicy(){stops++;},notifyActive(){}}},
 });

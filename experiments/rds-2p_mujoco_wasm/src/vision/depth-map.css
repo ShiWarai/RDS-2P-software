@@ -1,0 +1,38 @@
+.depth-window {
+  position: fixed;
+  z-index: 40;
+  top: 100px;
+  right: 24px;
+  width: min(440px, calc(100vw - 24px));
+  max-height: calc(100dvh - 120px);
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 18px;
+  border: 1px solid #d9dfd3;
+  border-radius: 18px;
+  background: #fffef9;
+  color: #263c2a;
+  box-shadow: 0 12px 48px #14291d38;
+  font: 14px/1.5 system-ui, sans-serif;
+}
+.depth-window[hidden] { display: none; }
+.depth-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: grab; touch-action: none; user-select: none; }
+.depth-window[data-dragging] .depth-heading { cursor: grabbing; }
+.depth-heading h2 { margin: 0; font-size: 19px; }
+.depth-heading button { flex-shrink: 0; }
+.depth-window canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  border-radius: 10px;
+  margin: 12px 0;
+  background: #252b34;
+}
+.depth-scale { height: 12px; border-radius: 6px; background: linear-gradient(to right, #ff4040, #ffdc40, #40d264, #40d2f0, #4060ff); }
+.depth-ticks { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; margin-top: 5px; }
+.depth-note, .depth-status { margin: 8px 0 0; color: #526452; font-size: 12px; }
+.depth-empty { display: inline-block; width: 12px; height: 12px; background: #252b34; vertical-align: -1px; border-radius: 3px; margin-right: 5px; }
+@media (max-width: 600px), (max-height: 550px) {
+  .depth-window { top: 12px; right: 12px; max-height: calc(100dvh - 24px); padding: 14px; }
+}

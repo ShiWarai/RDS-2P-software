@@ -8,6 +8,7 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='10' r='4' fill='%23ff8f3c'/%3E%3Ccircle cx='4' cy='5' r='2' fill='%234cc9f0'/%3E%3Ccircle cx='12' cy='5' r='2' fill='%23ffd166'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="./src/ui/theme.css">
   <link rel="stylesheet" href="./src/vision/vision.css">
+  <link rel="stylesheet" href="./src/vision/depth-map.css">
   <script src="/variant.js"></script>
   <style>
     #variant-banner{
@@ -119,6 +120,7 @@
             <button id="btn-pause" class="btn icon-btn" title="Пауза/продолжить">⏸︎</button>
             <button id="btn-reset" class="btn icon-btn" title="Поставить панду на место (базовая стойка)">↺</button>
             <button id="btn-frame" class="btn icon-btn" title="Показать фактические углы суставов (для снятия кадра на паузе)">📐</button>
+            <button id="btn-depth-map" class="btn" type="button" aria-controls="depth-window" aria-expanded="false" title="Карта станет доступна после загрузки симулятора" disabled>Карта глубины</button>
             <span class="grow"></span>
             <button id="btn-follow-blue" class="btn follow-blue" aria-pressed="false" disabled hidden>🎯 следовать</button>
           </div>
@@ -156,6 +158,19 @@
     })();
   </script>
   <script type="module" src="./src/main.js"></script>
+  <section id="depth-window" class="depth-window" role="dialog" aria-modal="false" aria-labelledby="depth-title" hidden>
+    <div class="depth-heading">
+      <h2 id="depth-title">Карта глубины · до 2 м</h2>
+      <button class="btn icon-btn" type="button" data-depth-close aria-label="Закрыть карту глубины">✕</button>
+    </div>
+    <p class="depth-status" data-depth-status role="status">Ожидание кадра…</p>
+    <canvas id="depth-canvas" width="320" height="240" role="img" aria-label="Цветная карта глубины с центральной камеры робота"></canvas>
+    <div class="depth-scale" aria-hidden="true"></div>
+    <div class="depth-ticks" aria-label="Шкала глубины в метрах"><span>0</span><span>0,5</span><span>1</span><span>1,5</span><span>2 м</span></div>
+    <p class="depth-note"><span class="depth-empty" aria-hidden="true"></span>Вне диапазона / нет данных</p>
+    <p class="depth-note">Глубина вдоль взгляда камеры. Данные симулятора.</p>
+    <p class="depth-note">Перетаскивай окно за заголовок.</p>
+  </section>
   <script type="module" src="./src/vision/bootstrap.js"></script>
 </body>
 </html>
