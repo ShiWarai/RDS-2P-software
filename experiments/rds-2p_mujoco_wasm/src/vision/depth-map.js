@@ -23,7 +23,7 @@ export class DepthMap {
     const signal = this.listeners.signal;
     this.dragHandle = panel?.querySelector(".depth-heading");
     this.dragHandle?.addEventListener("pointerdown", event => {
-      if (!event.isPrimary || event.button !== 0 || this.panelDrag ||
+      if (!event.isPrimary || event.button !== 0 || this.panelDrag || this.panelResize ||
           event.target.closest("button, a, input, select, textarea")) return;
       const rect = this.panel.getBoundingClientRect();
       this.panelDrag = { pointerId: event.pointerId, x: event.clientX - rect.left, y: event.clientY - rect.top };
@@ -40,6 +40,34 @@ export class DepthMap {
         if (event.pointerId === this.panelDrag?.pointerId) this.endPanelDrag();
       }, { signal });
     }
+    this.resizeHandle = panel?.querySelector("[data-depth-resize]");
+    this.resizeHandle?.addEventListener("pointerdown", event => {
+      if (!event.isPrimary || event.button !== 0 || this.panelDrag || this.panelResize) return;
+      const rect = this.panel.getBoundingClientRect();
+      this.placePanel(rect.left, rect.top);
+      this.panelResize = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, width: rect.width };
+      this.resizeHandle.setPointerCapture(event.pointerId);
+      event.preventDefault();
+    }, { signal });
+    this.resizeHandle?.addEventListener("pointermove", event => {
+      if (event.pointerId !== this.panelResize?.pointerId) return;
+      const dx = event.clientX - this.panelResize.x, dy = (event.clientY - this.panelResize.y) * 4 / 3;
+      this.sizePanel(this.panelResize.width + (Math.abs(dx) >= Math.abs(dy) ? dx : dy));
+    }, { signal });
+    for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
+      this.resizeHandle?.addEventListener(type, event => {
+        if (event.pointerId === this.panelResize?.pointerId) this.endPanelResize();
+      }, { signal });
+    }
+    this.resizeHandle?.addEventListener("keydown", event => {
+      const step = { ArrowLeft: -20, ArrowUp: -20, ArrowRight: 20, ArrowDown: 20 }[event.key];
+      if (!step) return;
+      event.preventDefault();
+      event.stopPropagation(); // Resizing with arrows must not drive the robot.
+      const rect = this.panel.getBoundingClientRect();
+      this.placePanel(rect.left, rect.top);
+      this.sizePanel(rect.width + step);
+    }, { signal });
     window.addEventListener("resize", () => {
       if (this.panelPositioned && this.state !== "closed" && this.state !== "disposed") this.clampPanel();
     }, { signal });
@@ -89,6 +117,17 @@ export class DepthMap {
     if (drag && this.dragHandle.hasPointerCapture(drag.pointerId)) this.dragHandle.releasePointerCapture(drag.pointerId);
   }
 
+  sizePanel(width) {
+    this.panel.style.width = `${Math.max(Math.min(260, innerWidth - 24), Math.min(width, 640, innerWidth - 24))}px`;
+    this.clampPanel();
+  }
+
+  endPanelResize() {
+    const resize = this.panelResize;
+    this.panelResize = null;
+    if (resize && this.resizeHandle.hasPointerCapture(resize.pointerId)) this.resizeHandle.releasePointerCapture(resize.pointerId);
+  }
+
   initResources() {
     if (this.target) return;
     this.camera = createRobotVisionCamera(this.sim);
@@ -134,6 +173,7 @@ export class DepthMap {
   close() {
     if (this.state === "disposed") return;
     this.endPanelDrag();
+    this.endPanelResize();
     const hadError = this.state === "error";
     this.state = "closed";
     this.panel?.setAttribute("hidden", "");

@@ -84,6 +84,14 @@
   - **Deliverables:** pointer drag в depth-map.js, стили захвата, подсказка, проверки и README.
   - **Acceptance:** браузерный drag мышью/касанием, границы, resize/reopen, отмена/закрытие PASS; камера не смещается, проверки карты не ломаются.
 
+## Расширение: размер окна
+- [x] **TSK-009 — Изменять визуальный размер окна глубины.**
+  - **Requirement:** FR-8, micro-spec depth-window-resize.
+  - **Dependencies:** TSK-008.
+  - **Deliverables:** угловая pointer-ручка, width/clamp, keyboard controls, подсказка/README, browser-проверки.
+  - **Acceptance:** мышь/touch/keyboard, размеры 260–640/viewport, 4:3 и 320×240, reopen/cancel/close и доступность ручки PASS.
+  - **Факт:** 43 browser + 20 GPU PASS; resize-evidence.json. Read-only ревью без новых actionable ошибок.
+
 ## Граф зависимостей
 ```mermaid
 flowchart LR
@@ -108,6 +116,7 @@ flowchart LR
 | FR-6: независимость и ресурсы | TSK-002–TSK-007 |
 | Производительность | TSK-004, TSK-006, TSK-007 |
 | FR-7: перемещение окна | TSK-008 |
+| FR-8: визуальный размер | TSK-009 |
 
 ## Progress
 | Задача | Статус | Факт / evidence |
@@ -120,8 +129,9 @@ flowchart LR
 | TSK-006 | Выполнена | 4 замера PASS, evidence.json |
 | TSK-007 | Выполнена | README, спека, evidence и QA готовы |
 | TSK-008 | Выполнена | 32 browser + 20 GPU PASS, drag-evidence.json |
+| TSK-009 | Выполнена | 43 browser + 20 GPU PASS, resize-evidence.json |
 
-Выполнено: 8 из 8 задач реализации с учётом расширения про перемещение окна. Базовая спека утверждена 2026-11-18, расширение оформлено micro-spec без дополнительных гейтов. Критерии приёмки подтверждены в evidence.md; коммиты и публикация не выполнялись.
+Выполнено: 9 из 9 задач реализации с учётом расширений окна. Базовая спека утверждена 2026-11-18, расширения оформлены micro-spec без дополнительных гейтов. Критерии приёмки подтверждены в evidence.md. Базовая карта опубликована коммитом 58895d8; изменение размера пока локальное.
 
 ### Уточнение исходной проверки (micro-spec, 2026-11-18)
 `check_blue_ball.mjs` падает до изменений фичи: mock кнопки не содержит style.setProperty и Object.create обходит инициализацию color. Исправить только тестовую оснастку (добавить style и blue), сохранив все assertions и production-поведение. Приёмка: эта же команда PASS; затем остальные исходные проверки.

@@ -43,6 +43,42 @@ def main():
         check(page.evaluate('[...__panda.depthMap.depthMeters].some(z=>z>0&&z<=2)'), 'real scene contains measurable surfaces')
         check(page.evaluate('''() => {const d=__panda.depthMap, c=d.camera;
           return c.far===3 && c.fov===90 && c.aspect===4/3 && c.parent.name==='base_link';}'''), 'separate central camera parameters')
+        resize_handle = page.locator('[data-depth-resize]')
+
+        def resize_mouse(delta):
+            box = resize_handle.bounding_box()
+            page.mouse.move(box['x']+box['width']/2, box['y']+box['height']/2)
+            page.mouse.down()
+            page.mouse.move(box['x']+box['width']/2+delta, box['y']+box['height']/2, steps=8)
+            page.mouse.up()
+
+        initial_width = page.locator('#depth-window').bounding_box()['width']
+        resize_mouse(-100)
+        check(page.locator('#depth-window').bounding_box()['width'] < initial_width-80, 'corner drag visually shrinks window')
+        page.evaluate('''() => {window.resizeKeyBubbled=false;window.resizeKeySpy=e=>{if(e.key==='ArrowLeft')window.resizeKeyBubbled=true;};
+          document.addEventListener('keydown',window.resizeKeySpy);}''')
+        key_width = page.locator('#depth-window').bounding_box()['width']
+        resize_handle.focus()
+        page.keyboard.press('ArrowLeft')
+        check(abs(page.locator('#depth-window').bounding_box()['width']-(key_width-20))<1 and not page.evaluate('window.resizeKeyBubbled'),
+              'keyboard resizes window without driving robot')
+        page.evaluate("document.removeEventListener('keydown',window.resizeKeySpy)")
+        resize_mouse(1000)
+        check(page.locator('#depth-window').bounding_box()['width'] == 640, 'visual width maximum 640px')
+        resize_mouse(-1000)
+        check(page.locator('#depth-window').bounding_box()['width'] == 260, 'visual width minimum 260px')
+        check(page.evaluate('''() => {const c=document.querySelector('#depth-canvas'),r=c.getBoundingClientRect();
+          return c.width===320&&c.height===240&&Math.abs(r.width/r.height-4/3)<.01;}'''), 'resizing preserves 4:3 and 320x240 sensor resolution')
+        page.evaluate('__panda.depthMap.close();__panda.depthMap.open()')
+        check(page.locator('#depth-window').bounding_box()['width'] == 260, 'reopen retains chosen visual size')
+        box = resize_handle.bounding_box()
+        page.mouse.move(box['x']+10,box['y']+10)
+        page.mouse.down()
+        page.evaluate('__panda.depthMap.close()')
+        page.mouse.up()
+        check(page.evaluate('!__panda.depthMap.panelResize'), 'closing window releases resize capture')
+        page.locator('#btn-depth-map').click()
+        page.evaluate('__panda.depthMap.sizePanel(440)')
         # Drag only the window header: camera transform must stay attached to the robot.
         original_camera = page.evaluate('__panda.depthMap.camera.position.toArray().concat(__panda.depthMap.camera.quaternion.toArray())')
         header = page.locator('.depth-heading')
@@ -78,6 +114,17 @@ def main():
         page.wait_for_timeout(100)
         after_touch = page.locator('#depth-window').bounding_box()
         check(after_touch['x'] < before_touch['x'] and after_touch['y'] < before_touch['y'], 'touch drag moves window')
+        box = resize_handle.bounding_box()
+        touch_width = page.locator('#depth-window').bounding_box()['width']
+        cdp.send('Input.dispatchTouchEvent', {'type':'touchStart','touchPoints':[{'x':box['x']+10,'y':box['y']+10}]})
+        cdp.send('Input.dispatchTouchEvent', {'type':'touchMove','touchPoints':[{'x':box['x']-50,'y':box['y']+10}]})
+        cdp.send('Input.dispatchTouchEvent', {'type':'touchEnd','touchPoints':[]})
+        page.wait_for_timeout(100)
+        check(page.locator('#depth-window').bounding_box()['width'] < touch_width-40, 'touch corner resize shrinks window')
+        box = resize_handle.bounding_box()
+        cdp.send('Input.dispatchTouchEvent', {'type':'touchStart','touchPoints':[{'x':box['x']+10,'y':box['y']+10}]})
+        cdp.send('Input.dispatchTouchEvent', {'type':'touchCancel','touchPoints':[]})
+        check(page.evaluate('!__panda.depthMap.panelResize'), 'pointercancel ends corner resize')
         handle = header.bounding_box()
         cdp.send('Input.dispatchTouchEvent', {'type': 'touchStart', 'touchPoints': [{'x': handle['x']+25, 'y': handle['y']+15}]})
         cdp.send('Input.dispatchTouchEvent', {'type': 'touchCancel', 'touchPoints': []})
@@ -138,6 +185,14 @@ def main():
         check(page.evaluate('''() => {const r=document.querySelector('#depth-window').getBoundingClientRect();
           const c=document.querySelector('#depth-canvas').getBoundingClientRect();
           return r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight&&Math.abs(c.width/c.height-4/3)<.01;}'''), 'narrow viewport preserves window and 4:3 image')
+        page.evaluate('__panda.depthMap.sizePanel(640)')
+        check(page.evaluate('''() => {const r=document.querySelector('[data-depth-resize]').getBoundingClientRect();
+          return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight;}'''), 'resize handle stays on screen with constrained height')
+        page.set_viewport_size({'width': 1440, 'height': 450})
+        page.evaluate('__panda.depthMap.sizePanel(640)')
+        check(page.evaluate('''() => {const p=document.querySelector('#depth-window'),r=document.querySelector('[data-depth-resize]').getBoundingClientRect();
+          return p.scrollHeight>p.clientHeight&&r.top>=0&&r.bottom<=innerHeight;}'''), 'resize handle visible when window content scrolls')
+        page.set_viewport_size({'width': 390, 'height': 650})
         page.screenshot(path=str(OUT / 'depth-mobile.png'))
         page.locator('[data-depth-close]').click()
         page.set_viewport_size({'width': 1440, 'height': 1000})

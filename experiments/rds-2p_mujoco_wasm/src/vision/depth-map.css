@@ -4,6 +4,8 @@
   top: 100px;
   right: 24px;
   width: min(440px, calc(100vw - 24px));
+  min-width: min(260px, calc(100vw - 24px));
+  max-width: min(640px, calc(100vw - 24px));
   max-height: calc(100dvh - 120px);
   overflow: auto;
   box-sizing: border-box;
@@ -33,6 +35,24 @@
 .depth-ticks { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; margin-top: 5px; }
 .depth-note, .depth-status { margin: 8px 0 0; color: #526452; font-size: 12px; }
 .depth-empty { display: inline-block; width: 12px; height: 12px; background: #252b34; vertical-align: -1px; border-radius: 3px; margin-right: 5px; }
+.depth-resize-handle {
+  position: sticky;
+  bottom: -10px;
+  display: block;
+  width: 28px;
+  height: 24px;
+  margin: 2px -10px -10px auto;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #526452;
+  font: 22px/1 system-ui, sans-serif;
+  cursor: nwse-resize;
+  touch-action: none;
+  user-select: none;
+}
+.depth-resize-handle:focus-visible { outline: 2px solid #287a48; }
 @media (max-width: 600px), (max-height: 550px) {
   .depth-window { top: 12px; right: 12px; max-height: calc(100dvh - 24px); padding: 14px; }
 }
