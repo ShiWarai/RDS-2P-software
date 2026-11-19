@@ -1,6 +1,6 @@
 
 import * as THREE from "three";
-import { ASTRA_MINI_PRO } from "./astra-mini-pro.js";
+import { ASTRA_MINI_PRO, DEPTH_RANGE } from "./astra-mini-pro.js";
 
 export const CAMERA_CONFIG = {
   name: "camera",
@@ -21,9 +21,10 @@ export const DEPTH_CAMERA_CONFIG = {
   fov: ASTRA_MINI_PRO.depth.verticalFov,
   horizontalFov: ASTRA_MINI_PRO.depth.horizontalFov,
   // Render close occluders too; range filtering happens after readback.
-  // A far plane beyond the sensor range keeps exactly 5 m measurable.
-  near: 0.01,
-  far: 6,
+  // Keep the near plane positive for perspective projection, and the far
+  // plane beyond the working range so exactly 2 m remains measurable.
+  near: 0.001,
+  far: DEPTH_RANGE.max + 1,
 };
 
 class SensorCamera extends THREE.PerspectiveCamera {

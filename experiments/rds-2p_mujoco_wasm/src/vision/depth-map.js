@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { createRobotVisionCamera, DEPTH_CAMERA_CONFIG } from "./robot-camera.js";
-import { ASTRA_MINI_PRO } from "./astra-mini-pro.js";
+import { ASTRA_MINI_PRO, DEPTH_RANGE } from "./astra-mini-pro.js";
 import { colorizeDepth } from "./depth-math.js";
 
 /** Synthetic axial depth of the rendered scene. Independent of RGB/YOLO. */
@@ -199,7 +199,7 @@ export class DepthMap {
     try {
       if (this.contextLost) throw new Error("Графика ещё не восстановлена");
       this.initResources();
-      this.setStatus(`Симулятор · ${this.width}×${this.height} · до ${this.hz} кадр/с · 0,6–5 м`);
+      this.setStatus(`Симулятор · ${this.width}×${this.height} · до ${this.hz} кадр/с · ${DEPTH_RANGE.min}–${DEPTH_RANGE.max} м`);
     } catch (error) { this.fail(error); }
     if (this.floating && this.panelPositioned) this.clampPanel();
     if (focus) this.panel?.querySelector("[data-depth-close]")?.focus({ preventScroll: true });

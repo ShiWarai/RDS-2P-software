@@ -41,9 +41,9 @@ def main():
         page.locator('#tab-btn-cv').click()
         page.wait_for_function('__panda.depthMap.metrics.frameCount>2')
         check(page.evaluate("document.querySelector('#depth-window').parentElement.id==='depth-mount'"), 'depth opens inside computer vision tab')
-        check(page.evaluate('[...__panda.depthMap.depthMeters].some(z=>z>=.6&&z<=5)'), 'real scene contains measurable surfaces')
+        check(page.evaluate('[...__panda.depthMap.depthMeters].some(z=>z>0&&z<=2)'), 'real scene contains measurable surfaces')
         check(page.evaluate('''() => {const d=__panda.depthMap, c=d.camera;
-          return d.width===640 && d.height===480 && d.hz===30 && c.far===6 && c.fov===45.5 && c.horizontalFov===58.4 && c.aspect===4/3 && c.parent.name==='base_link';}'''), 'Astra Mini Pro camera parameters')
+          return d.width===640 && d.height===480 && d.hz===30 && c.near===.001 && c.far===3 && c.fov===45.5 && c.horizontalFov===58.4 && c.aspect===4/3 && c.parent.name==='base_link';}'''), 'Astra Mini Pro camera parameters')
         check(page.evaluate('''() => {const s=__panda.sim,m=s.model;const names=new TextDecoder().decode(m.names);
           const id=Array.from(m.name_geomadr).findIndex(a=>names.slice(a).split('\\0')[0]==='astra_mini_pro_module');
           return id>=0 && [0.00996,0.04245,0.01].every((v,i)=>Math.abs(m.geom_size[id*3+i]-v)<1e-6); }'''), '3D module dimensions 84.9 x 20 x 19.92 mm')

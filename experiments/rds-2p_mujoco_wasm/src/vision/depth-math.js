@@ -1,7 +1,7 @@
-import { ASTRA_MINI_PRO } from "./astra-mini-pro.js";
+import { DEPTH_RANGE } from "./astra-mini-pro.js";
 
-export const MIN_DEPTH = ASTRA_MINI_PRO.depth.min;
-export const MAX_DEPTH = ASTRA_MINI_PRO.depth.max;
+export const MIN_DEPTH = DEPTH_RANGE.min;
+export const MAX_DEPTH = DEPTH_RANGE.max;
 export const DEPTH_EPSILON = 0.001;
 export const NO_DEPTH_COLOR = [37, 43, 52];
 export const DEPTH_COLORS = [
@@ -21,7 +21,7 @@ export function depthToMeters(depth, near, far) {
 }
 
 export function isDepthInRange(meters, near = MIN_DEPTH) {
-  return Number.isFinite(meters) && meters >= Math.max(MIN_DEPTH, near) - DEPTH_EPSILON && meters <= MAX_DEPTH + DEPTH_EPSILON;
+  return Number.isFinite(meters) && meters >= Math.max(MIN_DEPTH, near) && meters <= MAX_DEPTH + DEPTH_EPSILON;
 }
 
 /** Writes directly into the reused output array. */

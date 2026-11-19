@@ -23,12 +23,12 @@ test("fixed colors, maximum inclusive, invalid values neutral", () => {
     writeDepthColor(MIN_DEPTH + i * (MAX_DEPTH - MIN_DEPTH) / 4, rgba);
     assert.deepEqual([...rgba], [...DEPTH_COLORS[i], 255]);
   }
-  assert(isDepthInRange(0.6));
-  assert(isDepthInRange(5));
-  assert(isDepthInRange(5.0005));
-  assert(!isDepthInRange(5.01));
-  assert(!isDepthInRange(0));
-  for (const z of [NaN, Infinity, -1, 0.59, 5.01]) {
+  assert(isDepthInRange(0));
+  assert(isDepthInRange(0.05));
+  assert(isDepthInRange(2));
+  assert(isDepthInRange(2.0005));
+  assert(!isDepthInRange(2.01));
+  for (const z of [NaN, Infinity, -1, -0.0001, 2.01]) {
     writeDepthColor(z, rgba);
     assert.deepEqual([...rgba], [...NO_DEPTH_COLOR, 255]);
   }

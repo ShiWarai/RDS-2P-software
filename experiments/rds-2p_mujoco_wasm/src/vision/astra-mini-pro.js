@@ -9,3 +9,6 @@ export const ASTRA_MINI_PRO = Object.freeze({
   depth: Object.freeze({ horizontalFov: 58.4, verticalFov: 45.5, min: 0.6, max: 5 }),
   rgb: Object.freeze({ horizontalFov: 62, verticalFov: 49 }),
 });
+
+// Working range requested for the robot's depth map.
+export const DEPTH_RANGE = Object.freeze({ min: 0, max: 2 });

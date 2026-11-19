@@ -46,13 +46,14 @@ try {
   assert(map.width === 640 && map.height === 480, "native 640x480 sensor resolution");
   assert(near(2 * Math.atan(1 / camera.projectionMatrix.elements[0]) * 180 / Math.PI, 58.4), "horizontal FOV 58.4 degrees");
   assert(near(2 * Math.atan(1 / camera.projectionMatrix.elements[5]) * 180 / Math.PI, 45.5), "vertical FOV 45.5 degrees");
-  for (const z of [0.6, 1, 2.8, 5]) {
+  for (const z of [0.05, 0.5, 1, 1.5, 2]) {
     plane.position.z = -z;
     map.capture();
     assert(near(sample(320, 240), z), `center depth ${z}m (${sample(320,240)})`);
     assert(near(sample(20, 20), z) && near(sample(620, 460), z), `axial edge depth ${z}m`);
+    assert(JSON.stringify(color(320, 240)) !== "[37,43,52]", `${z}m has valid color`);
   }
-  for (const z of [0.59, 5.01]) {
+  for (const z of [2.01, 2.5]) {
     plane.position.z = -z; map.capture();
     assert(JSON.stringify(color(320, 240)) === "[37,43,52]", `${z}m neutral`);
   }
@@ -64,9 +65,9 @@ try {
   map.capture();
   assert(near(sample(105, 25), 0.8), "top-left near occluder orientation");
   assert(near(sample(530, 450), 1.5), "bottom-right far background orientation");
-  // Too-close surfaces must mask valid background rather than being clipped away.
+  // Close surfaces remain measurable and mask the background.
   front.position.set(0, 0, -0.3); map.capture();
-  assert(near(sample(320, 240), 0.3) && JSON.stringify(color(320, 240)) === "[37,43,52]", "close occluder masks background");
+  assert(near(sample(320, 240), 0.3) && JSON.stringify(color(320, 240)) !== "[37,43,52]", "close occluder is measurable and masks background");
   assert(state() === saved, "renderer state restored on success");
   const read = renderer.readRenderTargetPixels;
   renderer.readRenderTargetPixels = () => { throw new Error("injected readback failure"); };
