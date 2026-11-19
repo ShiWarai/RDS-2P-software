@@ -1,4 +1,7 @@
-export const MAX_DEPTH = 2;
+import { ASTRA_MINI_PRO } from "./astra-mini-pro.js";
+
+export const MIN_DEPTH = ASTRA_MINI_PRO.depth.min;
+export const MAX_DEPTH = ASTRA_MINI_PRO.depth.max;
 export const DEPTH_EPSILON = 0.001;
 export const NO_DEPTH_COLOR = [37, 43, 52];
 export const DEPTH_COLORS = [
@@ -17,16 +20,16 @@ export function depthToMeters(depth, near, far) {
   return near * far / (far - depth * (far - near));
 }
 
-export function isDepthInRange(meters, near = 0.001) {
-  return Number.isFinite(meters) && meters >= near && meters <= MAX_DEPTH + DEPTH_EPSILON;
+export function isDepthInRange(meters, near = MIN_DEPTH) {
+  return Number.isFinite(meters) && meters >= Math.max(MIN_DEPTH, near) - DEPTH_EPSILON && meters <= MAX_DEPTH + DEPTH_EPSILON;
 }
 
 /** Writes directly into the reused output array. */
-export function writeDepthColor(meters, output, offset = 0, near = 0.001) {
+export function writeDepthColor(meters, output, offset = 0, near = MIN_DEPTH) {
   if (!isDepthInRange(meters, near)) {
     output.set(NO_DEPTH_COLOR, offset);
   } else {
-    const t = Math.min(MAX_DEPTH, meters) * 2;
+    const t = (Math.max(MIN_DEPTH, Math.min(MAX_DEPTH, meters)) - MIN_DEPTH) / (MAX_DEPTH - MIN_DEPTH) * 4;
     const index = Math.min(3, Math.floor(t));
     const fraction = t - index;
     for (let channel = 0; channel < 3; channel++) {

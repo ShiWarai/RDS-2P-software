@@ -88,7 +88,33 @@
         </div>
 
         <div id="tab-cv" class="panel-tab hidden" role="tabpanel" aria-labelledby="tab-btn-cv">
-          <div id="vision-mount"></div>
+          <div class="camera-specs" aria-label="Параметры камеры симулятора">
+            <strong>Orbbec Astra Mini Pro</strong>
+            <span>RGB и глубина: 640×480 · до 30 кадр/с</span>
+            <span>Модуль: 84,9 × 20 × 19,92 мм (Ш × В × Г)</span>
+          </div>
+          <div class="depth-toolbar">
+            <button id="btn-depth-map" class="btn" type="button" aria-controls="depth-window" aria-expanded="false" title="Карта станет доступна после загрузки симулятора" disabled>Карта глубины</button>
+          </div>
+          <div class="vision-workspace">
+            <div id="vision-mount"></div>
+            <div id="depth-mount">
+              <section id="depth-window" class="depth-window" data-floating="false" role="region" aria-labelledby="depth-title" hidden>
+                <div class="depth-heading">
+                  <h2 id="depth-title">Карта глубины</h2>
+                  <div class="depth-actions">
+                    <button class="btn" type="button" data-depth-float aria-pressed="false">В отдельное окно</button>
+                    <button class="btn icon-btn" type="button" data-depth-close aria-label="Закрыть карту глубины">✕</button>
+                  </div>
+                </div>
+                <p class="depth-status" data-depth-status role="status">Ожидание кадра…</p>
+                <canvas id="depth-canvas" width="640" height="480" role="img" aria-label="Карта глубины Astra Mini Pro: 640 на 480 пикселей, от 0,6 до 5 метров"></canvas>
+                <div class="depth-scale" aria-hidden="true"></div>
+                <div class="depth-ticks" aria-label="Шкала глубины в метрах"><span>0,6</span><span>1,7</span><span>2,8</span><span>3,9</span><span>5 м</span></div>
+                <button class="depth-resize-handle" type="button" data-depth-resize aria-label="Изменить размер окна: потяни угол или используй стрелки" title="Потяни угол, чтобы уменьшить или увеличить окно">◢</button>
+              </section>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -120,7 +146,6 @@
             <button id="btn-pause" class="btn icon-btn" title="Пауза/продолжить">⏸︎</button>
             <button id="btn-reset" class="btn icon-btn" title="Поставить панду на место (базовая стойка)">↺</button>
             <button id="btn-frame" class="btn icon-btn" title="Показать фактические углы суставов (для снятия кадра на паузе)">📐</button>
-            <button id="btn-depth-map" class="btn" type="button" aria-controls="depth-window" aria-expanded="false" title="Карта станет доступна после загрузки симулятора" disabled>Карта глубины</button>
             <span class="grow"></span>
             <button id="btn-follow-blue" class="btn follow-blue" aria-pressed="false" disabled hidden>🎯 следовать</button>
           </div>
@@ -158,20 +183,6 @@
     })();
   </script>
   <script type="module" src="./src/main.js"></script>
-  <section id="depth-window" class="depth-window" role="dialog" aria-modal="false" aria-labelledby="depth-title" hidden>
-    <div class="depth-heading">
-      <h2 id="depth-title">Карта глубины · до 2 м</h2>
-      <button class="btn icon-btn" type="button" data-depth-close aria-label="Закрыть карту глубины">✕</button>
-    </div>
-    <p class="depth-status" data-depth-status role="status">Ожидание кадра…</p>
-    <canvas id="depth-canvas" width="320" height="240" role="img" aria-label="Цветная карта глубины с центральной камеры робота"></canvas>
-    <div class="depth-scale" aria-hidden="true"></div>
-    <div class="depth-ticks" aria-label="Шкала глубины в метрах"><span>0</span><span>0,5</span><span>1</span><span>1,5</span><span>2 м</span></div>
-    <p class="depth-note"><span class="depth-empty" aria-hidden="true"></span>Вне диапазона / нет данных</p>
-    <p class="depth-note">Глубина вдоль взгляда камеры. Данные симулятора.</p>
-    <p class="depth-note">За заголовок — переместить, за угол — изменить размер.</p>
-    <button class="depth-resize-handle" type="button" data-depth-resize aria-label="Изменить размер окна: потяни угол или используй стрелки" title="Потяни угол, чтобы уменьшить или увеличить окно">◢</button>
-  </section>
   <script type="module" src="./src/vision/bootstrap.js"></script>
 </body>
 </html>

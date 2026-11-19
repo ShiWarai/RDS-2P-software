@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   unpackDepth, depthToMeters, isDepthInRange, writeDepthColor, colorizeDepth,
-  NO_DEPTH_COLOR, DEPTH_COLORS,
+  NO_DEPTH_COLOR, DEPTH_COLORS, MIN_DEPTH, MAX_DEPTH,
 } from "../src/vision/depth-math.js";
 
 test("known RGBA bytes and perspective projection values", () => {
@@ -19,15 +19,16 @@ test("known RGBA bytes and perspective projection values", () => {
 
 test("fixed colors, maximum inclusive, invalid values neutral", () => {
   const rgba = new Uint8ClampedArray(4);
-  for (let i = 1; i < 5; i++) {
-    writeDepthColor(i * 0.5, rgba);
+  for (let i = 0; i < 5; i++) {
+    writeDepthColor(MIN_DEPTH + i * (MAX_DEPTH - MIN_DEPTH) / 4, rgba);
     assert.deepEqual([...rgba], [...DEPTH_COLORS[i], 255]);
   }
-  assert(isDepthInRange(2));
-  assert(isDepthInRange(2.0005));
-  assert(!isDepthInRange(2.01));
+  assert(isDepthInRange(0.6));
+  assert(isDepthInRange(5));
+  assert(isDepthInRange(5.0005));
+  assert(!isDepthInRange(5.01));
   assert(!isDepthInRange(0));
-  for (const z of [NaN, Infinity, -1, 2.01]) {
+  for (const z of [NaN, Infinity, -1, 0.59, 5.01]) {
     writeDepthColor(z, rgba);
     assert.deepEqual([...rgba], [...NO_DEPTH_COLOR, 255]);
   }
@@ -42,6 +43,8 @@ test("bottom-up readback flips vertically once, never horizontally", () => {
   assert(Number.isNaN(meters[1]));
   assert.equal(meters[2], 1);
   assert.equal(meters[3], 1.5);
-  assert.deepEqual([...rgba.slice(0, 4)], [...DEPTH_COLORS[4], 255]);
+  const expected = new Uint8ClampedArray(4);
+  writeDepthColor(2, expected);
+  assert.deepEqual([...rgba.slice(0, 4)], [...expected]);
   assert.deepEqual([...rgba.slice(4, 8)], [...NO_DEPTH_COLOR, 255]);
 });

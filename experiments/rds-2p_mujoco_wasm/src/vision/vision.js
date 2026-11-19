@@ -2,7 +2,7 @@
 import * as THREE from "three";
 import { createRobotVisionCamera, CAMERA_CONFIG } from "./robot-camera.js";
 
-// Видеовыход камеры панды — 480p, как в MJCF/URDF (resolution="640 480").
+// Full sensor resolution; YOLO has its own independent 320×320 input.
 const WIDTH = CAMERA_CONFIG.width;
 const HEIGHT = CAMERA_CONFIG.height;
 const FPS_LIMIT = 15;
@@ -170,7 +170,7 @@ export class VisionPipeline {
       <div class="vision-panel-heading">
         <div class="vision-heading-main">
           <span class="vision-title">ЗРЕНИЕ РОБОТА</span>
-          <span class="vision-subtitle">YOLO · 7 классов · камера ${WIDTH}×${HEIGHT} (480p) · вход 320×320</span>
+          <span class="vision-subtitle">YOLOv8n · 7 классов · RGB ${WIDTH}×${HEIGHT} · вход модели 320×320</span>
         </div>
 
         <div
@@ -190,7 +190,7 @@ export class VisionPipeline {
           aria-label="Изображение с камеры робота"
         >
           <div class="vision-fallback-head">
-            <span>КАМЕРА РОБОТА</span>
+            <span>RGB · ${WIDTH}×${HEIGHT}</span>
             <span id="vision-preview-count">Объектов: 0</span>
           </div>
 

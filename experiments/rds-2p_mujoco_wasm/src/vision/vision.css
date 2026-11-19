@@ -23,7 +23,8 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .vision-title {
@@ -33,7 +34,7 @@
 }
 
 .vision-subtitle {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted, #65717c);
 }
 
@@ -52,7 +53,7 @@
 
 .vision-panel-body {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: stretch;
   gap: 10px;
   width: 100%;
@@ -61,7 +62,7 @@
 
 /* Левая часть — статистика, занимает всё свободное место. */
 .vision-stats {
-  order: 0;
+  order: 1;
   flex: 1 1 0;
   min-width: 0;
   padding: 12px 14px;
@@ -88,14 +89,14 @@
   overflow-wrap: anywhere;
 }
 
-/* Правая часть — камера. Ширина рассчитывается из высоты 4:3. */
+/* RGB and depth use the available tab width with the same 4:3 aspect. */
 .vision-fallback {
-  order: 1;
+  order: 0;
   flex: 0 1 auto;
-  width: clamp(160px, calc((50vh - 120px) * 4 / 3), 640px);
-  max-width: min(640px, 62%);
+  width: 100%;
+  max-width: 640px;
   min-width: 0;
-  margin-left: auto;
+  margin-inline: auto;
   box-sizing: border-box;
 }
 
@@ -169,6 +170,6 @@
   }
 
   .vision-fallback {
-    max-width: 58%;
+    max-width: 640px;
   }
 }

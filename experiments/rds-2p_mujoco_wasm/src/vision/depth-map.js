@@ -1,16 +1,21 @@
 import * as THREE from "three";
-import { createRobotVisionCamera } from "./robot-camera.js";
+import { createRobotVisionCamera, DEPTH_CAMERA_CONFIG } from "./robot-camera.js";
+import { ASTRA_MINI_PRO } from "./astra-mini-pro.js";
 import { colorizeDepth } from "./depth-math.js";
 
 /** Synthetic axial depth of the rendered scene. Independent of RGB/YOLO. */
 export class DepthMap {
-  constructor(sim, canvas, { width = 320, height = 240, hz = 12, panel = null, button = null } = {}) {
+  constructor(sim, canvas, { width = ASTRA_MINI_PRO.width, height = ASTRA_MINI_PRO.height,
+    hz = ASTRA_MINI_PRO.fps, panel = null, button = null, dock = null } = {}) {
     this.sim = sim;
     this.canvas = canvas;
     this.width = width;
     this.height = height;
     this.hz = hz;
     this.panel = panel;
+    this.dock = dock;
+    this.floating = !dock || panel?.dataset.floating === "true";
+    this.tabActive = !dock;
     this.panelPositioned = Boolean(panel?.style.left);
     this.button = button;
     this.status = panel?.querySelector("[data-depth-status]");
@@ -23,7 +28,7 @@ export class DepthMap {
     const signal = this.listeners.signal;
     this.dragHandle = panel?.querySelector(".depth-heading");
     this.dragHandle?.addEventListener("pointerdown", event => {
-      if (!event.isPrimary || event.button !== 0 || this.panelDrag || this.panelResize ||
+      if (!this.floating || !event.isPrimary || event.button !== 0 || this.panelDrag || this.panelResize ||
           event.target.closest("button, a, input, select, textarea")) return;
       const rect = this.panel.getBoundingClientRect();
       this.panelDrag = { pointerId: event.pointerId, x: event.clientX - rect.left, y: event.clientY - rect.top };
@@ -42,7 +47,7 @@ export class DepthMap {
     }
     this.resizeHandle = panel?.querySelector("[data-depth-resize]");
     this.resizeHandle?.addEventListener("pointerdown", event => {
-      if (!event.isPrimary || event.button !== 0 || this.panelDrag || this.panelResize) return;
+      if (!this.floating || !event.isPrimary || event.button !== 0 || this.panelDrag || this.panelResize) return;
       const rect = this.panel.getBoundingClientRect();
       this.placePanel(rect.left, rect.top);
       this.panelResize = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, width: rect.width };
@@ -61,7 +66,7 @@ export class DepthMap {
     }
     this.resizeHandle?.addEventListener("keydown", event => {
       const step = { ArrowLeft: -20, ArrowUp: -20, ArrowRight: 20, ArrowDown: 20 }[event.key];
-      if (!step) return;
+      if (!step || !this.floating) return;
       event.preventDefault();
       event.stopPropagation(); // Resizing with arrows must not drive the robot.
       const rect = this.panel.getBoundingClientRect();
@@ -69,10 +74,11 @@ export class DepthMap {
       this.sizePanel(rect.width + step);
     }, { signal });
     window.addEventListener("resize", () => {
-      if (this.panelPositioned && this.state !== "closed" && this.state !== "disposed") this.clampPanel();
+      if (this.floating && this.panelPositioned && this.state !== "closed" && this.state !== "disposed") this.clampPanel();
     }, { signal });
     button?.addEventListener("click", () => this.state === "closed" ? this.open() : this.close(), { signal });
     panel?.querySelector("[data-depth-close]")?.addEventListener("click", () => this.close(), { signal });
+    panel?.querySelector("[data-depth-float]")?.addEventListener("click", () => this.setFloating(!this.floating), { signal });
     panel?.addEventListener("keydown", event => {
       if (event.key === "Escape") this.close(); // Bubble: Escape must still stop robot motion.
     }, { signal });
@@ -95,6 +101,37 @@ export class DepthMap {
   }
 
   setStatus(message) { if (this.status) this.status.textContent = message; }
+
+  setTabActive(active) {
+    this.tabActive = active;
+    if (active && this.state === "closed" && !this.userClosed) this.open({ focus: false });
+    if (active) {
+      this.startedAt = performance.now();
+      this.startedCount = this.metrics.frameCount;
+      this.invalidate();
+    }
+  }
+
+  setFloating(floating) {
+    if (!this.dock || !this.panel) return;
+    this.endPanelDrag();
+    this.endPanelResize();
+    this.floating = floating;
+    this.panel.dataset.floating = String(floating);
+    (floating ? document.body : this.dock).appendChild(this.panel);
+    this.panel.setAttribute("role", floating ? "dialog" : "region");
+    const toggle = this.panel.querySelector("[data-depth-float]");
+    toggle.textContent = floating ? "Во вкладку" : "В отдельное окно";
+    toggle.setAttribute("aria-pressed", String(floating));
+    if (floating) {
+      this.clampPanel();
+    } else {
+      for (const property of ["left", "top", "right", "width"]) this.panel.style.removeProperty(property);
+      this.panelPositioned = false;
+    }
+    toggle.focus({ preventScroll: true });
+    this.invalidate();
+  }
 
   placePanel(left, top) {
     const rect = this.panel.getBoundingClientRect();
@@ -130,11 +167,8 @@ export class DepthMap {
 
   initResources() {
     if (this.target) return;
-    this.camera = createRobotVisionCamera(this.sim);
+    this.camera = createRobotVisionCamera(this.sim, DEPTH_CAMERA_CONFIG);
     this.camera.name = "robot-depth-camera";
-    this.camera.near = 0.001;
-    this.camera.far = 3;
-    this.camera.updateProjectionMatrix();
     this.target = new THREE.WebGLRenderTarget(this.width, this.height, {
       format: THREE.RGBAFormat, type: THREE.UnsignedByteType,
       minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter,
@@ -153,21 +187,22 @@ export class DepthMap {
     this.image = this.context.createImageData(this.width, this.height);
   }
 
-  open() {
+  open({ focus = true } = {}) {
     if (this.state === "disposed") return;
     this.panel?.removeAttribute("hidden");
     this.button?.setAttribute("aria-expanded", "true");
     this.state = "open";
+    this.userClosed = false;
     this.startedAt = performance.now();
     this.startedCount = this.metrics.frameCount;
     this.invalidate();
     try {
       if (this.contextLost) throw new Error("Графика ещё не восстановлена");
       this.initResources();
-      this.setStatus(`Симулятор · ${this.width}×${this.height} · до 2 м`);
+      this.setStatus(`Симулятор · ${this.width}×${this.height} · до ${this.hz} кадр/с · 0,6–5 м`);
     } catch (error) { this.fail(error); }
-    if (this.panelPositioned) this.clampPanel();
-    this.panel?.querySelector("[data-depth-close]")?.focus({ preventScroll: true });
+    if (this.floating && this.panelPositioned) this.clampPanel();
+    if (focus) this.panel?.querySelector("[data-depth-close]")?.focus({ preventScroll: true });
   }
 
   close() {
@@ -176,10 +211,13 @@ export class DepthMap {
     this.endPanelResize();
     const hadError = this.state === "error";
     this.state = "closed";
+    this.userClosed = true;
     this.panel?.setAttribute("hidden", "");
     this.button?.setAttribute("aria-expanded", "false");
     if (hadError) this.releaseResources();
-    this.button?.focus({ preventScroll: true });
+    const focusTarget = this.button?.getClientRects().length ? this.button
+      : document.querySelector('#panel-tabs [aria-selected="true"]');
+    focusTarget?.focus({ preventScroll: true });
   }
 
   invalidate() {
@@ -188,7 +226,7 @@ export class DepthMap {
   }
 
   update(timeMS) {
-    if (this.state !== "open" || document.hidden || timeMS < this.nextFrameAt) return;
+    if (this.state !== "open" || (!this.floating && !this.tabActive) || document.hidden || timeMS < this.nextFrameAt) return;
     // Keep cadence across display frames, without a catch-up rendering loop.
     const interval = 1000 / this.hz;
     this.nextFrameAt = timeMS + interval - (this.nextFrameAt ? (timeMS - this.nextFrameAt) % interval : 0);

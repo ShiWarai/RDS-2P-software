@@ -28,6 +28,7 @@ try {
   const plane = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), material);
   scene.add(plane);
   const sample = (x, y) => map.depthMeters[y * map.width + x];
+  const color = (x, y) => [...map.image.data.slice(4 * (y * map.width + x), 4 * (y * map.width + x) + 3)];
   function state() {
     return JSON.stringify({
       target: renderer.getRenderTarget()?.uuid, viewport: renderer.getViewport(new THREE.Vector4()).toArray(),
@@ -42,22 +43,30 @@ try {
     });
   }
   const saved = state();
-  for (const z of [0.5, 1, 1.5, 2]) {
+  assert(map.width === 640 && map.height === 480, "native 640x480 sensor resolution");
+  assert(near(2 * Math.atan(1 / camera.projectionMatrix.elements[0]) * 180 / Math.PI, 58.4), "horizontal FOV 58.4 degrees");
+  assert(near(2 * Math.atan(1 / camera.projectionMatrix.elements[5]) * 180 / Math.PI, 45.5), "vertical FOV 45.5 degrees");
+  for (const z of [0.6, 1, 2.8, 5]) {
     plane.position.z = -z;
     map.capture();
-    assert(near(sample(160, 120), z), `center depth ${z}m (${sample(160,120)})`);
-    assert(near(sample(20, 20), z) && near(sample(300, 220), z), `axial edge depth ${z}m`);
+    assert(near(sample(320, 240), z), `center depth ${z}m (${sample(320,240)})`);
+    assert(near(sample(20, 20), z) && near(sample(620, 460), z), `axial edge depth ${z}m`);
   }
-  plane.position.z = -2.01; map.capture();
-  assert(map.image.data[4 * (120 * 320 + 160)] === 37, "2.01m neutral");
+  for (const z of [0.59, 5.01]) {
+    plane.position.z = -z; map.capture();
+    assert(JSON.stringify(color(320, 240)) === "[37,43,52]", `${z}m neutral`);
+  }
   plane.visible = false; map.capture();
   assert([...map.depthMeters].every(Number.isNaN), "empty sky is missing depth");
   plane.visible = true; plane.position.z = -1.5;
   const front = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.4), material);
-  front.position.set(-0.3, 0.3, -0.5); scene.add(front);
+  front.position.set(-0.3, 0.3, -0.8); scene.add(front);
   map.capture();
-  assert(near(sample(88, 48), 0.5), "top-left near occluder orientation");
-  assert(near(sample(232, 192), 1.5), "bottom-right far background orientation");
+  assert(near(sample(105, 25), 0.8), "top-left near occluder orientation");
+  assert(near(sample(530, 450), 1.5), "bottom-right far background orientation");
+  // Too-close surfaces must mask valid background rather than being clipped away.
+  front.position.set(0, 0, -0.3); map.capture();
+  assert(near(sample(320, 240), 0.3) && JSON.stringify(color(320, 240)) === "[37,43,52]", "close occluder masks background");
   assert(state() === saved, "renderer state restored on success");
   const read = renderer.readRenderTargetPixels;
   renderer.readRenderTargetPixels = () => { throw new Error("injected readback failure"); };

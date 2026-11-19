@@ -900,10 +900,12 @@ async function boot() {
     const createDepthMap = () => {
       app.depthMap = new DepthMap(app.sim, $("depth-canvas"), {
         panel: $("depth-window"), button: $("btn-depth-map"),
+        dock: $("depth-mount"),
       });
       app.sim.onDepthFrame = timeMS => app.depthMap.update(timeMS);
       $("btn-depth-map").disabled = false;
       $("btn-depth-map").title = "Показать расстояния до поверхностей в симуляторе";
+      app.depthMap.setTabActive($("tab-btn-cv").getAttribute("aria-selected") === "true");
     };
     createDepthMap();
     window.addEventListener("pagehide", () => {
@@ -965,6 +967,7 @@ async function boot() {
   // Вкладки левой панели: конвейер ЗРения стартует лениво, при первом открытии вкладки.
   initPanelTabs({
     onSwitch: (id) => {
+      app.depthMap?.setTabActive(id === "cv");
       if (id === "cv") {
         if (app.sim?.ballFollower?.remote) { app.sim.ballFollower.showRemotePreview(); return; }
         window.__vision?.ensureStarted().then(pipeline => pipeline.resume()).catch(error => {

@@ -20,6 +20,7 @@ def main():
     def check(condition, name):
         assert condition, name
         results['checks'].append(name)
+        print('PASS', name, flush=True)
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True, channel='chrome', args=['--enable-webgl'])
@@ -37,12 +38,28 @@ def main():
           return {browser:navigator.userAgent, gpu:ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER),
             viewport:[innerWidth,innerHeight],hardwareConcurrency:navigator.hardwareConcurrency};
         }''')
-        page.locator('#btn-depth-map').click()
+        page.locator('#tab-btn-cv').click()
         page.wait_for_function('__panda.depthMap.metrics.frameCount>2')
-        check(page.evaluate('!window.__visionPipeline'), 'map works before YOLO initialization')
-        check(page.evaluate('[...__panda.depthMap.depthMeters].some(z=>z>0&&z<=2)'), 'real scene contains measurable surfaces')
+        check(page.evaluate("document.querySelector('#depth-window').parentElement.id==='depth-mount'"), 'depth opens inside computer vision tab')
+        check(page.evaluate('[...__panda.depthMap.depthMeters].some(z=>z>=.6&&z<=5)'), 'real scene contains measurable surfaces')
         check(page.evaluate('''() => {const d=__panda.depthMap, c=d.camera;
-          return c.far===3 && c.fov===90 && c.aspect===4/3 && c.parent.name==='base_link';}'''), 'separate central camera parameters')
+          return d.width===640 && d.height===480 && d.hz===30 && c.far===6 && c.fov===45.5 && c.horizontalFov===58.4 && c.aspect===4/3 && c.parent.name==='base_link';}'''), 'Astra Mini Pro camera parameters')
+        check(page.evaluate('''() => {const s=__panda.sim,m=s.model;const names=new TextDecoder().decode(m.names);
+          const id=Array.from(m.name_geomadr).findIndex(a=>names.slice(a).split('\\0')[0]==='astra_mini_pro_module');
+          return id>=0 && [0.00996,0.04245,0.01].every((v,i)=>Math.abs(m.geom_size[id*3+i]-v)<1e-6); }'''), '3D module dimensions 84.9 x 20 x 19.92 mm')
+        page.locator('#tab-btn-osm').click()
+        count = page.evaluate('__panda.depthMap.metrics.frameCount')
+        page.wait_for_timeout(300)
+        check(page.evaluate('__panda.depthMap.metrics.frameCount') == count, 'hidden docked depth stops capture')
+        page.locator('#tab-btn-cv').click()
+        page.wait_for_function(f'__panda.depthMap.metrics.frameCount>{count}')
+        page.evaluate("document.querySelectorAll('.toast').forEach(n=>n.remove())")
+        page.screenshot(path=str(OUT / 'depth-docked.png'))
+        page.locator('[data-depth-float]').click()
+        check(page.evaluate("document.querySelector('#depth-window').parentElement===document.body"), 'depth detaches from tab')
+        page.locator('[data-depth-float]').click()
+        check(page.evaluate("document.querySelector('#depth-window').parentElement.id==='depth-mount'"), 'depth returns to tab')
+        page.locator('[data-depth-float]').click()
         resize_handle = page.locator('[data-depth-resize]')
 
         def resize_mouse(delta):
@@ -68,7 +85,7 @@ def main():
         resize_mouse(-1000)
         check(page.locator('#depth-window').bounding_box()['width'] == 260, 'visual width minimum 260px')
         check(page.evaluate('''() => {const c=document.querySelector('#depth-canvas'),r=c.getBoundingClientRect();
-          return c.width===320&&c.height===240&&Math.abs(r.width/r.height-4/3)<.01;}'''), 'resizing preserves 4:3 and 320x240 sensor resolution')
+          return c.width===640&&c.height===480&&Math.abs(r.width/r.height-4/3)<.01;}'''), 'resizing preserves 4:3 and 640x480 sensor resolution')
         page.evaluate('__panda.depthMap.close();__panda.depthMap.open()')
         check(page.locator('#depth-window').bounding_box()['width'] == 260, 'reopen retains chosen visual size')
         box = resize_handle.bounding_box()
@@ -226,8 +243,7 @@ def main():
         check(page.evaluate('__panda.depthMap.state==="disposed"&&__panda.sim.onDepthFrame===null'), 'pagehide disposes depth component')
         page.set_viewport_size({'width': 390, 'height': 650})
         page.evaluate("window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}))")
-        check(page.evaluate('__panda.depthMap.state==="closed"'), 'pageshow recreates closed depth controller')
-        page.evaluate("document.querySelector('#btn-depth-map').click()")
+        check(page.evaluate('__panda.depthMap.state==="open"'), 'pageshow restores depth in active vision tab')
         page.wait_for_function('__panda.depthMap.metrics.frameCount>2')
         check(page.evaluate('''() => {const r=document.querySelector('#depth-window').getBoundingClientRect();
           return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight;}'''), 'restored controller clamps retained coordinates after resize')
@@ -244,7 +260,6 @@ def main():
         failed.wait_for_function('window.__panda?.depthMap', timeout=90000)
         failed.locator('#tab-btn-cv').click()
         failed.wait_for_function('window.__visionPipeline?.modelError', timeout=90000)
-        failed.locator('#btn-depth-map').click()
         failed.wait_for_function('__panda.depthMap.metrics.frameCount>2')
         check(failed.evaluate('__panda.depthMap.state==="open"'), 'depth survives YOLO model download failure')
         failed.close()
@@ -254,6 +269,7 @@ def main():
         page.wait_for_function('window.__panda?.depthMap', timeout=90000)
         if args.perf:
             results['performance'] = []
+            page.evaluate('__panda.depthMap.setFloating(true)')
             for yolo in [False, True]:
                 if yolo:
                     page.locator('#tab-btn-cv').click()
@@ -285,7 +301,9 @@ def main():
         page.locator('#btn-depth-map').click() if page.locator('#depth-window').is_hidden() else None
         page.wait_for_function('__panda.depthMap.metrics.frameCount>2')
         page.wait_for_function('__visionPipeline.metrics.detections>0', timeout=30000)
-        check(page.evaluate('__panda.depthMap.state==="open"&&__visionPipeline.camera.far===100'), 'depth and RGB/YOLO work together without changing RGB range')
+        check(page.evaluate('''__panda.depthMap.state==="open" && __visionPipeline.camera.far===100 &&
+          __visionPipeline.camera.fov===49 && __visionPipeline.camera.horizontalFov===62 &&
+          __visionPipeline.previewCanvas.width===640 && __visionPipeline.previewCanvas.height===480'''), 'depth and full-resolution Astra RGB/YOLO work together')
         page.screenshot(path=str(OUT / 'depth-yolo.png'))
         check(not errors, 'no uncaught browser errors: ' + str(errors))
         if args.perf:
