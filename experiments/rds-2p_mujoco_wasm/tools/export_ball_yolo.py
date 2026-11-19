@@ -29,6 +29,7 @@ def main():
     copied = work / checkpoint.name
     shutil.copy2(checkpoint, copied)
     model = YOLO(str(copied))
+    training_imgsz = model.ckpt.get('train_args', {}).get('imgsz')
     exported = Path(model.export(format='onnx', imgsz=(480, 640), opset=17,
                                  simplify=False, dynamic=False, nms=False, device='cpu'))
     onnx.checker.check_model(onnx.load(str(exported)))
@@ -59,8 +60,9 @@ def main():
         report['export_imgsz'] = [480, 640]
         report['export'] = dict(input_shape=shape, output_shape=list(actual.shape),
                                 checkpoint_sha256=hashlib.sha256(checkpoint.read_bytes()).hexdigest(),
+                                checkpoint_training_imgsz=training_imgsz,
                                 checkpoint_onnx_max_absolute_error=error,
-                                note='Re-exported without retraining. Existing training metrics were measured at imgsz=320.')
+                                note='Export preserves checkpoint weights. Quality must be checked at the exported input shape.')
         report_path.write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
     print(json.dumps(dict(output=str(output), input_shape=shape, output_shape=list(actual.shape),
                           checkpoint_onnx_max_absolute_error=error)), flush=True)

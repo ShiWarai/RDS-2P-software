@@ -105,9 +105,44 @@ python experiments/rds-2p_mujoco_wasm/tools/collect_ball_dataset.py --url http:/
 .venv/Scripts/python experiments/rds-2p_mujoco_wasm/tools/export_ball_yolo.py experiments/rds-2p_mujoco_wasm/.test/vision_training/runs/balls_recovered/weights/best.pt
 ```
 
-Веса переэкспортированы официальным [ONNX export](https://docs.ultralytics.com/integrations/onnx/)
-с `imgsz=(480, 640)`. Метрики обучения в отчёте относятся к исходной проверке
-при `imgsz=320`; увеличение входа само по себе не подтверждает рост точности.
+Экспорт выполняется через [ONNX export](https://docs.ultralytics.com/integrations/onnx/)
+с `imgsz=(480, 640)`. Проверка совпадения ONNX с checkpoint не измеряет качество
+распознавания: при смене разрешения нужны дообучение и проверка каждого класса.
+
+Дообучение и проверка на полном кадре:
+
+```bash
+.venv/Scripts/python experiments/rds-2p_mujoco_wasm/tools/finetune_ball_yolo.py --epochs 12
+.venv/Scripts/python experiments/rds-2p_mujoco_wasm/tools/check_vision_quality.py --model /path/to/model.onnx --split test --output /path/to/quality.json
+python experiments/rds-2p_mujoco_wasm/tools/check_vision_scene.py --url http://localhost:8085
+```
+
+Обучение использует train-часть, выбор checkpoint — val-часть. Для обоих
+используются прямоугольные тензоры 480×640, совпадающие с рабочим входом.
+Итоговую test-часть проверяют отдельно. В отчёте качества для каждого класса
+показаны precision/recall при рабочих порогах confidence=0,35 и IoU=0,5,
+а также AP50 и AP50–95 по детекциям после NMS (не более 50 рамок на кадр).
+
+Для адаптации к реальному обзору Astra RGB (H62°/V49°) используется дополнительный
+синтетический набор из `collect_native_dataset.py`. В нём все семь классов
+размечаются по видимым маскам отдельных объектов, включая перекрытия и обрезку
+границами кадра. Эти сведения доступны только сборщику обучающих данных;
+рабочий детектор по-прежнему получает только RGB.
+
+```bash
+python experiments/rds-2p_mujoco_wasm/tools/collect_native_dataset.py --count 180
+.venv/Scripts/python experiments/rds-2p_mujoco_wasm/tools/merge_vision_datasets.py --dataset experiments/rds-2p_mujoco_wasm/.test/vision_training/dataset --dataset experiments/rds-2p_mujoco_wasm/.test/vision_regression/native_dataset --output experiments/rds-2p_mujoco_wasm/.test/vision_regression/combined_dataset
+.venv/Scripts/python experiments/rds-2p_mujoco_wasm/tools/finetune_ball_yolo.py --checkpoint /path/to/first-stage/best.pt --data experiments/rds-2p_mujoco_wasm/.test/vision_regression/combined_dataset/data.yaml --epochs 4 --name native_camera_62x49
+```
+
+Объединение сохраняет принадлежность кадров к train/val/test и отклоняет
+совпадающие хеши изображений в разных частях набора.
+
+При сравнении с предыдущей рабочей моделью используйте `--model baseline.onnx
+--model candidate.onnx --require-no-regression`: проверка завершится ошибкой,
+если AP50 любого из семи классов или recall деревьев, кустов, камней и цветов
+ниже исходной модели на том же наборе кадров. Итоговые результаты поставляемых
+весов записаны в `models/quality_report.json`.
 Для дообучения на размеченных реальных кадрах задайте `--data /path/to/data.yaml`
 с теми же семью классами и независимой реальной test-выборкой.
 

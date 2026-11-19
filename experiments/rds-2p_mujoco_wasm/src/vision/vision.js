@@ -156,6 +156,7 @@ export class VisionPipeline {
       import.meta.url
     );
     modelUrl.searchParams.set("input", `${WIDTH}x${HEIGHT}`);
+    modelUrl.searchParams.set("v", "64ff85f71120");
 
     this.worker.postMessage({
       type: "init",

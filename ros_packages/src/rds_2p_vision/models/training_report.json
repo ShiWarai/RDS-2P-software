@@ -1,6 +1,5 @@
 {
-  "source_model_sha256": "061a1681607c883e3fade1bc72f391f355133428707886a1d8135bfc4aeb4536",
-  "model_sha256": "0469b6de1ac18c951715022f207aff754ecc165ab5788b8422daacea2cd624e5",
+  "model_sha256": "64ff85f71120d21ef910581754952d37f51a68544f383f5c3b7921d9825dc846",
   "names": [
     "tree",
     "bush",
@@ -10,124 +9,181 @@
     "red_ball",
     "green_ball"
   ],
-  "imgsz": 320,
-  "epochs": 35,
-  "reconstruction_max_absolute_error": 0.0018310546875,
-  "test": {
-    "metrics/precision(B)": 0.8319343305704894,
-    "metrics/recall(B)": 0.7021903163041708,
-    "metrics/mAP50(B)": 0.7759570557885844,
-    "metrics/mAP50-95(B)": 0.552287748666631,
-    "fitness": 0.552287748666631
-  },
-  "dataset": {
-    "count": 450,
-    "counts": {
-      "tree": 949,
-      "bush": 566,
-      "rock": 331,
-      "flower": 2897,
-      "blue_ball": 324,
-      "red_ball": 342,
-      "green_ball": 338
+  "input_shape": [
+    1,
+    3,
+    480,
+    640
+  ],
+  "output_shape": [
+    1,
+    11,
+    6300
+  ],
+  "training": {
+    "initial": {
+      "imgsz": 320,
+      "epochs": 35,
+      "source_model_sha256": "061a1681607c883e3fade1bc72f391f355133428707886a1d8135bfc4aeb4536",
+      "model_sha256": "f15e33305482fcafd757e50d83e1bb08ffba9b3cce43badfe575d7580cf74dad"
     },
-    "seed": 317123,
-    "labels": "visible object-ID masks for balls; original YOLO pseudo-labels for four scenery classes",
-    "domain": "synthetic MuJoCo camera; real-camera generalization has not been measured"
-  },
-  "limitation": "Synthetic camera only. Real camera accuracy is not validated; collect and label real frames before deployment claims.",
-  "per_class": {
-    "tree": {
-      "precision": 0.8226629757513273,
-      "recall": 0.967391304347826,
-      "map50": 0.9643219695524633,
-      "map50_95": 0.822378708904186
-    },
-    "bush": {
-      "precision": 0.7085467268174139,
-      "recall": 0.5740579241578354,
-      "map50": 0.6137880720288296,
-      "map50_95": 0.39626923438895434
-    },
-    "rock": {
-      "precision": 0.7878228375491402,
-      "recall": 0.586456772324131,
-      "map50": 0.723971953057431,
-      "map50_95": 0.45560268509145346
-    },
-    "flower": {
-      "precision": 0.8410006358876385,
-      "recall": 0.7195081849704079,
-      "map50": 0.7689498908489244,
-      "map50_95": 0.4419266420315037
-    },
-    "blue_ball": {
-      "precision": 0.823865447382095,
-      "recall": 0.6451612903225806,
-      "map50": 0.7741714104996837,
-      "map50_95": 0.576627412545509
-    },
-    "red_ball": {
-      "precision": 0.9589555946260554,
-      "recall": 0.7082835386555525,
-      "map50": 0.7530408720311945,
-      "map50_95": 0.6009228750211919
-    },
-    "green_ball": {
-      "precision": 0.88068617665854,
-      "recall": 0.7144732777209782,
-      "map50": 0.8334552225015647,
-      "map50_95": 0.5722866826836184
-    }
-  },
-  "verification": {
-    "browser": "Real ONNX inference, pursuit with hidden CV tab, loss stop, Esc/reset passed",
-    "python_detector_same_frame": {
-      "label": "blue_ball",
-      "confidence": 0.9634045362472534
-    },
-    "hardware_robot": "not connected; physical validation not performed",
-    "ros_browser": "Mock rosbridge: preview, robot-only dispatch, manual override, Esc and disconnect passed",
-    "full_resolution": {
-      "input_shape": [
-        1,
-        3,
-        480,
-        640
-      ],
-      "unchanged_weight_initializers": 127,
-      "browser": "Real ONNX inference, fresh frames, hidden-tab pursuit, loss stop, Esc/reset passed",
-      "python_detector_frame": {
-        "input_shape": [
-          1,
-          3,
+    "finetuning": [
+      {
+        "name": "native_640x480",
+        "epochs_run": 12,
+        "training_frames": 360,
+        "image_shape": [
           480,
           640
         ],
-        "frame_shape": [
-          480,
-          640,
-          3
-        ],
-        "blue": {
-          "x1": 277.44598388671875,
-          "y1": 252.15774536132812,
-          "x2": 366.47723388671875,
-          "y2": 338.8822326660156,
-          "confidence": 0.9965862035751343,
-          "classId": 4,
-          "label": "blue_ball"
-        },
-        "inference_ms": 22.080900002038106
+        "selected_epoch": 10,
+        "selection": "highest validation mAP50-95",
+        "selected_validation_map50": 0.89662,
+        "selected_validation_map50_95": 0.72709,
+        "checkpoint_sha256": "30ddd88633669370fce66db6e1f2a329417d3c027045e9001b050bb3a29be8ec"
       },
-      "hardware_robot": "not connected; physical validation not performed"
+      {
+        "name": "native_camera_62x49",
+        "epochs_run": 4,
+        "training_frames": 504,
+        "image_shape": [
+          480,
+          640
+        ],
+        "selected_epoch": 4,
+        "selection": "highest validation mAP50-95",
+        "selected_validation_map50": 0.87272,
+        "selected_validation_map50_95": 0.69107,
+        "checkpoint_sha256": "1666995248c0b5ea89e734d5559704a2a2349f955bfc45dfe732ed07ef455603"
+      }
+    ],
+    "frozen_backbone_layers": 10,
+    "batch_norm": "frozen",
+    "seed": 317123
+  },
+  "dataset": {
+    "sources": [
+      {
+        "count": 450,
+        "counts": {
+          "tree": 949,
+          "bush": 566,
+          "rock": 331,
+          "flower": 2897,
+          "blue_ball": 324,
+          "red_ball": 342,
+          "green_ball": 338
+        },
+        "seed": 317123,
+        "labels": "visible object-ID masks for balls; original YOLO pseudo-labels for four scenery classes",
+        "domain": "synthetic MuJoCo camera; real-camera generalization has not been measured"
+      },
+      {
+        "count": 180,
+        "counts": {
+          "tree": 206,
+          "bush": 198,
+          "rock": 102,
+          "flower": 675,
+          "blue_ball": 102,
+          "red_ball": 99,
+          "green_ball": 101
+        },
+        "fov": {
+          "horizontal": 62,
+          "vertical": 49
+        },
+        "resolution": [
+          640,
+          480
+        ],
+        "seed": 986321,
+        "labels": "Visible instance masks for all seven classes; no teacher predictions.",
+        "domain": "Synthetic scene; instance IDs are used only for training labels."
+      }
+    ],
+    "split_images": {
+      "train": 504,
+      "val": 63,
+      "test": 63
+    },
+    "labels": "Original scenery pseudo-labels plus native-camera instance masks.",
+    "split_integrity": "Original split membership preserved; duplicate image names and cross-split image hashes rejected."
+  },
+  "test": {
+    "frames": 63,
+    "map50": 0.8705387828841865,
+    "confidence": 0.35,
+    "matching_iou": 0.5,
+    "nms_iou": 0.45,
+    "max_detections": 50
+  },
+  "per_class": {
+    "tree": {
+      "precision": 0.8482142857142857,
+      "recall": 0.8260869565217391,
+      "map50": 0.9002584966954689,
+      "map50_95": 0.7268897005761192,
+      "true_positive": 95,
+      "false_positive": 17,
+      "ground_truth": 115
+    },
+    "bush": {
+      "precision": 0.7183098591549296,
+      "recall": 0.5543478260869565,
+      "map50": 0.7423246249306477,
+      "map50_95": 0.5346256473659632,
+      "true_positive": 51,
+      "false_positive": 20,
+      "ground_truth": 92
+    },
+    "rock": {
+      "precision": 0.9117647058823529,
+      "recall": 0.62,
+      "map50": 0.8089327650541116,
+      "map50_95": 0.49124213392274135,
+      "true_positive": 31,
+      "false_positive": 3,
+      "ground_truth": 50
+    },
+    "flower": {
+      "precision": 0.9290322580645162,
+      "recall": 0.829971181556196,
+      "map50": 0.9187765771987106,
+      "map50_95": 0.6487785754709707,
+      "true_positive": 288,
+      "false_positive": 22,
+      "ground_truth": 347
+    },
+    "blue_ball": {
+      "precision": 0.9722222222222222,
+      "recall": 0.8333333333333334,
+      "map50": 0.9140656962459288,
+      "map50_95": 0.8163827232986085,
+      "true_positive": 35,
+      "false_positive": 1,
+      "ground_truth": 42
+    },
+    "red_ball": {
+      "precision": 0.967741935483871,
+      "recall": 0.6666666666666666,
+      "map50": 0.8744497291833357,
+      "map50_95": 0.7384988938234649,
+      "true_positive": 30,
+      "false_positive": 1,
+      "ground_truth": 45
+    },
+    "green_ball": {
+      "precision": 0.9230769230769231,
+      "recall": 0.8372093023255814,
+      "map50": 0.9349635908811025,
+      "map50_95": 0.7804682732477384,
+      "true_positive": 36,
+      "false_positive": 3,
+      "ground_truth": 43
     }
   },
-  "split_images": {
-    "train": 360,
-    "val": 45,
-    "test": 45
-  },
+  "quality_report": "quality_report.json",
   "export": {
     "input_shape": [
       1,
@@ -140,12 +196,15 @@
       11,
       6300
     ],
-    "checkpoint_sha256": "3774524c284e5f6b74b23866512be7b504b93763f1563f8357cb1825b1482937",
-    "checkpoint_onnx_max_absolute_error": 0.00067138671875,
-    "note": "Re-exported without retraining. Existing training metrics were measured at imgsz=320."
+    "checkpoint_onnx_max_absolute_error": 0.00067901611328125
   },
-  "export_imgsz": [
-    480,
-    640
-  ]
+  "verification": {
+    "all_seven_classes_AP50_not_lower_than_320": true,
+    "browser_scene_all_seven_classes": true,
+    "hardware_robot": "not connected",
+    "browser_follow": "Real ONNX, hidden CV pursuit, target loss stop, Escape and reset passed.",
+    "python_unit_tests": 4,
+    "regression_gate": "All seven AP50 and all four scenery recalls meet/exceed the 320 baseline on the same 63 held-out frames."
+  },
+  "limitation": "Synthetic scenes only. Legacy scenery labels are teacher pseudo-labels; native-camera labels use visible instance masks. Real-camera performance has not been measured."
 }

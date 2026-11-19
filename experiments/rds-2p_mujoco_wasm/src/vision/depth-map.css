@@ -42,11 +42,9 @@
 .depth-ticks { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; margin-top: 5px; }
 .depth-status { margin: 8px 0 0; color: var(--muted, #526452); font-size: 12px; }
 .depth-window[data-floating="false"] .depth-resize-handle { display: none; }
-.camera-specs { display: flex; flex-direction: column; gap: 4px; padding: 12px; font-size: 13px; }
-.camera-specs span { color: var(--muted, #526452); }
 .depth-toolbar { padding: 0 12px 8px; }
 #tab-cv { overflow: auto; container-type: inline-size; }
-.camera-specs, .depth-toolbar, .vision-workspace { flex-shrink: 0; }
+.depth-toolbar, .vision-workspace { flex-shrink: 0; }
 .vision-workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; padding: 10px; }
 .vision-workspace #vision-mount, .vision-workspace #vision-controls,
 .vision-workspace .vision-panel-body { display: contents; }
