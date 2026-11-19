@@ -120,7 +120,7 @@ def main():
     trained=YOLO(str(yolo.trainer.best))
     results=trained.val(data=str(dataset),split='test',imgsz=320,device='cpu',workers=0,plots=True,
                         project=str(ROOT/'.test/vision_training'),name='holdout_validation')
-    exported=trained.export(format='onnx',imgsz=320,opset=17,simplify=False,dynamic=False,nms=False)
+    exported=trained.export(format='onnx',imgsz=(480,640),opset=17,simplify=False,dynamic=False,nms=False)
     destination=ROOT.parents[1]/'ros_packages/src/rds_2p_vision/models/yolov8n_balls.onnx'
     destination.parent.mkdir(parents=True,exist_ok=True)
     destination.write_bytes(Path(exported).read_bytes())
@@ -130,7 +130,7 @@ def main():
     provenance=dataset.parent/'provenance.json'
     report=dict(source_model_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
                 model_sha256=hashlib.sha256(destination.read_bytes()).hexdigest(),
-                names=NAMES,imgsz=320,epochs=args.epochs,reconstruction_max_absolute_error=parity,
+                names=NAMES,imgsz=320,export_imgsz=[480,640],epochs=args.epochs,reconstruction_max_absolute_error=parity,
                 test=results.results_dict,per_class=per_class,
                 dataset=json.loads(provenance.read_text()) if provenance.exists() else {'path':str(dataset)},
                 limitation='Synthetic camera only. Real camera accuracy is not validated; collect and label real frames before deployment claims.')

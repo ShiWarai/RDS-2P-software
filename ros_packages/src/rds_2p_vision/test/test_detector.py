@@ -2,10 +2,22 @@ import unittest
 from types import SimpleNamespace
 
 import numpy as np
-from rds_2p_vision.detector import follow_command, image_to_rgb, select_blue
+from rds_2p_vision.detector import YoloDetector, follow_command, image_to_rgb, select_blue
 
 
 class DetectorContractTests(unittest.TestCase):
+    def test_native_rectangular_input_preserves_every_pixel(self):
+        tensors = []
+        detector = YoloDetector.__new__(YoloDetector)
+        detector.width, detector.height = 640, 480
+        detector.input = SimpleNamespace(name='images')
+        detector.confidence = .35
+        detector.session = SimpleNamespace(run=lambda _, feeds: (
+            tensors.append(feeds['images']) or [np.zeros((1,11,1),np.float32)]))
+        image = np.random.default_rng(17).integers(0,256,(480,640,3),dtype=np.uint8)
+        self.assertEqual(detector.detect(image), [])
+        np.testing.assert_array_equal(tensors[0],image.transpose(2,0,1)[None].astype(np.float32)/255)
+
     def test_neural_target_only(self):
         blue=dict(label='blue_ball',confidence=.9,x1=280,y1=200,x2=360,y2=280)
         self.assertIsNone(select_blue([dict(blue,label='red_ball')],640,480))

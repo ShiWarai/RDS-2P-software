@@ -2,7 +2,7 @@
 import * as THREE from "three";
 import { createRobotVisionCamera, CAMERA_CONFIG } from "./robot-camera.js";
 
-// Full sensor resolution; YOLO has its own independent 320×320 input.
+// RGB capture and YOLO input both use the full sensor resolution.
 const WIDTH = CAMERA_CONFIG.width;
 const HEIGHT = CAMERA_CONFIG.height;
 const FPS_LIMIT = 15;
@@ -65,6 +65,7 @@ export class VisionPipeline {
     this.camera = null;
     this.target = null;
     this.worker = null;
+    this.workerBusy = false;
 
     this.running = false;
     this.paused = false;
@@ -146,18 +147,20 @@ export class VisionPipeline {
     this.worker.onmessage = (event) => this.handleWorkerMessage(event.data);
 
     this.worker.onerror = (event) => {
+      this.workerBusy = false;
       this.recordError(event.message || "Ошибка Web Worker");
     };
 
     const modelUrl = new URL(
       "../../models/vision/yolov8n_balls.onnx",
       import.meta.url
-    ).href;
+    );
+    modelUrl.searchParams.set("input", `${WIDTH}x${HEIGHT}`);
 
     this.worker.postMessage({
       type: "init",
       backend: this.backendRequested,
-      modelUrl,
+      modelUrl: modelUrl.href,
     });
   }
 
@@ -170,7 +173,7 @@ export class VisionPipeline {
       <div class="vision-panel-heading">
         <div class="vision-heading-main">
           <span class="vision-title">ЗРЕНИЕ РОБОТА</span>
-          <span class="vision-subtitle">YOLOv8n · 7 классов · RGB ${WIDTH}×${HEIGHT} · вход модели 320×320</span>
+          <span class="vision-subtitle">YOLOv8n · 7 классов · RGB и модель ${WIDTH}×${HEIGHT}</span>
         </div>
 
         <div
@@ -255,6 +258,7 @@ export class VisionPipeline {
     switch (message.type) {
       case "status":
         if (message.state === "ready") {
+          this.inputShape = message.inputShape;
           this.ready = true;
           for (const waiter of this.readyWaiters) waiter.resolve();
           this.readyWaiters.clear();
@@ -280,6 +284,7 @@ export class VisionPipeline {
         break;
 
       case "result":
+        this.workerBusy = false;
         this.backend = message.backend;
         this.latestDetections = message.detections || [];
         this.sim.ballFollower?.receiveDetections(this.latestDetections, WIDTH, HEIGHT, message.timestamp);
@@ -298,11 +303,13 @@ export class VisionPipeline {
         break;
 
       case "frame-error":
+        this.workerBusy = false;
         this.sim.ballFollower?.receiveDetections([], WIDTH, HEIGHT, performance.now());
         this.recordError(message.error);
         break;
 
       case "fatal":
+        this.workerBusy = false;
         this.modelError = new Error(message.error);
         for (const waiter of this.readyWaiters) waiter.reject(this.modelError);
         this.readyWaiters.clear();
@@ -360,6 +367,12 @@ export class VisionPipeline {
 
   async captureFrame() {
     if (!this.running || this.disposed || this.paused) return;
+    // A full-resolution inference can outlast the capture interval. Keep only
+    // one frame in flight so worker messages cannot accumulate stale images.
+    if (this.workerBusy) {
+      this.scheduleCapture();
+      return;
+    }
 
     const started = performance.now();
 
@@ -402,19 +415,20 @@ export class VisionPipeline {
 
       this.metrics.captureMs = performance.now() - started;
 
-      const workerPixels = this.rawPixels.slice();
-
-      this.worker?.postMessage(
-        {
-          type: "frame",
-          width: WIDTH,
-          height: HEIGHT,
-          timestamp: performance.now(),
-          buffer: workerPixels.buffer,
-        },
-        [workerPixels.buffer]
-      );
-
+      if (this.ready) {
+        const workerPixels = this.rawPixels.slice();
+        this.workerBusy = true;
+        this.worker.postMessage(
+          {
+            type: "frame",
+            width: WIDTH,
+            height: HEIGHT,
+            timestamp: performance.now(),
+            buffer: workerPixels.buffer,
+          },
+          [workerPixels.buffer]
+        );
+      }
 
       // Данные для окна просмотра: обычный порядок строк сверху вниз.
       const displayPixels = new Uint8ClampedArray(this.rawPixels.length);
@@ -440,6 +454,7 @@ export class VisionPipeline {
       this.updateFps();
       this.updateHud();
     } catch (error) {
+      this.workerBusy = false;
       this.recordError(error?.message || error);
     } finally {
       this.scheduleCapture();

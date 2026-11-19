@@ -6,6 +6,10 @@
 YOLO-рамка `blue_ball` с confidence ≥ 0.35; HSV и координаты объектов сцены
 в рабочем контуре отсутствуют.
 
+Вход ONNX — **640×480** (`NCHW: 1×3×480×640`), как у RGB-камеры.
+Кадр 640×480 поступает в сеть без уменьшения и без полей. Для других размеров
+сохраняются пропорции и добавляются поля до прямоугольного входа 640×480.
+
 ## Запуск на роботе
 
 Соберите пакет в обычном ROS workspace и установите его Python-зависимости:
@@ -95,6 +99,15 @@ python experiments/rds-2p_mujoco_wasm/tools/collect_ball_dataset.py --url http:/
 Отчёт и SHA-256 весов: `models/training_report.json`; полные обучающие
 артефакты и `.pt` checkpoint: `experiments/rds-2p_mujoco_wasm/.test/vision_training/`.
 Для продолжения прерванного обучения передайте `--resume .../weights/last.pt`.
+Для переэкспорта существующего checkpoint в 640×480 без нового обучения:
+
+```bash
+.venv/Scripts/python experiments/rds-2p_mujoco_wasm/tools/export_ball_yolo.py experiments/rds-2p_mujoco_wasm/.test/vision_training/runs/balls_recovered/weights/best.pt
+```
+
+Веса переэкспортированы официальным [ONNX export](https://docs.ultralytics.com/integrations/onnx/)
+с `imgsz=(480, 640)`. Метрики обучения в отчёте относятся к исходной проверке
+при `imgsz=320`; увеличение входа само по себе не подтверждает рост точности.
 Для дообучения на размеченных реальных кадрах задайте `--data /path/to/data.yaml`
 с теми же семью классами и независимой реальной test-выборкой.
 
