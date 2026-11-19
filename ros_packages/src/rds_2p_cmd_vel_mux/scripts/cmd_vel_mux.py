@@ -78,12 +78,24 @@ class CmdVelMuxNode(Node):
         self.declare_parameter('source_timeouts', [0.5, 0.5, 2.5, 0.5])
         self.declare_parameter('source_status_topics', ['/joy/status', '', '', ''])
         self.declare_parameter('default_source', 'joy')
+        # Авто-обнаружение: любой топик с префиксом auto_discover_prefix и типом
+        # Twist (напр. /cmd_vel/neiry) добавляется источником на лету.
+        self.declare_parameter('auto_discover', True)
+        self.declare_parameter('auto_discover_prefix', '/cmd_vel/')
+        self.declare_parameter('auto_discover_rate', 1.0)
+        self.declare_parameter('auto_source_timeout', 0.5)
 
         self._output_topic = self._param_str('output_topic')
         self._zero_epsilon = max(0.0, self._param_double('zero_epsilon'))
         publish_rate = max(1.0, self._param_double('publish_rate'))
         state_rate = max(0.1, self._param_double('state_rate'))
         self._state_period = 1.0 / state_rate
+
+        self._default_source_name = self._param_str('default_source')
+        self._auto_discover = bool(self.get_parameter('auto_discover').value)
+        self._auto_prefix = self._param_str('auto_discover_prefix')
+        auto_rate = max(0.1, self._param_double('auto_discover_rate'))
+        self._auto_timeout = max(0.05, self._param_double('auto_source_timeout'))
 
         names = self._param_str_array('source_names')
         topics = self._param_str_array('source_topics')
@@ -104,27 +116,10 @@ class CmdVelMuxNode(Node):
             String, self._param_str('state_topic'), state_qos)
 
         self._sources = []
+        self._known_topics = set()
         for name, topic, timeout_sec, status_topic in zip(
                 names, topics, timeouts, status_topics):
-            source = CmdVelSource(
-                name=name,
-                topic=topic,
-                timeout_sec=timeout_sec,
-            )
-            source.subscription = self.create_subscription(
-                Twist,
-                topic,
-                lambda msg, src=source: self._on_twist(src, msg),
-                10,
-            )
-            if status_topic:
-                source.status_subscription = self.create_subscription(
-                    DiagnosticStatus,
-                    status_topic,
-                    lambda msg, src=source: self._on_status(src, msg),
-                    10,
-                )
-            self._sources.append(source)
+            self._add_source(name, topic, timeout_sec, status_topic)
 
         self._selected: Optional[CmdVelSource] = None
         self._active = False
@@ -150,10 +145,13 @@ class CmdVelMuxNode(Node):
             f'{self._param_str("select_topic")} (String); {sources_text}'
         )
 
-        default_source = self._param_str('default_source')
-        if default_source:
+        if self._auto_discover:
+            self.create_timer(1.0 / auto_rate, self._discover_sources)
+            self._discover_sources()
+
+        if self._default_source_name:
             self._select_source(
-                default_source, f'параметр default_source', reset=False)
+                self._default_source_name, 'параметр default_source', reset=False)
         self._publish_active(False)
         self._publish_state()
 
@@ -188,6 +186,55 @@ class CmdVelMuxNode(Node):
             if name in seen:
                 raise ValueError(f'cmd_vel_mux: повторяющееся имя источника {name}')
             seen.add(name)
+
+    def _add_source(self, name: str, topic: str, timeout_sec: float,
+                    status_topic: str = '') -> 'CmdVelSource':
+        source = CmdVelSource(name=name, topic=topic, timeout_sec=timeout_sec)
+        source.subscription = self.create_subscription(
+            Twist,
+            topic,
+            lambda msg, src=source: self._on_twist(src, msg),
+            10,
+        )
+        if status_topic:
+            source.status_subscription = self.create_subscription(
+                DiagnosticStatus,
+                status_topic,
+                lambda msg, src=source: self._on_status(src, msg),
+                10,
+            )
+        self._sources.append(source)
+        self._known_topics.add(topic)
+        return source
+
+    def _discover_sources(self) -> None:
+        """Добавляет как источники любые новые топики <prefix><N> типа Twist."""
+        if not self._auto_prefix:
+            return
+        try:
+            topics = self.get_topic_names_and_types()
+        except Exception:
+            return
+        added = False
+        for topic, types in topics:
+            if topic in self._known_topics or len(topic) <= len(self._auto_prefix):
+                continue
+            if not topic.startswith(self._auto_prefix):
+                continue
+            if 'geometry_msgs/msg/Twist' not in types:
+                continue
+            name = topic[len(self._auto_prefix):].strip('/')
+            if not name or self._find_source(name) is not None:
+                continue
+            self._add_source(name, topic, self._auto_timeout)
+            self.get_logger().info(
+                f'cmd_vel mux: авто-источник {name} ({topic})')
+            added = True
+            if (self._selected is None and self._default_source_name
+                    and name == self._default_source_name):
+                self._select_source(name, 'auto default_source', reset=False)
+        if added:
+            self._publish_state()
 
     def _find_source(self, value: str) -> Optional[CmdVelSource]:
         for source in self._sources:

@@ -25,6 +25,11 @@ cmd_vel_mux:
     state_topic: /cmd_vel_mux/state
     select_topic: /cmd_vel_mux/select
     default_source: joy
+    # Любой новый топик /cmd_vel/<N> (Twist) регистрируется источником на лету.
+    auto_discover: true
+    auto_discover_prefix: /cmd_vel/
+    auto_discover_rate: 1.0
+    auto_source_timeout: 0.5
     publish_rate: 20.0
     state_rate: 2.0
     zero_epsilon: 1.0e-6
