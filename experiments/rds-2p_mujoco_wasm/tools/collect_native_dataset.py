@@ -41,16 +41,29 @@ SETUP = r"""async () => {
   balls.forEach((o,i)=>add([o],i+4));
   const black=new THREE.MeshBasicMaterial({color:0,toneMapped:false}),meshes=[];
   s.scene.traverse(o=>{if(o.isMesh)meshes.push({o,material:o.material,id:membership.get(o)||0});});
-  window.nativeTrainingFrame=seed=>{
+  window.nativeTrainingFrame=(seed,focusBushes=false)=>{
     let state=seed>>>0;const rand=()=>{state=(Math.imul(1664525,state)+1013904223)>>>0;return state/4294967296;};
     const range=(a,b)=>a+(b-a)*rand(),nearHome=rand()<.45;
-    const yaw=nearHome?range(-1.4,1.4):range(-Math.PI,Math.PI);
-    const x=nearHome?range(-.15,.4):range(-.7,.7),z=nearHome?range(-.3,.3):range(-.7,.7),height=range(.13,.21);
+    let yaw=nearHome?range(-1.4,1.4):range(-Math.PI,Math.PI);
+    let x=nearHome?range(-.15,.4):range(-.7,.7),z=nearHome?range(-.3,.3):range(-.7,.7);
+    const height=range(.13,.21);
     camera.position.set(x,height,z);camera.lookAt(x+Math.cos(yaw),height+range(-.09,.035),z-Math.sin(yaw));
     s.hemiLight.intensity=range(.65,1.2);s.ambientLight.intensity=range(.2,.55);s.spotlight.intensity=range(1.4,2.8);
     balls.forEach((b,i)=>{const distance=range(.35,1.7),bearing=yaw+range(-.85,.85),radius=range(.045,.085);
       b.position.set(x+Math.cos(bearing)*distance,radius,z-Math.sin(bearing)*distance);b.scale.setScalar(radius/.065);
       b.visible=rand()>.12;});
+    if(focusBushes){
+      const bush=bushes[Math.floor(rand()*bushes.length)],distance=range(.65,1.9);
+      yaw=range(-Math.PI,Math.PI);x=bush.position.x-Math.cos(yaw)*distance;z=bush.position.z+Math.sin(yaw)*distance;
+      camera.position.set(x,height,z);camera.lookAt(bush.position.x,range(.10,.19),bush.position.z);
+      const regime=rand();
+      balls.forEach((b,i)=>{
+        const ballDistance=distance*range(.65,1.05),side=(i===2?(rand()<.5?-1:1):i-0.5)*range(.23,.38)*ballDistance;
+        const radius=range(.05,.085);
+        b.position.set(x+Math.cos(yaw)*ballDistance+Math.sin(yaw)*side,radius,z-Math.sin(yaw)*ballDistance+Math.cos(yaw)*side);
+        b.scale.setScalar(radius/.065);b.visible=regime>=.4&&(i===2||regime>.72);
+      });
+    }
     s.scene.updateMatrixWorld(true);camera.updateMatrixWorld(true);
     s.renderer.setRenderTarget(target);s.renderer.outputColorSpace=THREE.SRGBColorSpace;s.renderer.toneMapping=THREE.NoToneMapping;
     s.renderer.clear();s.renderer.render(s.scene,camera);s.renderer.readRenderTargetPixels(target,0,0,640,480,pixels);
@@ -79,6 +92,8 @@ def main():
     parser.add_argument('--url', default='http://localhost:8085')
     parser.add_argument('--count', type=int, default=180)
     parser.add_argument('--output', type=Path, default=ROOT/'.test/vision_regression/native_dataset')
+    parser.add_argument('--focus-bushes', action='store_true', help='Bush-centred frames with and without genuine balls')
+    parser.add_argument('--seed', type=int, default=986321)
     args = parser.parse_args()
     root = args.output.resolve()
     if (root/'data.yaml').exists():
@@ -94,10 +109,11 @@ def main():
             split = 'val' if index % 10 == 8 else 'test' if index % 10 == 9 else 'train'
             for kind in ['images', 'labels']:
                 (root/kind/split).mkdir(parents=True, exist_ok=True)
-            seed = 986321+index*4597
-            frame = page.evaluate('seed=>nativeTrainingFrame(seed)', seed)
-            (root/'images'/split/f'native-{seed}.jpg').write_bytes(base64.b64decode(frame['jpeg']))
-            (root/'labels'/split/f'native-{seed}.txt').write_text(
+            seed = args.seed+index*4597
+            frame = page.evaluate('args=>nativeTrainingFrame(args.seed,args.focus)', dict(seed=seed,focus=args.focus_bushes))
+            prefix = 'bush-ball' if args.focus_bushes else 'native'
+            (root/'images'/split/f'{prefix}-{seed}.jpg').write_bytes(base64.b64decode(frame['jpeg']))
+            (root/'labels'/split/f'{prefix}-{seed}.txt').write_text(
                 ''.join(' '.join(map(str, row))+'\n' for row in frame['labels']), encoding='utf-8')
             for row in frame['labels']:
                 counts[NAMES[int(row[0])]] += 1
@@ -106,7 +122,8 @@ def main():
         browser.close()
     (root/'data.yaml').write_text('path: '+root.as_posix()+'\ntrain: images/train\nval: images/val\ntest: images/test\nnames: '+json.dumps(NAMES)+'\n', encoding='utf-8')
     (root/'provenance.json').write_text(json.dumps(dict(count=args.count, counts=counts,
-        fov=dict(horizontal=62, vertical=49), resolution=[640, 480], seed=986321,
+        fov=dict(horizontal=62, vertical=49), resolution=[640, 480], seed=args.seed,
+        focus='bush/ball discrimination; balls absent, green ball present, or all three colours' if args.focus_bushes else 'general scene',
         labels='Visible instance masks for all seven classes; no teacher predictions.',
         domain='Synthetic scene; instance IDs are used only for training labels.'), indent=2), encoding='utf-8')
     print(root, counts, flush=True)

@@ -143,6 +143,33 @@ python experiments/rds-2p_mujoco_wasm/tools/collect_native_dataset.py --count 18
 если AP50 любого из семи классов или recall деревьев, кустов, камней и цветов
 ниже исходной модели на том же наборе кадров. Итоговые результаты поставляемых
 весов записаны в `models/quality_report.json`.
+
+## Проверка «куст или шарик»
+
+Старый четырёхклассовый учитель мог назвать зелёный шарик кустом. При добавлении
+точной маски шарика это давало две противоречивые метки одного объекта.
+Сборщик `collect_ball_dataset.py` теперь исключает такие псевдометки учителя;
+точные маски шариков сохраняются. Проверка фильтра — `tools/check_training_labels.py`.
+
+Для направленных примеров `collect_native_dataset.py --focus-bushes` снимает
+кусты без шариков, рядом с зелёным шариком и рядом с шариками всех трёх цветов.
+Все семь классов размечаются масками объектов. Порог confidence не понижается,
+а рабочему детектору не передаются координаты или типы объектов сцены.
+
+```bash
+python experiments/rds-2p_mujoco_wasm/tools/collect_native_dataset.py --focus-bushes --count 240 --seed 2093117 --output experiments/rds-2p_mujoco_wasm/.test/bush_ball/focused_dataset
+python experiments/rds-2p_mujoco_wasm/tools/check_bush_ball_browser.py --url http://localhost:8085
+.venv/Scripts/python experiments/rds-2p_mujoco_wasm/tools/check_bush_ball_quality.py --model ros_packages/src/rds_2p_vision/models/yolov8n_balls.onnx --data /path/to/data.yaml --split test --require-no-swaps --output /path/to/bush-ball-report.json
+```
+
+Браузерная проверка требует правильного распознавания исходного куста,
+куста без шариков в трёх ракурсах и куста рядом с каждым из трёх настоящих
+шариков. Обнаружить куст где-нибудь в сцене для прохождения этого теста недостаточно.
+
+Почти совпадающие рамки разных классов (IoU > 0,8) объединяются: остаётся метка
+с большей уверенностью. Для одного класса сохраняется порог NMS 0,45.
+Это одинаково реализовано в браузере и ROS; соседние отдельные объекты не
+переименовываются. Результаты парной проверки — `models/bush_ball_report.json`.
 Для дообучения на размеченных реальных кадрах задайте `--data /path/to/data.yaml`
 с теми же семью классами и независимой реальной test-выборкой.
 

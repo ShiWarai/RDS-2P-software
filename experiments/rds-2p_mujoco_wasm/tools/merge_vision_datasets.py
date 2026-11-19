@@ -43,7 +43,7 @@ def main():
                 counts[split] += 1
     (root/'data.yaml').write_text('path: '+root.as_posix()+'\ntrain: images/train\nval: images/val\ntest: images/test\nnames: '+json.dumps(NAMES)+'\n', encoding='utf-8')
     provenance = dict(sources=sources, split_images=counts,
-                      labels='Original scenery pseudo-labels plus native-camera instance masks.',
+                      labels='; '.join(dict.fromkeys(source.get('labels','unspecified') for source in sources)),
                       split_integrity='Original split membership preserved; duplicate image names and cross-split image hashes rejected.')
     (root/'provenance.json').write_text(json.dumps(provenance, indent=2), encoding='utf-8')
     print(root, counts, flush=True)

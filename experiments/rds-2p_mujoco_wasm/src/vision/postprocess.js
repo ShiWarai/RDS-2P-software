@@ -34,7 +34,8 @@ export function boxIoU(a, b) {
 export function nonMaximumSuppression(
   candidates,
   iouThreshold = 0.45,
-  maxDetections = 50
+  maxDetections = 50,
+  crossClassIouThreshold = 0.8
 ) {
   if (!Array.isArray(candidates) || candidates.length === 0) {
     return [];
@@ -54,11 +55,10 @@ export function nonMaximumSuppression(
     selected.push(best);
 
     for (let i = sorted.length - 1; i >= 0; i--) {
-      if (sorted[i].classId !== best.classId) {
-        continue;
-      }
-
-      if (boxIoU(best, sorted[i]) > iouThreshold) {
+      // Nearly identical boxes describe one object even when anchors disagree
+      // about its class. Keep the more confident label, without relabelling it.
+      const threshold = sorted[i].classId === best.classId ? iouThreshold : crossClassIouThreshold;
+      if (boxIoU(best, sorted[i]) > threshold) {
         sorted.splice(i, 1);
       }
     }
@@ -77,6 +77,7 @@ export function decodeYoloV8(
     confidenceThreshold = 0.35,
     iouThreshold = 0.45,
     maxDetections = 50,
+    crossClassIouThreshold = 0.8,
   } = options;
 
   if (
@@ -191,6 +192,7 @@ export function decodeYoloV8(
   return nonMaximumSuppression(
     candidates,
     iouThreshold,
-    maxDetections
+    maxDetections,
+    crossClassIouThreshold
   );
 }

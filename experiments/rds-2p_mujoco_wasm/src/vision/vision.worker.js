@@ -1,6 +1,6 @@
 
 import { preprocessRgbaBottomUp, MODEL_WIDTH, MODEL_HEIGHT } from "./preprocess.js";
-import { decodeYoloV8 } from "./postprocess.js";
+import { decodeYoloV8 } from "./postprocess.js?v=class-dedup-2";
 
 const RUNTIME_FILES = {
   webgpu: "ort.webgpu.bundle.min.mjs",

@@ -1,10 +1,17 @@
 import assert from "node:assert/strict";
 import { selectBlueBall, blueBallCommand } from "../src/vision/blue-ball.js";
-import { decodeYoloV8 } from "../src/vision/postprocess.js";
+import { decodeYoloV8, nonMaximumSuppression } from "../src/vision/postprocess.js";
 import { getLetterboxGeometry, preprocessRgbaBottomUp } from "../src/vision/preprocess.js";
 import { BallFollower } from "../src/vision/ball-follower.js";
 
 const blue={label:"blue_ball",confidence:.9,x1:280,y1:200,x2:360,y2:280};
+const green={classId:6,label:"green_ball",confidence:.92,x1:483,y1:250,x2:519,y2:284};
+const falseBush={classId:1,label:"bush",confidence:.49,x1:482,y1:248,x2:521,y2:283};
+assert.deepEqual(nonMaximumSuppression([falseBush,green]),[green],"one green ball must not also carry a weaker bush label");
+const bush={...falseBush,confidence:.95};
+assert.deepEqual(nonMaximumSuppression([green,bush]),[bush],"one bush must not also carry a weaker ball label");
+const nearbyBush={...bush,x1:510,x2:590};
+assert.equal(nonMaximumSuppression([nearbyBush,green]).length,2,"a nearby real bush and ball must both survive NMS");
 const detection=selectBlueBall([blue,{...blue,label:"red_ball",x2:450}],640,480);
 assert.equal(detection.centerX,.5);
 assert.equal(selectBlueBall([{...blue,label:"tree"}],640,480),null);

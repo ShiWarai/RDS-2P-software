@@ -2,10 +2,19 @@ import unittest
 from types import SimpleNamespace
 
 import numpy as np
-from rds_2p_vision.detector import YoloDetector, follow_command, image_to_rgb, select_blue
+from rds_2p_vision.detector import YoloDetector, follow_command, image_to_rgb, select_blue, non_maximum_suppression
 
 
 class DetectorContractTests(unittest.TestCase):
+    def test_bush_ball_duplicate_labels_keep_stronger_class(self):
+        green=dict(classId=6,label='green_ball',confidence=.92,x1=483,y1=250,x2=519,y2=284)
+        false_bush=dict(classId=1,label='bush',confidence=.49,x1=482,y1=248,x2=521,y2=283)
+        self.assertEqual(non_maximum_suppression([false_bush,green]),[green])
+        bush=dict(false_bush,confidence=.95)
+        self.assertEqual(non_maximum_suppression([green,bush]),[bush])
+        nearby_bush=dict(bush,x1=510,x2=590)
+        self.assertEqual(len(non_maximum_suppression([nearby_bush,green])),2)
+
     def test_native_rectangular_input_preserves_every_pixel(self):
         tensors = []
         detector = YoloDetector.__new__(YoloDetector)

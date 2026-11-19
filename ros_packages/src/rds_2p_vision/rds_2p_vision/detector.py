@@ -45,14 +45,19 @@ class YoloDetector:
                 continue
             candidates.append(dict(x1=x1,y1=y1,x2=x2,y2=y2,confidence=float(scores[i]),
                                    classId=int(classes[i]),label=NAMES[int(classes[i])]))
-        selected = []
-        for box in sorted(candidates,key=lambda b:b['confidence'],reverse=True):
-            if any(box['classId']==other['classId'] and iou(box,other)>.45 for other in selected):
-                continue
-            selected.append(box)
-            if len(selected)>=50:
-                break
-        return selected
+        return non_maximum_suppression(candidates)
+
+
+def non_maximum_suppression(candidates, iou_threshold=.45, max_detections=50, cross_class_iou=.8):
+    selected = []
+    for box in sorted(candidates,key=lambda b:b['confidence'],reverse=True):
+        if any(iou(box,other) > (iou_threshold if box['classId']==other['classId'] else cross_class_iou)
+               for other in selected):
+            continue
+        selected.append(box)
+        if len(selected)>=max_detections:
+            break
+    return selected
 
 
 def iou(a,b):

@@ -5,6 +5,7 @@ import { createRobotVisionCamera, CAMERA_CONFIG } from "./robot-camera.js";
 // RGB capture and YOLO input both use the full sensor resolution.
 const WIDTH = CAMERA_CONFIG.width;
 const HEIGHT = CAMERA_CONFIG.height;
+const MODEL_REVISION = "df43fd17cfad";
 const FPS_LIMIT = 15;
 const FRAME_INTERVAL = 1000 / FPS_LIMIT;
 
@@ -139,10 +140,9 @@ export class VisionPipeline {
   }
 
   createWorker() {
-    this.worker = new Worker(
-      new URL("./vision.worker.js", import.meta.url),
-      { type: "module" }
-    );
+    const workerUrl = new URL("./vision.worker.js", import.meta.url);
+    workerUrl.searchParams.set("v", MODEL_REVISION);
+    this.worker = new Worker(workerUrl, { type: "module" });
 
     this.worker.onmessage = (event) => this.handleWorkerMessage(event.data);
 
@@ -156,7 +156,7 @@ export class VisionPipeline {
       import.meta.url
     );
     modelUrl.searchParams.set("input", `${WIDTH}x${HEIGHT}`);
-    modelUrl.searchParams.set("v", "64ff85f71120");
+    modelUrl.searchParams.set("v", MODEL_REVISION);
 
     this.worker.postMessage({
       type: "init",

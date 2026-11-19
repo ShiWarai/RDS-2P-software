@@ -101,7 +101,7 @@ def main():
     provenance_path = dataset/'provenance.json'
     provenance = json.loads(provenance_path.read_text()) if provenance_path.exists() else {}
     report = dict(split=args.split, dataset_sha256=fingerprint.hexdigest(),
-                  confidence=.35, matching_iou=.5, nms_iou=.45, max_detections=50,
+                  confidence=.35, matching_iou=.5, nms_iou=.45, cross_class_nms_iou=.8, max_detections=50,
                   labels=provenance.get('labels', 'Synthetic labels; not real-camera ground truth.'), models={})
     for model in args.model:
         report['models'][str(model)] = evaluate(model, frames)
