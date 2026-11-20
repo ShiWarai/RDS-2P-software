@@ -3,7 +3,7 @@
 Запускать вместо ``voice-control.service`` (он держит микрофон/динамик/ttysS7)::
 
     sudo systemctl stop voice-control.service
-    ros2 launch rds_2p panda_ros_only.launch.py
+    ros2 launch rds_2p panda.launch.py
 
 Что поднимается:
   * virtual_twin_sim — motor_controller + bridge + MuJoCo-твин; он же даёт
@@ -56,6 +56,9 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "include_inference", default_value="true",
             description="Поднимать inference policy (как rds_2p_inference_node.service)"),
+        DeclareLaunchArgument(
+            "include_battery_monitor", default_value="true",
+            description="Поднимать battery_monitor (телеметрия батареи по моторам)"),
         DeclareLaunchArgument(
             "require_control_input", default_value="true",
             description="Inference не едет без свежего /cmd_vel и active cmd_vel_mux"),
@@ -110,6 +113,13 @@ def generate_launch_description():
                     "control_timeout_sec"),
             }.items(),
             condition=IfCondition(LaunchConfiguration("include_inference")),
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([
+                PathJoinSubstitution([
+                    FindPackageShare("rds_2p"), "launch",
+                    "battery_monitor.launch.py"])]),
+            condition=IfCondition(LaunchConfiguration("include_battery_monitor")),
         ),
 
         # --- голос/LLM/OSM --------------------------------------------------

@@ -20,7 +20,7 @@ source install/setup.bash
 В отдельных терминалах запустите RGB-камеру, YOLO и rosbridge:
 
 ```bash
-ros2 launch rds_2p astra_mini_rgb.launch.py
+ros2 launch rds_2p astra_mini.launch.py stream_profile:=rgb_only
 ros2 launch rds_2p_vision ball_follow.launch.py image_topic:=/camera/color/image_raw
 ros2 launch rosbridge_server rosbridge_websocket_launch.xml
 ```

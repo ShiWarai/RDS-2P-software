@@ -3,7 +3,7 @@ set -euo pipefail
 
 IMAGE="${IMAGE:-rds2p/robot:humble}"
 MODELS_DIR="${MODELS_DIR:-$HOME/RDS-2P-models}"
-LAUNCH="${LAUNCH_OVERRIDE:-ros2 launch rds_2p rds_2p_complete.launch.py}"
+LAUNCH="${LAUNCH_OVERRIDE:-ros2 launch rds_2p panda.launch.py}"
 
 # Сеть DDS: по умолчанию — штатные дефолты ROS 2 (domain 0, rmw по умолчанию образа).
 # DDS_PROFILES_FILE — xml профиля активного rmw:

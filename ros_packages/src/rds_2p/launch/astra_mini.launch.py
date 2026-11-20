@@ -7,9 +7,7 @@
 - **``rgb_only``** — только цвет: глубина, IR, point cloud выключены.
 - **``rgb_depth``** — цвет + глубина без IR и без point cloud.
 
-Готовые профили: ``astra_mini_rgb.launch.py``, ``astra_mini_rgb_depth.launch.py`` (thin include
-с ``stream_profile``). Для тонкой настройки с параметрами удобнее:
-``ros2 launch rds_2p astra_mini.launch.py stream_profile:=rgb_only``.
+Пример: ``ros2 launch rds_2p astra_mini.launch.py stream_profile:=rgb_only``.
 """
 
 from __future__ import annotations

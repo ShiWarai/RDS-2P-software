@@ -153,7 +153,7 @@ ros2 launch rds_2p voice_system.launch.py stt:=gigaam   # GigaAM (RKNN NPU)
 # камера Astra Mini (если orbbec в образе):
 ros2 launch rds_2p astra_mini.launch.py
 ```
-По умолчанию стартует `rds_2p_complete.launch.py` (моторы + bridges joints<->motors).
+По умолчанию стартует `panda.launch.py` (единый стек: база + голос + LLM + команды + RAG).
 
 ### Wireless PS4 джойстик (Bluetooth)
 
