@@ -32,6 +32,8 @@ public:
         this->declare_parameter("debug_mode", false);
         this->declare_parameter("i2c_device", "/dev/i2c-1");
         this->declare_parameter("spi_device", "/dev/spidev0.0");
+        this->declare_parameter("spi_mode", 3);
+        this->declare_parameter("spi_speed", 1000000);
         
         // Get parameters
         interface_type_ = this->get_parameter("interface").as_string();
@@ -42,6 +44,8 @@ public:
         debug_mode_ = this->get_parameter("debug_mode").as_bool();
         i2c_device_ = this->get_parameter("i2c_device").as_string();
         spi_device_ = this->get_parameter("spi_device").as_string();
+        spi_mode_ = static_cast<int>(this->get_parameter("spi_mode").as_int());
+        spi_speed_ = static_cast<int>(this->get_parameter("spi_speed").as_int());
         
         RCLCPP_INFO(this->get_logger(), "MPU6500 IMU Node initialized with:");
         RCLCPP_INFO(this->get_logger(), "  Interface: %s", interface_type_.c_str());
@@ -51,11 +55,13 @@ public:
         RCLCPP_INFO(this->get_logger(), "  Calibration: %s", enable_calibration_ ? "enabled" : "disabled");
         RCLCPP_INFO(this->get_logger(), "  Debug mode: %s", debug_mode_ ? "enabled" : "disabled");
         RCLCPP_INFO(this->get_logger(), "  I2C device: %s", i2c_device_.c_str());
-        RCLCPP_INFO(this->get_logger(), "  SPI device: %s", spi_device_.c_str());
+        RCLCPP_INFO(this->get_logger(), "  SPI device: %s (mode=%d speed=%d Hz)", spi_device_.c_str(), spi_mode_, spi_speed_);
         
         // Apply runtime-overridable bus device (falls back to the parameter default)
         if (interface_type_ == "spi") {
             mpu6500_interface_set_spi_device(spi_device_.c_str());
+            mpu6500_interface_set_spi_mode(static_cast<uint8_t>(spi_mode_));
+            mpu6500_interface_set_spi_speed(static_cast<uint32_t>(spi_speed_));
         } else {
             mpu6500_interface_set_iic_device(i2c_device_.c_str());
         }
@@ -618,6 +624,8 @@ private:
     bool debug_mode_;
     std::string i2c_device_;
     std::string spi_device_;
+    int spi_mode_;
+    int spi_speed_;
 };
 
 int main(int argc, char** argv)

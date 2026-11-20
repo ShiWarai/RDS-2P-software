@@ -2,6 +2,7 @@
 
 from launch import LaunchDescription
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 
@@ -43,6 +44,18 @@ def generate_launch_description():
         description='SPI device path (e.g. /dev/spidev0.0)'
     )
     
+    spi_mode_arg = DeclareLaunchArgument(
+        'spi_mode',
+        default_value='3',
+        description='SPI mode 0-3 (CPOL/CPHA)'
+    )
+    
+    spi_speed_arg = DeclareLaunchArgument(
+        'spi_speed',
+        default_value='1000000',
+        description='SPI speed in Hz'
+    )
+    
     # MPU6500 IMU Node
     mpu6500_node = Node(
         package='mpu6500_ros',
@@ -56,6 +69,8 @@ def generate_launch_description():
             'enable_calibration': LaunchConfiguration('enable_calibration'),
             'i2c_device': LaunchConfiguration('i2c_device'),
             'spi_device': LaunchConfiguration('spi_device'),
+            'spi_mode': ParameterValue(LaunchConfiguration('spi_mode'), value_type=int),
+            'spi_speed': ParameterValue(LaunchConfiguration('spi_speed'), value_type=int),
         }],
         remappings=[
             ('/imu', '/imu'),
@@ -69,5 +84,7 @@ def generate_launch_description():
         calibration_arg,
         i2c_device_arg,
         spi_device_arg,
+        spi_mode_arg,
+        spi_speed_arg,
         mpu6500_node,
     ])
