@@ -108,6 +108,7 @@ def generate_launch_description():
             PathJoinSubstitution([
                 rds_2p_pkg,
                 'launch',
+                'sim',
                 'description.launch.py',
             ])
         ]),
@@ -123,6 +124,7 @@ def generate_launch_description():
             PathJoinSubstitution([
                 rds_2p_pkg,
                 'launch',
+                'sim',
                 'imu_transform.launch.py',
             ])
         ]),

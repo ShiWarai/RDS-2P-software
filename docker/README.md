@@ -146,7 +146,7 @@ ros2 topic pub -r 10 geometry_msgs/msg/Twist '{linear: {x: 0.1}}' /cmd_vel   # �
 ros2 launch rds_2p_inference inference_node.launch.py
 aplay -l                               # /dev/snd виден
 # дисплей-морда:
-ros2 launch rds_2p display.launch.py
+ros2 launch rds_2p sim/display.launch.py
 # голос:
 ros2 launch rds_2p voice_system.launch.py
 ros2 launch rds_2p voice_system.launch.py stt:=gigaam   # GigaAM (RKNN NPU)

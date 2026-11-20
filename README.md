@@ -59,7 +59,7 @@ ros2 launch ftservo_ros motor_controller.launch.py \
 
 ros2 launch rds_2p bridge_motors_to_joints.launch.py
 
-ros2 launch rds_2p display.launch.py
+ros2 launch rds_2p sim/display.launch.py
 
 # Дополнительно (нужна сборка робота / соответствующих пакетов, не desktop-скрипт)
 ros2 launch mpu6500_ros mpu6500_simple_imu.launch.py \

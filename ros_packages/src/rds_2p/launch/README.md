@@ -3,9 +3,9 @@
 ## Основные launch файлы
 
 ### 🤖 Визуализация робота
-- **`display.launch.py`** - Визуализация робота для реальных моторов и датчиков
+- **`sim/display.launch.py`** - Визуализация робота для реальных моторов и датчиков
   ```bash
-  ros2 launch rds-2p display.launch.py
+  ros2 launch rds-2p sim/display.launch.py
   ```
 
 ### 🔧 Дополнительные файлы
@@ -13,13 +13,13 @@
   ```bash
   ros2 launch rds-2p bridge_motors_to_joints.launch.py
   ```
-- **`fake_imu.launch.py`** - Фейковый IMU паблишер для разработки без железа
+- **`sim/fake_imu.launch.py`** - Фейковый IMU паблишер для разработки без железа
   ```bash
-  ros2 launch rds-2p fake_imu.launch.py
+  ros2 launch rds-2p sim/fake_imu.launch.py
   ```
-- **`description.launch.py`** - Запуск robot_state_publisher (используется другими launch файлами)
-- **`controllers.launch.py`** - Контроллеры суставов
-- **`gazebo_sim.launch.py`** - Симуляция в Gazebo
+- **`sim/description.launch.py`** - Запуск robot_state_publisher (используется другими launch файлами)
+- **`sim/controllers.launch.py`** - Контроллеры суставов
+- **`sim/gazebo_sim.launch.py`** - Симуляция в Gazebo
 
 ### 🗣️ Голос + LLM
 - **`voice_system.launch.py`** - голосовой контур: audio + STT (Vosk/GigaAM) + Paroli + lip_sync.
@@ -58,19 +58,19 @@ ros2 run ftservo_ros motor_controller_node --ros-args \
 
 # Терминал 2: Мост + визуализация
 ros2 launch rds-2p bridge_motors_to_joints.launch.py
-ros2 launch rds-2p display.launch.py
+ros2 launch rds-2p sim/display.launch.py
 ```
 
 ### Для разработки без железа:
 ```bash
 # Фейковый IMU для разработки
-ros2 launch rds-2p fake_imu.launch.py
+ros2 launch rds-2p sim/fake_imu.launch.py
 
 # Визуализация робота
-ros2 launch rds-2p display.launch.py
+ros2 launch rds-2p sim/display.launch.py
 ```
 
 ### Для симуляции:
 ```bash
-ros2 launch rds-2p gazebo_sim.launch.py
+ros2 launch rds-2p sim/gazebo_sim.launch.py
 ```

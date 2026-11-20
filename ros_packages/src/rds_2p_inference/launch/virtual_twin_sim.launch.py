@@ -140,7 +140,7 @@ def generate_launch_description():
     )
     
     # Примечание: IMU трансформации и статические трансформации должны запускаться
-    # отдельно через display.launch.py, чтобы избежать дублирования трансформаций
+    # отдельно черезsim/display.launch.py, чтобы избежать дублирования трансформаций
     
     # Включение общего launch файла mtf02p_odom_with_fusion
     # Запускает и mtf02p_odom (публикует /odom/raw), и odom_fusion (публикует /odom)

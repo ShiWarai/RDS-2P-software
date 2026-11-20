@@ -68,7 +68,7 @@ source install/setup.bash
 В `package.xml` пакет называется **`rds_2p`** (подчёркивание). Команды запуска:
 
 ```bash
-ros2 launch rds_2p display.launch.py
+ros2 launch rds_2p sim/display.launch.py
 ros2 launch rds_2p bridge_motors_to_joints.launch.py
 ```
 
@@ -102,7 +102,7 @@ ros2 launch rds_2p bridge_motors_to_joints.launch.py
 Терминал 3 — визуализация:
 
 ```bash
-ros2 launch rds_2p display.launch.py
+ros2 launch rds_2p sim/display.launch.py
 ```
 
 Дополнительно при необходимости: IMU (`mpu6500_ros`), камера Orbbec и т.д. — см. корневой `README.md` репозитория и README соответствующих пакетов.
@@ -110,10 +110,10 @@ ros2 launch rds_2p display.launch.py
 ## Визуализация и симуляция
 
 ```bash
-ros2 launch rds_2p display.launch.py
-ros2 launch rds_2p fake_imu.launch.py
-ros2 launch rds_2p gazebo_sim.launch.py
-ros2 launch rds_2p gazebo_sim.launch.py use_rviz:=true
+ros2 launch rds_2p sim/display.launch.py
+ros2 launch rds_2p sim/fake_imu.launch.py
+ros2 launch rds_2p sim/gazebo_sim.launch.py
+ros2 launch rds_2p sim/gazebo_sim.launch.py use_rviz:=true
 ```
 
 ## Публикация суставов из командной строки

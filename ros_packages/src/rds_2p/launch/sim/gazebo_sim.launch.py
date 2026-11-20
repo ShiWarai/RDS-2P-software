@@ -61,6 +61,7 @@ def generate_launch_description():
             PathJoinSubstitution([
                 FindPackageShare('rds_2p'),
                 'launch',
+                'sim',
                 'description.launch.py'
             ])
         ]),
@@ -100,6 +101,7 @@ def generate_launch_description():
             PathJoinSubstitution([
                 FindPackageShare('rds_2p'),
                 'launch',
+                'sim',
                 'controllers.launch.py'
             ])
         ]),
@@ -123,6 +125,7 @@ def generate_launch_description():
             PathJoinSubstitution([
                 FindPackageShare('rds_2p'),
                 'launch',
+                'sim',
                 'display.launch.py'
             ])
         ]),
