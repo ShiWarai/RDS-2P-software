@@ -84,6 +84,7 @@ class CmdVelMuxNode(Node):
         self.declare_parameter('auto_discover_prefix', '/cmd_vel/')
         self.declare_parameter('auto_discover_rate', 1.0)
         self.declare_parameter('auto_source_timeout', 0.5)
+        self.declare_parameter('auto_follow', True)
 
         self._output_topic = self._param_str('output_topic')
         self._zero_epsilon = max(0.0, self._param_double('zero_epsilon'))
@@ -96,6 +97,7 @@ class CmdVelMuxNode(Node):
         self._auto_prefix = self._param_str('auto_discover_prefix')
         auto_rate = max(0.1, self._param_double('auto_discover_rate'))
         self._auto_timeout = max(0.05, self._param_double('auto_source_timeout'))
+        self._auto_follow = bool(self.get_parameter('auto_follow').value)
 
         names = self._param_str_array('source_names')
         topics = self._param_str_array('source_topics')
@@ -122,6 +124,7 @@ class CmdVelMuxNode(Node):
             self._add_source(name, topic, timeout_sec, status_topic)
 
         self._selected: Optional[CmdVelSource] = None
+        self._auto_selected: Optional[CmdVelSource] = None
         self._active = False
         self._selected_stale_logged = False
         self._next_state_time = 0.0
@@ -273,6 +276,7 @@ class CmdVelMuxNode(Node):
             return
 
         self._selected = selected
+        self._auto_selected = None
         self._active = False
         self._selected_stale_logged = False
         if reset:
@@ -305,37 +309,70 @@ class CmdVelMuxNode(Node):
                 f'{"доступен" if present else "недоступен"} ({msg.message})')
         source.present = present
 
+    def _twist_magnitude(self, twist: Twist) -> float:
+        return (abs(twist.linear.x) + abs(twist.linear.y) + abs(twist.linear.z)
+                + abs(twist.angular.x) + abs(twist.angular.y)
+                + abs(twist.angular.z))
+
+    def _pick_auto_source(self) -> Optional[CmdVelSource]:
+        """Приоритет — свежий источник с не-нулевой командой; если таких нет,
+        берём любой свежий (нулевой). Так mux остаётся active, пока живой
+        контроллер подключён (нужно для IMU-управления позой в inference)."""
+        best_moving = None
+        best_live = None
+        for source in self._sources:
+            if not (source.fresh and source.present):
+                continue
+            last = source.last_msg_time or 0.0
+            if best_live is None or last >= (best_live.last_msg_time or 0.0):
+                best_live = source
+            if self._twist_magnitude(source.last_twist) > self._zero_epsilon:
+                if best_moving is None or last >= (best_moving.last_msg_time or 0.0):
+                    best_moving = source
+        return best_moving if best_moving is not None else best_live
+
     def _tick(self) -> None:
         now = time.monotonic()
 
         for source in self._sources:
             source.fresh = self._is_fresh(source, now) and source.present
 
-        selected = self._selected
-        selected_fresh = selected is not None and selected.fresh
-
-        self._cmd_pub.publish(
-            selected.last_twist if selected_fresh else Twist())
-
-        active = selected_fresh
-        self._active = active
-
-        if active != self._last_active_published:
-            self.get_logger().info(f'cmd_vel mux: active={active}')
-            self._last_active_published = active
-        # active публикуется каждый тик, чтобы watchdog inference видел
-        # свежее состояние, а не только переход.
-        self._publish_active(active)
-
-        if selected is not None and not selected_fresh:
-            if not self._selected_stale_logged:
+        if self._selected is not None:
+            # Явный выбор (через /cmd_vel_mux/select) — приоритет над auto.
+            selected = self._selected
+            selected_fresh = selected.fresh
+            out_twist = selected.last_twist if selected_fresh else Twist()
+            active = selected_fresh
+            self._auto_selected = None
+            if not selected_fresh and not self._selected_stale_logged:
                 self.get_logger().warn(
                     f'cmd_vel mux: источник {selected.name} не присылает '
                     f'команды дольше {selected.timeout_sec:g} с — '
                     f'публикуется нулевая Twist')
                 self._selected_stale_logged = True
         else:
+            # Auto-follow: приоритет источнику с не-нулём, иначе живой (liveness/active).
             self._selected_stale_logged = False
+            self._auto_selected = self._pick_auto_source()
+            if self._auto_selected is not None:
+                out_twist = self._auto_selected.last_twist
+                active = True
+            else:
+                out_twist = Twist()
+                active = False
+
+        self._cmd_pub.publish(out_twist)
+        self._active = active
+
+        if active != self._last_active_published:
+            self.get_logger().info(
+                f'cmd_vel mux: active={active}'
+                + (f' (auto: {self._auto_selected.name})'
+                   if self._auto_selected is not None else ''))
+            self._last_active_published = active
+        # active публикуется каждый тик, чтобы watchdog inference видел
+        # свежее состояние, а не только переход.
+        self._publish_active(active)
 
         if now >= self._next_state_time:
             self._publish_state(now, active)
@@ -368,10 +405,15 @@ class CmdVelMuxNode(Node):
                 'age_sec': age_sec,
             }
 
+        effective = (self._selected if self._selected is not None
+                     else self._auto_selected)
         state = {
             'active': active,
-            'selected_source': (
-                self._selected.name if self._selected is not None else ''),
+            'auto_follow': self._auto_follow,
+            'selected_source': (effective.name if effective is not None else ''),
+            'selection_mode': (
+                'explicit' if self._selected is not None
+                else ('auto' if self._auto_follow else 'none')),
             'output_topic': self._output_topic,
             'sources': sources_state,
         }
