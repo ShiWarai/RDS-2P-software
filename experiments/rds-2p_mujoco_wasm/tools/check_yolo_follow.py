@@ -27,7 +27,7 @@ def main():
         errors=[]
         page.on('pageerror',lambda error:errors.append(str(error)))
         if args.model:
-            page.route('**/models/vision/yolov8n_balls.onnx',lambda route:route.fulfill(
+            page.route('**/models/vision/yolov8n_balls.onnx*',lambda route:route.fulfill(
                 path=str(args.model.resolve()),content_type='application/octet-stream'))
         page.goto(args.url+'/?backend=wasm',wait_until='domcontentloaded')
         page.wait_for_function('window.__panda?.sim?.ballFollower',timeout=60000)
@@ -35,7 +35,13 @@ def main():
         page.locator('#tab-btn-cv').click()
         page.wait_for_function('window.__visionPipeline?.ready || window.__visionPipeline?.modelError',timeout=120000)
         assert page.evaluate('window.__visionPipeline.ready'),page.evaluate('String(window.__visionPipeline.modelError)')
+        assert page.evaluate('JSON.stringify(__visionPipeline.inputShape)==="[1,3,480,640]"'), 'YOLO must use native 640x480 input'
+        # With Astra's narrower FOV, the default ball is already at the stop size.
+        # Start farther away to exercise actual pursuit instead of a correct stop.
+        page.evaluate('''() => {const s=__panda.sim;s.data.qpos[19]=.95;s.data.qvel.fill(0,18,24);
+            s.mujoco.mj_forward(s.model,s.data);}''')
         page.wait_for_function('window.__panda.sim.ballFollower.detection?.label === "blue_ball"',timeout=30000)
+        page.wait_for_function('__panda.sim.ballFollower.detection?.relativeWidth<.16',timeout=30000)
         print('YOLO',json.dumps(page.evaluate('''() => ({detection:window.__panda.sim.ballFollower.detection,
             metrics:window.__visionPipeline.metrics,backend:window.__visionPipeline.backend})''')),flush=True)
         raw=page.evaluate('''() => {const v=window.__visionPipeline,c=document.createElement('canvas');

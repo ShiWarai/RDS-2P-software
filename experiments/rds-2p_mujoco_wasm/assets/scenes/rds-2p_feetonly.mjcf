@@ -164,7 +164,11 @@
       <geom name="base_link_collision_31" pos="-0.017626 -0.000162 -0.007849" quat="0.7071065431725606 -0.0 0.0 -0.7071070192004544" type="mesh" mesh="base_31.obj" class="collision" />
       <site name="base_link_site" pos="0.0 0.0 0.0" quat="1 0 0 0" />
       <camera name="track" mode="trackcom" fovy="45.0" quat="0.9238795325112867 0.3826834323650898 0.0 0.0" pos="0.0 -1.0 1.1" />
-      <camera name="camera" mode="fixed" fovy="90.0" quat="-0.500000 -0.500000 0.500000 0.500000" pos="0.152412 0.002539 0.004207" resolution="640 480" />
+      <camera name="camera" mode="fixed" fovy="49.0" quat="-0.500000 -0.500000 0.500000 0.500000" pos="0.152412 0.002539 0.004207" resolution="640 480" />
+      <!-- Astra Mini Pro envelope: W=84.9, H=20, D=19.92 mm.
+           Front optical plane stays at the existing camera mount (+X forward).
+           Visual only: the trained robot's mass and contacts stay unchanged. -->
+      <geom name="astra_mini_pro_module" type="box" size="0.00996 0.04245 0.01" pos="0.142452 0.002539 0.004207" material="App0.010" class="visual" />
       <body name="leg_block_fl_link" pos="0.098579 0.061964 0.002449" quat="0.7071068967259818 0.0 -0.7071066656470943 0.0">
         <joint name="leg_block_fl_joint" type="hinge" ref="0.0" class="scs40" range="-0.959931 1.745329" axis="0.000000 0.000000 -1.000000" />
         <inertial pos="-0.009629 0.002871 0.000273" quat="0.707107 0.000000 0.000000 0.707107" mass="0.193000" diaginertia="0.000094 0.000070 0.000061" />

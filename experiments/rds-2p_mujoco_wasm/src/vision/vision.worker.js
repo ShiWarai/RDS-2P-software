@@ -1,6 +1,6 @@
 
-import { preprocessRgbaBottomUp } from "./preprocess.js";
-import { decodeYoloV8 } from "./postprocess.js";
+import { preprocessRgbaBottomUp, MODEL_WIDTH, MODEL_HEIGHT } from "./preprocess.js";
+import { decodeYoloV8 } from "./postprocess.js?v=class-dedup-2";
 
 const RUNTIME_FILES = {
   webgpu: "ort.webgpu.bundle.min.mjs",
@@ -104,6 +104,7 @@ async function initialize(message) {
         state: "ready",
         inputName,
         outputName,
+        inputShape: [1, 3, MODEL_HEIGHT, MODEL_WIDTH],
       });
 
       void drainFrames();
@@ -144,14 +145,15 @@ async function processFrame(frame) {
     rgba,
     frame.width,
     frame.height,
-    320
+    MODEL_WIDTH,
+    MODEL_HEIGHT
   );
   const preprocessMs = performance.now() - tPreStart;
 
   const tensor = new ort.Tensor(
     "float32",
     prepared.data,
-    [1, 3, 320, 320]
+    [1, 3, MODEL_HEIGHT, MODEL_WIDTH]
   );
 
   const tInferenceStart = performance.now();

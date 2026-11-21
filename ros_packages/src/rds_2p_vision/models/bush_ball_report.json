@@ -1,0 +1,122 @@
+{
+  "model_sha256": "df43fd17cfad621785e2d751fa04788a4dd8cc9304f02ee505c30051e2a04de0",
+  "confidence": 0.35,
+  "matching_iou": 0.5,
+  "nms_iou": 0.45,
+  "cross_class_nms_iou": 0.8,
+  "baseline_validation": {
+    "counts": {
+      "frames": 24,
+      "no_ball_frames": 8,
+      "bushes": 48,
+      "balls": 30,
+      "bushes_found": 17,
+      "balls_found": 28,
+      "bush_as_ball": 7,
+      "ball_as_bush": 2,
+      "false_balls_in_no_ball_frames": 6
+    },
+    "bush_recall": 0.3541666666666667,
+    "ball_recall": 0.9333333333333333,
+    "nms_iou": 0.45,
+    "cross_class_nms_iou": null,
+    "pipeline_commit": "0acfcfc"
+  },
+  "corrected_validation": {
+    "counts": {
+      "frames": 24,
+      "no_ball_frames": 8,
+      "bushes": 48,
+      "balls": 30,
+      "bushes_found": 41,
+      "balls_found": 28,
+      "bush_as_ball": 0,
+      "ball_as_bush": 0,
+      "false_balls_in_no_ball_frames": 0
+    },
+    "bush_recall": 0.8541666666666666,
+    "ball_recall": 0.9333333333333333
+  },
+  "corrected_test": {
+    "counts": {
+      "frames": 24,
+      "no_ball_frames": 9,
+      "bushes": 50,
+      "balls": 33,
+      "bushes_found": 44,
+      "balls_found": 32,
+      "bush_as_ball": 0,
+      "ball_as_bush": 0,
+      "false_balls_in_no_ball_frames": 1
+    },
+    "bush_recall": 0.88,
+    "ball_recall": 0.9696969696969697
+  },
+  "browser_cases": [
+    {
+      "name": "original_scene",
+      "bush_found": true,
+      "bush_as_ball": 0,
+      "real_ball_found": true
+    },
+    {
+      "name": "bush_only_center",
+      "bush_found": true,
+      "bush_as_ball": 0,
+      "real_ball_found": true
+    },
+    {
+      "name": "bush_only_left",
+      "bush_found": true,
+      "bush_as_ball": 0,
+      "real_ball_found": true
+    },
+    {
+      "name": "bush_only_right",
+      "bush_found": true,
+      "bush_as_ball": 0,
+      "real_ball_found": true
+    },
+    {
+      "name": "bush_and_blue",
+      "bush_found": true,
+      "bush_as_ball": 0,
+      "real_ball_found": true
+    },
+    {
+      "name": "bush_and_red",
+      "bush_found": true,
+      "bush_as_ball": 0,
+      "real_ball_found": true
+    },
+    {
+      "name": "bush_and_green",
+      "bush_found": true,
+      "bush_as_ball": 0,
+      "real_ball_found": true
+    }
+  ],
+  "other_false_detections": [
+    {
+      "frame": "bush-ball-2548220.jpg",
+      "prediction": {
+        "x1": 580.2719116210938,
+        "y1": 198.60720825195312,
+        "x2": 640.0,
+        "y2": 290.521240234375,
+        "confidence": 0.4299778938293457,
+        "classId": 4,
+        "label": "blue_ball"
+      },
+      "nearest_ground_truth": {
+        "classId": 3,
+        "x1": 579.0,
+        "y1": 197.0,
+        "x2": 640.0,
+        "y2": 469.0
+      },
+      "overlap": 0.3308732778150741
+    }
+  ],
+  "limitation": "Finite synthetic checks, not a guarantee of error-free real-camera recognition. One cropped flower was falsely detected as a blue ball; no bush/ball swaps occurred in the held-out pair test."
+}

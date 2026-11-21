@@ -8,6 +8,7 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='10' r='4' fill='%23ff8f3c'/%3E%3Ccircle cx='4' cy='5' r='2' fill='%234cc9f0'/%3E%3Ccircle cx='12' cy='5' r='2' fill='%23ffd166'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="./src/ui/theme.css">
   <link rel="stylesheet" href="./src/vision/vision.css">
+  <link rel="stylesheet" href="./src/vision/depth-map.css">
   <script src="/variant.js"></script>
   <style>
     #variant-banner{
@@ -87,7 +88,28 @@
         </div>
 
         <div id="tab-cv" class="panel-tab hidden" role="tabpanel" aria-labelledby="tab-btn-cv">
-          <div id="vision-mount"></div>
+          <div class="depth-toolbar">
+            <button id="btn-depth-map" class="btn" type="button" aria-controls="depth-window" aria-expanded="false" title="Карта станет доступна после загрузки симулятора" disabled>Карта глубины</button>
+          </div>
+          <div class="vision-workspace">
+            <div id="vision-mount"></div>
+            <div id="depth-mount">
+              <section id="depth-window" class="depth-window" data-floating="false" role="region" aria-labelledby="depth-title" hidden>
+                <div class="depth-heading">
+                  <h2 id="depth-title">Карта глубины</h2>
+                  <div class="depth-actions">
+                    <button class="btn" type="button" data-depth-float aria-pressed="false">В отдельное окно</button>
+                    <button class="btn icon-btn" type="button" data-depth-close aria-label="Закрыть карту глубины">✕</button>
+                  </div>
+                </div>
+                <p class="depth-status" data-depth-status role="status">Ожидание кадра…</p>
+                <canvas id="depth-canvas" width="640" height="480" role="img" aria-label="Карта глубины: 640 на 480 пикселей, от 0 до 2 метров"></canvas>
+                <div class="depth-scale" aria-hidden="true"></div>
+                <div class="depth-ticks" aria-label="Шкала глубины в метрах"><span>0</span><span>0,5</span><span>1</span><span>1,5</span><span>2 м</span></div>
+                <button class="depth-resize-handle" type="button" data-depth-resize aria-label="Изменить размер окна: потяни угол или используй стрелки" title="Потяни угол, чтобы уменьшить или увеличить окно">◢</button>
+              </section>
+            </div>
+          </div>
         </div>
       </section>
 

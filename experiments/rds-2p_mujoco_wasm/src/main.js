@@ -7,6 +7,7 @@ import { SpeechListener, speechSupported } from "./speech/recognizer.js";
 import { VoskStt, voskSupported, voskWarmup, voskWarmupError, voskModelReady, isSecure } from "./speech/vosk_stt.js";
 import { MANUAL_BUTTONS, programForCommand, commandLabel } from "./robot/motions.js";
 import { BALL_COLORS } from "./vision/blue-ball.js";
+import { DepthMap } from "./vision/depth-map.js";
 import { PoseManager } from "./sim/poseManager.js";
 import {
   initBlocks,
@@ -896,6 +897,24 @@ async function boot() {
   window.__panda = app;
   try {
     await app.sim.init($("sim"));
+    const createDepthMap = () => {
+      app.depthMap = new DepthMap(app.sim, $("depth-canvas"), {
+        panel: $("depth-window"), button: $("btn-depth-map"),
+        dock: $("depth-mount"),
+      });
+      app.sim.onDepthFrame = timeMS => app.depthMap.update(timeMS);
+      $("btn-depth-map").disabled = false;
+      $("btn-depth-map").title = "Показать расстояния до поверхностей в симуляторе";
+      app.depthMap.setTabActive($("tab-btn-cv").getAttribute("aria-selected") === "true");
+    };
+    createDepthMap();
+    window.addEventListener("pagehide", () => {
+      app.sim.onDepthFrame = null;
+      app.depthMap.dispose();
+    });
+    window.addEventListener("pageshow", event => {
+      if (event.persisted && app.depthMap.state === "disposed") createDepthMap();
+    });
   } catch (err) {
     console.error("Симулятор не поднялся:", err);
     toast("Симулятор не удалось загрузить. Проверь сервер.", { kind: "err" });
@@ -948,6 +967,7 @@ async function boot() {
   // Вкладки левой панели: конвейер ЗРения стартует лениво, при первом открытии вкладки.
   initPanelTabs({
     onSwitch: (id) => {
+      app.depthMap?.setTabActive(id === "cv");
       if (id === "cv") {
         if (app.sim?.ballFollower?.remote) { app.sim.ballFollower.showRemotePreview(); return; }
         window.__vision?.ensureStarted().then(pipeline => pipeline.resume()).catch(error => {
@@ -1034,6 +1054,7 @@ async function boot() {
   };
   $("btn-reset").onclick = () => {
     app.sim.resetToHome();
+    app.depthMap?.invalidate();
     $("hud-status").textContent = "🏠 Панда дома";
   };
   $("btn-frame").onclick = (e) => {

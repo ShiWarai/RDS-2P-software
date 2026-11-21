@@ -9,6 +9,7 @@ import argparse
 import hashlib
 import json
 import math
+from copy import copy
 from pathlib import Path
 
 import cv2
@@ -17,11 +18,13 @@ import onnx
 from onnx import numpy_helper
 import onnxruntime as ort
 import torch
-import yaml
 from ultralytics import YOLO
 from ultralytics.models.yolo.detect import DetectionTrainer
+from ultralytics.models.yolo.detect import DetectionValidator
 from ultralytics.nn.modules import Conv
 from ultralytics.nn.tasks import DetectionModel
+from ultralytics.utils import YAML
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 NAMES = ['tree','bush','rock','flower','blue_ball','red_ball','green_ball']
@@ -75,6 +78,33 @@ class FrozenBNTrainer(DetectionTrainer):
                 module.eval()
 
 
+def native_frame_dataset(dataset):
+    if not dataset.rect:
+        raise ValueError('Native-frame training requires rect=True')
+    for file in dataset.im_files:
+        with Image.open(file) as image:
+            if image.size != (640, 480):
+                raise ValueError(f'Expected 640x480 training frames: {file}')
+    # Remove the default validation margin so training, validation and exported
+    # inference use the exact same rectangular tensor shape.
+    dataset.batch_shapes[:] = np.array([480, 640])
+    return dataset
+
+
+class NativeFrameValidator(DetectionValidator):
+    def build_dataset(self, img_path, mode='val', batch=None):
+        return native_frame_dataset(super().build_dataset(img_path, mode, batch))
+
+
+class NativeFrameTrainer(FrozenBNTrainer):
+    def build_dataset(self, img_path, mode='train', batch=None):
+        return native_frame_dataset(super().build_dataset(img_path, mode, batch))
+
+    def get_validator(self):
+        return NativeFrameValidator(self.test_loader, save_dir=self.save_dir,
+                                    args=copy(self.args), _callbacks=self.callbacks)
+
+
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--epochs',type=int,default=35)
@@ -86,7 +116,7 @@ def main():
     torch.set_num_threads(args.threads)
     source=ROOT/'models/vision/yolov8n_final.onnx'
     dataset=args.data.resolve()
-    names=yaml.safe_load(dataset.read_text(encoding='utf-8')).get('names',[])
+    names=YAML.load(str(dataset)).get('names',[])
     if isinstance(names,dict):
         names=[names[key] for key in sorted(names,key=int)]
     if names!=NAMES:
@@ -110,17 +140,17 @@ def main():
     if not args.resume:
         yolo.model=restored
         yolo.ckpt={'model':restored}
-    yolo.train(trainer=FrozenBNTrainer,resume=str(args.resume) if args.resume else False,
-               data=str(dataset),epochs=args.epochs,imgsz=320,batch=args.batch,
+    yolo.train(trainer=NativeFrameTrainer,resume=str(args.resume) if args.resume else False,
+               data=str(dataset),epochs=args.epochs,imgsz=640,rect=True,batch=args.batch,
                device='cpu',workers=0,freeze=10,optimizer='AdamW',lr0=.002,lrf=.1,warmup_epochs=2,warmup_bias_lr=.002,
                patience=12,hsv_h=0.,hsv_s=.25,hsv_v=.3,mosaic=.5,close_mosaic=8,
                degrees=4,translate=.1,scale=.25,fliplr=.5,cache=True,amp=False,
                project=str(ROOT/'.test/vision_training/runs'),name='balls_recovered',exist_ok=True,
                seed=317123,deterministic=True,plots=True)
     trained=YOLO(str(yolo.trainer.best))
-    results=trained.val(data=str(dataset),split='test',imgsz=320,device='cpu',workers=0,plots=True,
+    results=trained.val(validator=NativeFrameValidator,data=str(dataset),split='test',imgsz=640,rect=True,device='cpu',workers=0,plots=True,
                         project=str(ROOT/'.test/vision_training'),name='holdout_validation')
-    exported=trained.export(format='onnx',imgsz=320,opset=17,simplify=False,dynamic=False,nms=False)
+    exported=trained.export(format='onnx',imgsz=(480,640),opset=17,simplify=False,dynamic=False,nms=False)
     destination=ROOT.parents[1]/'ros_packages/src/rds_2p_vision/models/yolov8n_balls.onnx'
     destination.parent.mkdir(parents=True,exist_ok=True)
     destination.write_bytes(Path(exported).read_bytes())
@@ -130,7 +160,7 @@ def main():
     provenance=dataset.parent/'provenance.json'
     report=dict(source_model_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
                 model_sha256=hashlib.sha256(destination.read_bytes()).hexdigest(),
-                names=NAMES,imgsz=320,epochs=args.epochs,reconstruction_max_absolute_error=parity,
+                names=NAMES,imgsz=640,export_imgsz=[480,640],epochs=args.epochs,reconstruction_max_absolute_error=parity,
                 test=results.results_dict,per_class=per_class,
                 dataset=json.loads(provenance.read_text()) if provenance.exists() else {'path':str(dataset)},
                 limitation='Synthetic camera only. Real camera accuracy is not validated; collect and label real frames before deployment claims.')

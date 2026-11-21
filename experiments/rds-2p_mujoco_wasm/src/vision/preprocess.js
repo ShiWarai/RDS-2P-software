@@ -1,16 +1,19 @@
 
-export const MODEL_SIZE = 640;
+import { ASTRA_MINI_PRO } from "./astra-mini-pro.js";
+
+export const MODEL_WIDTH = ASTRA_MINI_PRO.width;
+export const MODEL_HEIGHT = ASTRA_MINI_PRO.height;
 
 /**
  * Геометрия letterbox.
- * Координаты source -> квадратная модель.
+ * Координаты source -> прямоугольный вход модели.
  */
-export function getLetterboxGeometry(sourceWidth, sourceHeight, targetSize = MODEL_SIZE) {
-  if (sourceWidth <= 0 || sourceHeight <= 0 || targetSize <= 0) {
+export function getLetterboxGeometry(sourceWidth, sourceHeight, targetWidth = MODEL_WIDTH, targetHeight = MODEL_HEIGHT) {
+  if (sourceWidth <= 0 || sourceHeight <= 0 || targetWidth <= 0 || targetHeight <= 0) {
     throw new Error("Некорректные размеры изображения");
   }
 
-  const scale = Math.min(targetSize / sourceWidth, targetSize / sourceHeight);
+  const scale = Math.min(targetWidth / sourceWidth, targetHeight / sourceHeight);
   const resizedWidth = Math.max(1, Math.round(sourceWidth * scale));
   const resizedHeight = Math.max(1, Math.round(sourceHeight * scale));
 
@@ -20,9 +23,10 @@ export function getLetterboxGeometry(sourceWidth, sourceHeight, targetSize = MOD
     scaleY: resizedHeight / sourceHeight,
     resizedWidth,
     resizedHeight,
-    padLeft: Math.floor((targetSize - resizedWidth) / 2),
-    padTop: Math.floor((targetSize - resizedHeight) / 2),
-    targetSize,
+    padLeft: Math.floor((targetWidth - resizedWidth) / 2),
+    padTop: Math.floor((targetHeight - resizedHeight) / 2),
+    targetWidth,
+    targetHeight,
     sourceWidth,
     sourceHeight,
   };
@@ -35,21 +39,23 @@ export function getLetterboxGeometry(sourceWidth, sourceHeight, targetSize = MOD
  * @param {Uint8Array|Uint8ClampedArray} rgba
  * @param {number} width
  * @param {number} height
- * @param {number} targetSize
+ * @param {number} targetWidth
+ * @param {number} targetHeight
  * @returns {{data: Float32Array, geometry: object}}
  */
 export function preprocessRgbaBottomUp(
   rgba,
   width,
   height,
-  targetSize = MODEL_SIZE
+  targetWidth = MODEL_WIDTH,
+  targetHeight = MODEL_HEIGHT
 ) {
   if (!rgba || rgba.length !== width * height * 4) {
     throw new Error("Неверный размер RGBA-буфера");
   }
 
-  const geometry = getLetterboxGeometry(width, height, targetSize);
-  const planeSize = targetSize * targetSize;
+  const geometry = getLetterboxGeometry(width, height, targetWidth, targetHeight);
+  const planeSize = targetWidth * targetHeight;
   const output = new Float32Array(planeSize * 3);
 
   // Цвет фона letterbox — 114/255, как в стандартной YOLO-предобработке.
@@ -74,7 +80,7 @@ export function preprocessRgbaBottomUp(
       );
 
       const sourceIndex = (sourceYBottomUp * width + sourceX) * 4;
-      const destIndex = (dy + padTop) * targetSize + dx + padLeft;
+      const destIndex = (dy + padTop) * targetWidth + dx + padLeft;
 
       output[destIndex] = rgba[sourceIndex] / 255;
       output[planeSize + destIndex] = rgba[sourceIndex + 1] / 255;

@@ -1,0 +1,179 @@
+{
+  "split": "test",
+  "dataset_sha256": "b3815a475ab0943270e7f59232c4bd224f118b78e89cf4fe5e8fe5e0b60a934c",
+  "confidence": 0.35,
+  "matching_iou": 0.5,
+  "nms_iou": 0.45,
+  "cross_class_nms_iou": 0.8,
+  "max_detections": 50,
+  "labels": "Visible instance masks for all seven classes; no teacher predictions.",
+  "models": {
+    "previous_release": {
+      "commit": "0acfcfc",
+      "sha256": "64ff85f71120d21ef910581754952d37f51a68544f383f5c3b7921d9825dc846",
+      "input_shape": [
+        1,
+        3,
+        480,
+        640
+      ],
+      "frames": 42,
+      "median_ms": 105.19205000309739,
+      "classes": {
+        "tree": {
+          "precision": 0.7435897435897436,
+          "recall": 0.7631578947368421,
+          "map50": 0.815119368797247,
+          "map50_95": 0.289918107918564,
+          "true_positive": 58,
+          "false_positive": 20,
+          "ground_truth": 76
+        },
+        "bush": {
+          "precision": 0.88,
+          "recall": 0.3142857142857143,
+          "map50": 0.7266931668522553,
+          "map50_95": 0.379931085905224,
+          "true_positive": 22,
+          "false_positive": 3,
+          "ground_truth": 70
+        },
+        "rock": {
+          "precision": 0.9285714285714286,
+          "recall": 0.3939393939393939,
+          "map50": 0.5785250360889653,
+          "map50_95": 0.24936853680925103,
+          "true_positive": 13,
+          "false_positive": 1,
+          "ground_truth": 33
+        },
+        "flower": {
+          "precision": 0.8793103448275862,
+          "recall": 0.7216981132075472,
+          "map50": 0.7680460761307399,
+          "map50_95": 0.39171441674735236,
+          "true_positive": 153,
+          "false_positive": 21,
+          "ground_truth": 212
+        },
+        "blue_ball": {
+          "precision": 0.8947368421052632,
+          "recall": 0.85,
+          "map50": 0.9258571428571429,
+          "map50_95": 0.855560224089636,
+          "true_positive": 17,
+          "false_positive": 2,
+          "ground_truth": 20
+        },
+        "red_ball": {
+          "precision": 1.0,
+          "recall": 0.8095238095238095,
+          "map50": 0.9795893719806763,
+          "map50_95": 0.8530523039762169,
+          "true_positive": 17,
+          "false_positive": 0,
+          "ground_truth": 21
+        },
+        "green_ball": {
+          "precision": 0.75,
+          "recall": 0.8888888888888888,
+          "map50": 0.9379283435862383,
+          "map50_95": 0.8482835598135654,
+          "true_positive": 24,
+          "false_positive": 8,
+          "ground_truth": 27
+        }
+      },
+      "map50": 0.8188226437561806
+    },
+    "bush_ball_corrected": {
+      "sha256": "df43fd17cfad621785e2d751fa04788a4dd8cc9304f02ee505c30051e2a04de0",
+      "input_shape": [
+        1,
+        3,
+        480,
+        640
+      ],
+      "frames": 42,
+      "median_ms": 106.22285000135889,
+      "classes": {
+        "tree": {
+          "precision": 0.9852941176470589,
+          "recall": 0.881578947368421,
+          "map50": 0.9271084573779882,
+          "map50_95": 0.7594004951739104,
+          "true_positive": 67,
+          "false_positive": 1,
+          "ground_truth": 76
+        },
+        "bush": {
+          "precision": 0.9117647058823529,
+          "recall": 0.8857142857142857,
+          "map50": 0.9253448584074103,
+          "map50_95": 0.7156685065414344,
+          "true_positive": 62,
+          "false_positive": 6,
+          "ground_truth": 70
+        },
+        "rock": {
+          "precision": 0.8,
+          "recall": 0.48484848484848486,
+          "map50": 0.6886380655549633,
+          "map50_95": 0.4965068329789545,
+          "true_positive": 16,
+          "false_positive": 4,
+          "ground_truth": 33
+        },
+        "flower": {
+          "precision": 0.9351351351351351,
+          "recall": 0.8160377358490566,
+          "map50": 0.8607205735968864,
+          "map50_95": 0.6413600204380137,
+          "true_positive": 173,
+          "false_positive": 12,
+          "ground_truth": 212
+        },
+        "blue_ball": {
+          "precision": 0.9473684210526315,
+          "recall": 0.9,
+          "map50": 0.9402380952380953,
+          "map50_95": 0.8478730158730159,
+          "true_positive": 18,
+          "false_positive": 1,
+          "ground_truth": 20
+        },
+        "red_ball": {
+          "precision": 0.95,
+          "recall": 0.9047619047619048,
+          "map50": 0.9846739130434781,
+          "map50_95": 0.8619123847167325,
+          "true_positive": 19,
+          "false_positive": 1,
+          "ground_truth": 21
+        },
+        "green_ball": {
+          "precision": 1.0,
+          "recall": 0.8888888888888888,
+          "map50": 0.9635185185185184,
+          "map50_95": 0.845506034024455,
+          "true_positive": 24,
+          "false_positive": 0,
+          "ground_truth": 27
+        }
+      },
+      "map50": 0.89860606881962
+    }
+  },
+  "regression_gate": {
+    "passed": true,
+    "failures": []
+  },
+  "dataset": {
+    "images": 420,
+    "train": 336,
+    "val": 42,
+    "test": 42,
+    "labels": "Visible instance masks for all seven classes. No legacy teacher pseudo-labels used in this fine-tuning."
+  },
+  "scope": "This report uses a clean 42-frame instance-mask test set; earlier reports used a different mixed-label set."
+}
