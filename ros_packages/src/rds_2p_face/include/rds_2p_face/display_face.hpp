@@ -5,6 +5,7 @@
 #include <sensor_msgs/msg/image.hpp>
 #include <rclcpp/qos.hpp>
 #include <vector>
+#include <string>
 #include <stdint.h>
 #include <gpiod.h>
 #include <linux/spi/spidev.h>
@@ -71,6 +72,17 @@ private:
     
     // SPI файловый дескриптор
     int spi_fd_;
+    
+    // Конфигурация SPI/GPIO из параметров (фолбэк на #define по умолчанию)
+    std::string spi_device_;
+    int spi_mode_;
+    int spi_speed_;
+    std::string res_chip_name_;
+    int res_line_idx_;
+    std::string dc_chip_name_;
+    int dc_line_idx_;
+    std::string cs_chip_name_;
+    int cs_line_idx_;
     
     // Флаг инициализации дисплея
     bool display_initialized_;

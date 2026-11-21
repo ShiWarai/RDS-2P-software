@@ -10,7 +10,10 @@
 | `ftservo_ros` | Контроллер сервоприводов |
 | `mpu6500_ros`, `mtf02p_ros` | IMU и дальномер |
 | `rds_2p_inference`, `rds_2p_commands`, `rds_2p_dance`, `rds_2p_audio`, `rds_2p_face`, `rds_2p_joystick`, `rds_2p_telegram_bot` | Прикладная логика и интерфейсы |
-| `ros2_perf_test` | Тесты производительности |
+| `audio_filters` | Фильтрация аудио (RNNoise, SoXR) |
+| `paroli_ros` | TTS Paroli для RK3588 (ONNX + RKNN) |
+| `rkllm_ros` | LLM инференс (RKNN vision encoder + RKLLM) |
+| `ros_perf_test` | Тесты производительности |
 
 Подробности по отдельным пакетам — в их `README.md` внутри `src/<пакет>/`.
 
@@ -65,7 +68,7 @@ source install/setup.bash
 В `package.xml` пакет называется **`rds_2p`** (подчёркивание). Команды запуска:
 
 ```bash
-ros2 launch rds_2p display.launch.py
+ros2 launch rds_2p sim/display.launch.py
 ros2 launch rds_2p bridge_motors_to_joints.launch.py
 ```
 
@@ -99,7 +102,7 @@ ros2 launch rds_2p bridge_motors_to_joints.launch.py
 Терминал 3 — визуализация:
 
 ```bash
-ros2 launch rds_2p display.launch.py
+ros2 launch rds_2p sim/display.launch.py
 ```
 
 Дополнительно при необходимости: IMU (`mpu6500_ros`), камера Orbbec и т.д. — см. корневой `README.md` репозитория и README соответствующих пакетов.
@@ -107,10 +110,10 @@ ros2 launch rds_2p display.launch.py
 ## Визуализация и симуляция
 
 ```bash
-ros2 launch rds_2p display.launch.py
-ros2 launch rds_2p fake_imu.launch.py
-ros2 launch rds_2p gazebo_sim.launch.py
-ros2 launch rds_2p gazebo_sim.launch.py use_rviz:=true
+ros2 launch rds_2p sim/display.launch.py
+ros2 launch rds_2p sim/fake_imu.launch.py
+ros2 launch rds_2p sim/gazebo_sim.launch.py
+ros2 launch rds_2p sim/gazebo_sim.launch.py use_rviz:=true
 ```
 
 ## Публикация суставов из командной строки

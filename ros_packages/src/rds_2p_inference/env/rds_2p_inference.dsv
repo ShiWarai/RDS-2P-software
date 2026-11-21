@@ -1,0 +1,3 @@
+# Внешняя python-зависимость mujoco_playground: ros_packages/deps (ставится build_for_desktop.sh).
+# Путь относителен от префикса пакета: install/rds_2p_inference/../../deps = ros_packages/deps
+prepend-non-duplicate-if-exists;PYTHONPATH;../../deps

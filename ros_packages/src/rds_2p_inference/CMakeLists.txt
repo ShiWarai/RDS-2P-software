@@ -17,7 +17,6 @@ find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
-find_package(rds_2p REQUIRED)
 
 # Generate interfaces
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -74,7 +73,6 @@ ament_target_dependencies(inference_node
   sensor_msgs
   geometry_msgs
   nav_msgs
-  rds_2p
 )
 
 # Link OnnxRuntime
@@ -98,8 +96,11 @@ install(TARGETS
 # Install models directory
 install(DIRECTORY
   models/
-  DESTINATION share/${PROJECT_NAME}/models
-)
+  DESTINATION share/${PROJECT_NAME}/models)
+
+# Внешняя python-зависимость mujoco_playground (ros_packages/deps, ставится build_for_desktop.sh):
+# добавляем deps в PYTHONPATH при source install/setup.bash
+ament_environment_hooks("${CMAKE_CURRENT_SOURCE_DIR}/env/${PROJECT_NAME}.dsv")
 
 # Install launch files
 install(DIRECTORY

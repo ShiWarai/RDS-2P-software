@@ -37,6 +37,12 @@ def generate_launch_description():
         description='Enable temperature publishing (every 5 seconds)'
     )
     
+    i2c_device_arg = DeclareLaunchArgument(
+        'i2c_device',
+        default_value='/dev/i2c-1',
+        description='I2C device path (e.g. /dev/i2c-1)'
+    )
+    
     # MPU6500 Simple IMU Node
     mpu6500_simple_node = Node(
         package='mpu6500_ros',
@@ -49,6 +55,7 @@ def generate_launch_description():
             'frame_id': LaunchConfiguration('frame_id'),
             'enable_calibration': LaunchConfiguration('enable_calibration'),
             'enable_temperature': LaunchConfiguration('enable_temperature'),
+            'i2c_device': LaunchConfiguration('i2c_device'),
         }],
         remappings=[
             ('/imu', '/imu'),
@@ -61,5 +68,6 @@ def generate_launch_description():
         frame_id_arg,
         calibration_arg,
         temperature_arg,
+        i2c_device_arg,
         mpu6500_simple_node,
     ])

@@ -1,0 +1,13 @@
+ball_follow:
+  ros__parameters:
+    image_topic: /camera/color/image_raw
+    cmd_topic: /cmd_vel/ball_follow
+    enable_topic: /ball_follow/enable
+    status_topic: /ball_follow/status
+    confidence: 0.35
+    frame_timeout_sec: 0.7
+    heartbeat_timeout_sec: 0.7
+    target_width: 0.18
+    max_forward: 0.55
+    max_yaw: 0.65
+    inference_threads: 2

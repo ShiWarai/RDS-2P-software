@@ -1,0 +1,17 @@
+node_modules/
+# package-lock.json КОММИТИТСЯ: CI ставит библиотеки через npm ci (docker/build_web.sh)
+
+# Крупные артефакты Laya (ONNX + tokenizer) — см. tools/download_models.sh
+models/laya/*
+!models/laya/README.md
+
+*.log
+.DS_Store
+
+# Модель офлайн-распознавания речи (vosk, ~46 МБ) — tools/download_vosk_model.sh
+models/stt/
+.test/
+
+# obj-меши в эксперименте не храним: serve.py отдаёт их из
+# urdf_src/export/rds-2p/meshes/obj (как docker-prepare, план п.4)
+assets/scenes/meshes/

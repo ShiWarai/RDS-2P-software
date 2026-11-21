@@ -2,10 +2,10 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>rds_2p_face</name>
-  <version>0.0.1</version>
-  <description>Face visualization from PS4 touchpad data</description>
-  <maintainer email="zhuravliov.pav@yandex.ru">Zhuravliov Pavel</maintainer>
-  <license>MIT License</license>
+  <version>1.0.0</version>
+  <description>Визуализация лица робота RDS-2P из данных тачпада геймпада (PS-подобный)</description>
+  <maintainer email="zhuravliov.pav@yandex.ru">ShiWarai</maintainer>
+  <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
@@ -14,6 +14,12 @@
   <depend>geometry_msgs</depend>
   <depend>cv_bridge</depend>
   <depend>image_transport</depend>
+
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>audio_common_msgs</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-pil</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

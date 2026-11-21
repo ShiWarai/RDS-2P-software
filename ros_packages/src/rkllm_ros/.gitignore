@@ -1,0 +1,4 @@
+# Vendor binaries and SDK headers — см. vendor/README.md
+vendor/lib/*
+vendor/include/*
+!vendor/README.md

@@ -11,7 +11,8 @@
  *     /joint_states (sensor_msgs/JointState): Текущие позиции и скорости суставов
  *     /imu (sensor_msgs/Imu): Данные IMU (гироскоп, ориентация, ускорение)
  *     /odom/raw (nav_msgs/Odometry): Данные одометрии (линейная и угловая скорость)
- *     /cmd_vel (geometry_msgs/Twist): Команды скорости
+ *     /cmd_vel (geometry_msgs/Twist): Команды скорости от cmd_vel_mux
+ *     /cmd_vel_mux/active (std_msgs/Bool): Есть ли свежий источник управления
  *   
  *   Публикации:
  *     /joint_commands (sensor_msgs/JointState): Целевые позиции суставов (команды) - 50Hz
@@ -23,6 +24,7 @@
 #include <sensor_msgs/msg/joy.hpp>
 #include <geometry_msgs/msg/twist.hpp>
 #include <nav_msgs/msg/odometry.hpp>
+#include <std_msgs/msg/bool.hpp>
 #include <rmw/qos_profiles.h>
 #include <ament_index_cpp/get_package_share_directory.hpp>
 
@@ -72,8 +74,21 @@ public:
       current_pitch_rad_(0.0),
       r1_pressed_(false),
       inference_enabled_(true),
-      triangle_pressed_(false)
+      triangle_pressed_(false),
+      require_control_input_(true),
+      control_timeout_sec_(0.5),
+      cmd_vel_seen_(false),
+      mux_active_seen_(false),
+      mux_active_(false),
+      hold_pose_published_(false)
   {
+    // Защита от runaway: inference работает только при свежем /cmd_vel от
+    // cmd_vel_mux и активном источнике в mux. Если mux не запущен, достаточно
+    // свежего /cmd_vel (обратная совместимость с прямыми публикаторами).
+    // Без источника команды не публикуются, один раз выставляется безопасная поза.
+    require_control_input_ = this->declare_parameter<bool>("require_control_input", true);
+    control_timeout_sec_ = this->declare_parameter<double>("control_timeout_sec", 0.5);
+
     // Имена суставов для RDS-2P (из MJCF файла)
     joint_names_ = {
       "leg_block_fl_joint", "hip_fl_joint", "shin_fl_joint",
@@ -121,6 +136,18 @@ public:
       std::bind(&InferenceNode::cmd_vel_callback, this, std::placeholders::_1)
     );
 
+    // Признак наличия свежего источника в cmd_vel_mux. Если топик не
+    // публикуется (mux не запущен), watchdog опирается только на /cmd_vel.
+    auto mux_state_qos = rclcpp::QoS(1)
+      .reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE)
+      .durability(RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL)
+      .history(RMW_QOS_POLICY_HISTORY_KEEP_LAST);
+    mux_active_sub_ = this->create_subscription<std_msgs::msg::Bool>(
+      "/cmd_vel_mux/active",
+      mux_state_qos,
+      std::bind(&InferenceNode::mux_active_callback, this, std::placeholders::_1)
+    );
+
     // Подписка на данные джойстика IMU
     joy_imu_sub_ = this->create_subscription<sensor_msgs::msg::Imu>(
       "/joy/imu",
@@ -148,7 +175,9 @@ public:
     );
 
     RCLCPP_INFO(this->get_logger(), "=== Инициализация Inference Node ===");
-    RCLCPP_INFO(this->get_logger(), "Подписки: /joint_states, /imu, /odom/raw, /cmd_vel, /joy/imu, /joy");
+    RCLCPP_INFO(this->get_logger(),
+                "Подписки: /joint_states, /imu, /odom/raw, /cmd_vel, "
+                "/cmd_vel_mux/active, /joy/imu, /joy");
     RCLCPP_INFO(this->get_logger(), "Публикация: /joint_commands (50Hz)");
     RCLCPP_INFO(this->get_logger(), "QoS оптимизирован для минимальной задержки");
     RCLCPP_INFO(this->get_logger(), "Обновление наклона активируется кнопкой R1");
@@ -170,11 +199,23 @@ private:
   }
 
   void cmd_vel_callback(const geometry_msgs::msg::Twist::SharedPtr msg) {
+    {
+      std::lock_guard<std::mutex> lock(cmd_vel_mutex_);
+      cmd_vel_seen_ = true;
+      last_cmd_vel_time_ = std::chrono::steady_clock::now();
+    }
     controller_->set_cmd_vel(
       static_cast<float>(msg->linear.x),
       static_cast<float>(msg->linear.y),
       static_cast<float>(msg->angular.z)
     );
+  }
+
+  void mux_active_callback(const std_msgs::msg::Bool::SharedPtr msg) {
+    std::lock_guard<std::mutex> lock(mux_active_mutex_);
+    mux_active_seen_ = true;
+    mux_active_ = msg->data;
+    last_mux_active_time_ = std::chrono::steady_clock::now();
   }
 
   void joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
@@ -216,7 +257,7 @@ private:
     if (!triangle_was_pressed && triangle_pressed) {
       std::lock_guard<std::mutex> lock(inference_enabled_mutex_);
       inference_enabled_ = !inference_enabled_;
-      RCLCPP_INFO(this->get_logger(), "Кнопка треугольник нажата - инференс %s", 
+      RCLCPP_INFO(this->get_logger(), "Кнопка треугольник нажата - инференс %s",
                   inference_enabled_ ? "включен" : "выключен");
     }
   }
@@ -305,6 +346,63 @@ private:
       return;
     }
 
+    if (require_control_input_) {
+      const auto now = std::chrono::steady_clock::now();
+      const auto timeout = std::chrono::duration<double>(control_timeout_sec_);
+
+      bool cmd_vel_fresh = false;
+      {
+        std::lock_guard<std::mutex> lock(cmd_vel_mutex_);
+        cmd_vel_fresh = cmd_vel_seen_ &&
+          (now - last_cmd_vel_time_ <= timeout);
+      }
+
+      // Если cmd_vel_mux публикует состояние, требуем active=true. Если
+      // состояния нет (mux не запущен), достаточно свежего /cmd_vel.
+      bool mux_ok = true;
+      {
+        std::lock_guard<std::mutex> lock(mux_active_mutex_);
+        if (mux_active_seen_ && (now - last_mux_active_time_ <= timeout)) {
+          mux_ok = mux_active_;
+        }
+      }
+
+      if (!cmd_vel_fresh || !mux_ok) {
+        // Не оставляем последнюю ненулевую команду в контроллере.
+        controller_->set_cmd_vel(0.0f, 0.0f, 0.0f);
+        RCLCPP_WARN_THROTTLE(
+          this->get_logger(), *this->get_clock(), 2000,
+          "Нет источника управления (свежий /cmd_vel и active cmd_vel_mux) — "
+          "inference заблокирован");
+
+        bool publish_hold = false;
+        {
+          std::lock_guard<std::mutex> lock(hold_pose_mutex_);
+          if (!hold_pose_published_) {
+            hold_pose_published_ = true;
+            publish_hold = true;
+          }
+        }
+        if (publish_hold) {
+          controller_->set_default_angles(DEFAULT_ANGLES);
+          auto hold = std::make_shared<sensor_msgs::msg::JointState>();
+          hold->header.stamp = this->get_clock()->now();
+          hold->header.frame_id = "base_link";
+          hold->name = joint_names_;
+          hold->position.assign(DEFAULT_ANGLES.begin(), DEFAULT_ANGLES.end());
+          joint_commands_pub_->publish(*hold);
+          RCLCPP_INFO(this->get_logger(),
+                      "Источник управления пропал — опубликована безопасная поза");
+        }
+        return;
+      }
+
+      // Управление вернулось — снова разрешаем одну безопасную позу при
+      // следующей потере источника.
+      std::lock_guard<std::mutex> lock(hold_pose_mutex_);
+      hold_pose_published_ = false;
+    }
+
     // Проверяем, можно ли запустить inference
     if (!controller_->can_run_inference()) {
       // Если данных нет, просто не публикуем ничего
@@ -354,10 +452,25 @@ private:
   bool triangle_pressed_;
   std::mutex triangle_mutex_;
 
+  // Защита походки от запуска без источника управления
+  // (свежий /cmd_vel + active cmd_vel_mux)
+  bool require_control_input_;
+  double control_timeout_sec_;
+  bool cmd_vel_seen_;
+  bool mux_active_seen_;
+  bool mux_active_;
+  bool hold_pose_published_;
+  std::chrono::steady_clock::time_point last_cmd_vel_time_;
+  std::chrono::steady_clock::time_point last_mux_active_time_;
+  std::mutex cmd_vel_mutex_;
+  std::mutex mux_active_mutex_;
+  std::mutex hold_pose_mutex_;
+
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_states_sub_;
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr mux_active_sub_;
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr joy_imu_sub_;
   rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_commands_pub_;

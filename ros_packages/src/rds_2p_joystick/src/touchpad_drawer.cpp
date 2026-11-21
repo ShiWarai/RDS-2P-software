@@ -14,7 +14,8 @@ TouchpadDrawerNode::TouchpadDrawerNode() : Node("touchpad_drawer") {
     constexpr int MIN_BRUSH_SIZE = 10;
     constexpr int MAX_BRUSH_SIZE = 100;
     constexpr int DEFAULT_BRUSH_SIZE = MIN_BRUSH_SIZE;
-    constexpr double FAST_TOUCH_THRESHOLD = 0.4;
+    constexpr double FAST_TOUCH_THRESHOLD = 0.7;
+    constexpr double L2_DRAW_DEADZONE = 0.12;  // 12% хода курка
     
     // QoS профиль с увеличенной глубиной очереди
     rclcpp::QoS qos_profile(100);
@@ -40,9 +41,17 @@ TouchpadDrawerNode::TouchpadDrawerNode() : Node("touchpad_drawer") {
         "/joy/drawing",
         10
     );
+    touch_rate_pub_ = this->create_publisher<std_msgs::msg::Float32>(
+        "/joy/touch_rate_hz",
+        10
+    );
     
     // Инициализация
     brush_size_.store(DEFAULT_BRUSH_SIZE);
+    drawing_enabled_.store(false);
+    last_touch_msg_time_ = 0.0;
+    touch_rate_intervals_count_ = 0;
+    touch_rate_intervals_sum_ = 0.0;
     // Используем OpenCV Mat для быстрой отрисовки
     image_ = cv::Mat::zeros(TOUCHPAD_HEIGHT, TOUCHPAD_WIDTH, CV_8UC1);
     touchpad_width_ = TOUCHPAD_WIDTH;
@@ -64,12 +73,42 @@ TouchpadDrawerNode::TouchpadDrawerNode() : Node("touchpad_drawer") {
     
     RCLCPP_INFO(this->get_logger(), "Touchpad drawer node started");
     RCLCPP_INFO(this->get_logger(), "Publishing to /joy/drawing at ~30 FPS");
+    RCLCPP_INFO(this->get_logger(), "Publishing touch rate to /joy/touch_rate_hz");
     RCLCPP_INFO(this->get_logger(), "Brush size control: L2 axis (index 4, -1=max, 1=min)");
+    RCLCPP_INFO(this->get_logger(), "Drawing enabled when L2 press > %.0f%%", L2_DRAW_DEADZONE * 100.0);
     RCLCPP_INFO(this->get_logger(), "Clear: L2==-1 and button 0 (X button)");
 }
 
 void TouchpadDrawerNode::touchpad_callback(const geometry_msgs::msg::PointStamped::SharedPtr msg) {
-    double received_time = this->now().seconds();
+    constexpr double TOUCH_RATE_RESET_TIMEOUT = 0.7;  // Пауза, после которой начинаем новую сессию частоты
+    const double now_time = this->now().seconds();
+
+    // Публикуем среднюю частоту входящих touch-сообщений в пределах одной сессии касания.
+    // Если была длинная пауза, считаем, что началась новая сессия и сбрасываем статистику.
+    if (last_touch_msg_time_ > 0.0) {
+        const double dt = now_time - last_touch_msg_time_;
+        if (dt > TOUCH_RATE_RESET_TIMEOUT) {
+            touch_rate_intervals_count_ = 0;
+            touch_rate_intervals_sum_ = 0.0;
+        } else if (dt > 0.0) {
+            touch_rate_intervals_sum_ += dt;
+            ++touch_rate_intervals_count_;
+            if (touch_rate_intervals_sum_ > 0.0) {
+                std_msgs::msg::Float32 rate_msg;
+                rate_msg.data = static_cast<float>(
+                    static_cast<double>(touch_rate_intervals_count_) / touch_rate_intervals_sum_
+                );
+                touch_rate_pub_->publish(rate_msg);
+            }
+        }
+    }
+    last_touch_msg_time_ = now_time;
+
+    if (!drawing_enabled_.load()) {
+        return;
+    }
+
+    double received_time = now_time;
     double x = msg->point.x;
     double y = msg->point.y;
     
@@ -120,6 +159,13 @@ void TouchpadDrawerNode::joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg
     // Управление толщиной через L2 (ось 4)
     if (msg->axes.size() > 4) {
         double l2_value = msg->axes[4];  // L2 ось (от -1 до 1)
+        constexpr double L2_DRAW_DEADZONE = 0.12;  // 12% от отпущенного состояния (1.0)
+        // 1.0 — отпущен. Включаем рисование, только когда ушли ниже 1.0 хотя бы на dead zone.
+        const double l2_draw_threshold = 1.0 - L2_DRAW_DEADZONE;
+        const bool zero_like_state = (l2_value == 0.0);  // Блокируем только строго 0.0
+        const bool new_drawing_enabled = (l2_value <= l2_draw_threshold) && !zero_like_state;
+        drawing_enabled_.store(new_drawing_enabled);
+
         // L2: -1 -> MAX (инвертировано), 1 -> MIN
         int new_brush_size = static_cast<int>(
             max_brush_size_ - 

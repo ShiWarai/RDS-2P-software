@@ -63,6 +63,7 @@ ament_target_dependencies(motor_controller_lib
 
 target_link_libraries(motor_controller_lib
   motor_config_lib
+  ftservo_lib
 )
 
 # Add dependency on generated messages for libraries

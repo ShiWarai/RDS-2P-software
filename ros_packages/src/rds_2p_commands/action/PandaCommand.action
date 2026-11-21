@@ -1,0 +1,10 @@
+# Goal
+string routine_id
+string source
+---
+# Result
+bool success
+string message
+---
+# Feedback
+string status
