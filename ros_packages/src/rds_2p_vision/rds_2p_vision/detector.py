@@ -13,7 +13,7 @@ class YoloDetector:
         options.intra_op_num_threads = threads
         self.session = ort.InferenceSession(str(model_path), options, providers=['CPUExecutionProvider'])
         self.input = self.session.get_inputs()[0]
-        self.size = int(self.input.shape[2])
+        self.height, self.width = map(int, self.input.shape[2:4])
         metadata = self.session.get_modelmeta().custom_metadata_map
         names = ast.literal_eval(metadata.get('names', '{}'))
         labels = list(names.values()) if isinstance(names, dict) else names
@@ -23,10 +23,10 @@ class YoloDetector:
 
     def detect(self, rgb):
         height, width = rgb.shape[:2]
-        scale = min(self.size/width, self.size/height)
+        scale = min(self.width/width, self.height/height)
         rw, rh = max(1, round(width*scale)), max(1, round(height*scale))
-        left, top = (self.size-rw)//2, (self.size-rh)//2
-        image = np.full((self.size, self.size, 3), 114, np.uint8)
+        left, top = (self.width-rw)//2, (self.height-rh)//2
+        image = np.full((self.height, self.width, 3), 114, np.uint8)
         image[top:top+rh, left:left+rw] = cv2.resize(rgb, (rw, rh), interpolation=cv2.INTER_NEAREST_EXACT)
         tensor = np.ascontiguousarray(image.transpose(2,0,1)[None], dtype=np.float32) / 255
         output = self.session.run(None, {self.input.name: tensor})[0]
@@ -45,14 +45,19 @@ class YoloDetector:
                 continue
             candidates.append(dict(x1=x1,y1=y1,x2=x2,y2=y2,confidence=float(scores[i]),
                                    classId=int(classes[i]),label=NAMES[int(classes[i])]))
-        selected = []
-        for box in sorted(candidates,key=lambda b:b['confidence'],reverse=True):
-            if any(box['classId']==other['classId'] and iou(box,other)>.45 for other in selected):
-                continue
-            selected.append(box)
-            if len(selected)>=50:
-                break
-        return selected
+        return non_maximum_suppression(candidates)
+
+
+def non_maximum_suppression(candidates, iou_threshold=.45, max_detections=50, cross_class_iou=.8):
+    selected = []
+    for box in sorted(candidates,key=lambda b:b['confidence'],reverse=True):
+        if any(iou(box,other) > (iou_threshold if box['classId']==other['classId'] else cross_class_iou)
+               for other in selected):
+            continue
+        selected.append(box)
+        if len(selected)>=max_detections:
+            break
+    return selected
 
 
 def iou(a,b):

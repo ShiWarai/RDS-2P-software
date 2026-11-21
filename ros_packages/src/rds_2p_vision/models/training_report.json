@@ -1,6 +1,5 @@
 {
-  "source_model_sha256": "061a1681607c883e3fade1bc72f391f355133428707886a1d8135bfc4aeb4536",
-  "model_sha256": "f15e33305482fcafd757e50d83e1bb08ffba9b3cce43badfe575d7580cf74dad",
+  "model_sha256": "df43fd17cfad621785e2d751fa04788a4dd8cc9304f02ee505c30051e2a04de0",
   "names": [
     "tree",
     "bush",
@@ -10,88 +9,234 @@
     "red_ball",
     "green_ball"
   ],
-  "imgsz": 320,
-  "epochs": 35,
-  "reconstruction_max_absolute_error": 0.0018310546875,
-  "test": {
-    "metrics/precision(B)": 0.8319343305704894,
-    "metrics/recall(B)": 0.7021903163041708,
-    "metrics/mAP50(B)": 0.7759570557885844,
-    "metrics/mAP50-95(B)": 0.552287748666631,
-    "fitness": 0.552287748666631
+  "input_shape": [
+    1,
+    3,
+    480,
+    640
+  ],
+  "output_shape": [
+    1,
+    11,
+    6300
+  ],
+  "training": {
+    "initial": {
+      "imgsz": 320,
+      "epochs": 35,
+      "source_model_sha256": "061a1681607c883e3fade1bc72f391f355133428707886a1d8135bfc4aeb4536",
+      "model_sha256": "f15e33305482fcafd757e50d83e1bb08ffba9b3cce43badfe575d7580cf74dad"
+    },
+    "finetuning": [
+      {
+        "name": "native_640x480",
+        "epochs_run": 12,
+        "training_frames": 360,
+        "image_shape": [
+          480,
+          640
+        ],
+        "selected_epoch": 10,
+        "selection": "highest validation mAP50-95",
+        "selected_validation_map50": 0.89662,
+        "selected_validation_map50_95": 0.72709,
+        "checkpoint_sha256": "30ddd88633669370fce66db6e1f2a329417d3c027045e9001b050bb3a29be8ec"
+      },
+      {
+        "name": "native_camera_62x49",
+        "epochs_run": 4,
+        "training_frames": 504,
+        "image_shape": [
+          480,
+          640
+        ],
+        "selected_epoch": 4,
+        "selection": "highest validation mAP50-95",
+        "selected_validation_map50": 0.87272,
+        "selected_validation_map50_95": 0.69107,
+        "checkpoint_sha256": "1666995248c0b5ea89e734d5559704a2a2349f955bfc45dfe732ed07ef455603"
+      },
+      {
+        "name": "bush_ball_discrimination",
+        "epochs_run": 6,
+        "training_frames": 336,
+        "image_shape": [
+          480,
+          640
+        ],
+        "selected_epoch": 6,
+        "selection": "highest validation mAP50-95",
+        "selected_validation_map50": 0.90056,
+        "selected_validation_map50_95": 0.71694,
+        "checkpoint_sha256": "ec00e7f83476a5396c0d8af61ea6a6451e80f4d8351b3cfb37f68ecf7c74735d",
+        "labels": "Exact visible-instance masks only; contradictory teacher labels excluded."
+      }
+    ],
+    "frozen_backbone_layers": 10,
+    "batch_norm": "frozen",
+    "seed": 317123
   },
   "dataset": {
-    "count": 450,
-    "counts": {
-      "tree": 949,
-      "bush": 566,
-      "rock": 331,
-      "flower": 2897,
-      "blue_ball": 324,
-      "red_ball": 342,
-      "green_ball": 338
+    "sources": [
+      {
+        "count": 180,
+        "counts": {
+          "tree": 206,
+          "bush": 198,
+          "rock": 102,
+          "flower": 675,
+          "blue_ball": 102,
+          "red_ball": 99,
+          "green_ball": 101
+        },
+        "fov": {
+          "horizontal": 62,
+          "vertical": 49
+        },
+        "resolution": [
+          640,
+          480
+        ],
+        "seed": 986321,
+        "labels": "Visible instance masks for all seven classes; no teacher predictions.",
+        "domain": "Synthetic scene; instance IDs are used only for training labels."
+      },
+      {
+        "count": 240,
+        "counts": {
+          "tree": 541,
+          "bush": 498,
+          "rock": 241,
+          "flower": 1360,
+          "blue_ball": 81,
+          "red_ball": 78,
+          "green_ball": 159
+        },
+        "fov": {
+          "horizontal": 62,
+          "vertical": 49
+        },
+        "resolution": [
+          640,
+          480
+        ],
+        "seed": 2093117,
+        "focus": "bush/ball discrimination; balls absent, green ball present, or all three colours",
+        "labels": "Visible instance masks for all seven classes; no teacher predictions.",
+        "domain": "Synthetic scene; instance IDs are used only for training labels."
+      }
+    ],
+    "split_images": {
+      "train": 336,
+      "val": 42,
+      "test": 42
     },
-    "seed": 317123,
-    "labels": "visible object-ID masks for balls; original YOLO pseudo-labels for four scenery classes",
-    "domain": "synthetic MuJoCo camera; real-camera generalization has not been measured"
+    "labels": "Visible instance masks for all seven classes; no teacher predictions.",
+    "split_integrity": "Original split membership preserved; duplicate image names and cross-split image hashes rejected."
   },
-  "limitation": "Synthetic camera only. Real camera accuracy is not validated; collect and label real frames before deployment claims.",
+  "test": {
+    "frames": 42,
+    "map50": 0.89860606881962,
+    "confidence": 0.35,
+    "matching_iou": 0.5,
+    "nms_iou": 0.45,
+    "cross_class_nms_iou": 0.8,
+    "max_detections": 50
+  },
   "per_class": {
     "tree": {
-      "precision": 0.8226629757513273,
-      "recall": 0.967391304347826,
-      "map50": 0.9643219695524633,
-      "map50_95": 0.822378708904186
+      "precision": 0.9852941176470589,
+      "recall": 0.881578947368421,
+      "map50": 0.9271084573779882,
+      "map50_95": 0.7594004951739104,
+      "true_positive": 67,
+      "false_positive": 1,
+      "ground_truth": 76
     },
     "bush": {
-      "precision": 0.7085467268174139,
-      "recall": 0.5740579241578354,
-      "map50": 0.6137880720288296,
-      "map50_95": 0.39626923438895434
+      "precision": 0.9117647058823529,
+      "recall": 0.8857142857142857,
+      "map50": 0.9253448584074103,
+      "map50_95": 0.7156685065414344,
+      "true_positive": 62,
+      "false_positive": 6,
+      "ground_truth": 70
     },
     "rock": {
-      "precision": 0.7878228375491402,
-      "recall": 0.586456772324131,
-      "map50": 0.723971953057431,
-      "map50_95": 0.45560268509145346
+      "precision": 0.8,
+      "recall": 0.48484848484848486,
+      "map50": 0.6886380655549633,
+      "map50_95": 0.4965068329789545,
+      "true_positive": 16,
+      "false_positive": 4,
+      "ground_truth": 33
     },
     "flower": {
-      "precision": 0.8410006358876385,
-      "recall": 0.7195081849704079,
-      "map50": 0.7689498908489244,
-      "map50_95": 0.4419266420315037
+      "precision": 0.9351351351351351,
+      "recall": 0.8160377358490566,
+      "map50": 0.8607205735968864,
+      "map50_95": 0.6413600204380137,
+      "true_positive": 173,
+      "false_positive": 12,
+      "ground_truth": 212
     },
     "blue_ball": {
-      "precision": 0.823865447382095,
-      "recall": 0.6451612903225806,
-      "map50": 0.7741714104996837,
-      "map50_95": 0.576627412545509
+      "precision": 0.9473684210526315,
+      "recall": 0.9,
+      "map50": 0.9402380952380953,
+      "map50_95": 0.8478730158730159,
+      "true_positive": 18,
+      "false_positive": 1,
+      "ground_truth": 20
     },
     "red_ball": {
-      "precision": 0.9589555946260554,
-      "recall": 0.7082835386555525,
-      "map50": 0.7530408720311945,
-      "map50_95": 0.6009228750211919
+      "precision": 0.95,
+      "recall": 0.9047619047619048,
+      "map50": 0.9846739130434781,
+      "map50_95": 0.8619123847167325,
+      "true_positive": 19,
+      "false_positive": 1,
+      "ground_truth": 21
     },
     "green_ball": {
-      "precision": 0.88068617665854,
-      "recall": 0.7144732777209782,
-      "map50": 0.8334552225015647,
-      "map50_95": 0.5722866826836184
+      "precision": 1.0,
+      "recall": 0.8888888888888888,
+      "map50": 0.9635185185185184,
+      "map50_95": 0.845506034024455,
+      "true_positive": 24,
+      "false_positive": 0,
+      "ground_truth": 27
     }
   },
-  "verification": {
-    "browser": "Real ONNX inference, pursuit with hidden CV tab, loss stop, Esc/reset passed",
-    "python_detector_same_frame": {
-      "label": "blue_ball",
-      "confidence": 0.9634045362472534
-    },
-    "hardware_robot": "not connected; physical validation not performed",
-    "ros_browser": "Mock rosbridge: preview, robot-only dispatch, manual override, Esc and disconnect passed"
+  "quality_report": "quality_report.json",
+  "export": {
+    "input_shape": [
+      1,
+      3,
+      480,
+      640
+    ],
+    "output_shape": [
+      1,
+      11,
+      6300
+    ],
+    "checkpoint_onnx_max_absolute_error": 0.00067138671875
   },
-  "split_images": {
-    "train": 360,
-    "val": 45,
-    "test": 45
-  }
+  "verification": {
+    "bush_ball_browser_cases": 7,
+    "bush_ball_test_swaps": 0,
+    "all_seven_AP50_no_regression": true,
+    "scenery_recall_no_regression": true,
+    "hardware_robot": "not connected",
+    "browser_follow": "Real ONNX: pursuit, hidden CV, lost-target stop, Escape/reset passed.",
+    "unit_tests": {
+      "training_label_filter": 4,
+      "python_detector": 5,
+      "node_tests": 4
+    }
+  },
+  "limitation": "Synthetic instance-mask test set only; real-camera accuracy is unmeasured. The earlier weak-label dataset contained conflicting bush/ball labels and is excluded from this fine-tuning.",
+  "previous_model_sha256": "64ff85f71120d21ef910581754952d37f51a68544f383f5c3b7921d9825dc846",
+  "bush_ball_report": "bush_ball_report.json"
 }

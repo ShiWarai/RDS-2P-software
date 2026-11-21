@@ -36,6 +36,7 @@ export class Simulator {
     this.resolvePoseAngles = () => null;
     this.resolveCommand = () => null;
     this.onStep = () => {};
+    this.onDepthFrame = null;
     this.simClockMs = 0;
     this.tmpVec = new THREE.Vector3();
     this.tmpQuat = new THREE.Quaternion();
@@ -555,6 +556,7 @@ export class Simulator {
     }
     drawTendonsAndFlex(this.mujocoRoot, this.model, this.data);
     this.updateFrameReadout();
+    this.onDepthFrame?.(timeMS);
     this.renderer.render(this.scene, this.camera);
   }
 }

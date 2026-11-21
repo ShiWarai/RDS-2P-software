@@ -6,6 +6,10 @@
 YOLO-рамка `blue_ball` с confidence ≥ 0.35; HSV и координаты объектов сцены
 в рабочем контуре отсутствуют.
 
+Вход ONNX — **640×480** (`NCHW: 1×3×480×640`), как у RGB-камеры.
+Кадр 640×480 поступает в сеть без уменьшения и без полей. Для других размеров
+сохраняются пропорции и добавляются поля до прямоугольного входа 640×480.
+
 ## Запуск на роботе
 
 Соберите пакет в обычном ROS workspace и установите его Python-зависимости:
@@ -95,6 +99,77 @@ python experiments/rds-2p_mujoco_wasm/tools/collect_ball_dataset.py --url http:/
 Отчёт и SHA-256 весов: `models/training_report.json`; полные обучающие
 артефакты и `.pt` checkpoint: `experiments/rds-2p_mujoco_wasm/.test/vision_training/`.
 Для продолжения прерванного обучения передайте `--resume .../weights/last.pt`.
+Для переэкспорта существующего checkpoint в 640×480 без нового обучения:
+
+```bash
+.venv/Scripts/python experiments/rds-2p_mujoco_wasm/tools/export_ball_yolo.py experiments/rds-2p_mujoco_wasm/.test/vision_training/runs/balls_recovered/weights/best.pt
+```
+
+Экспорт выполняется через [ONNX export](https://docs.ultralytics.com/integrations/onnx/)
+с `imgsz=(480, 640)`. Проверка совпадения ONNX с checkpoint не измеряет качество
+распознавания: при смене разрешения нужны дообучение и проверка каждого класса.
+
+Дообучение и проверка на полном кадре:
+
+```bash
+.venv/Scripts/python experiments/rds-2p_mujoco_wasm/tools/finetune_ball_yolo.py --epochs 12
+.venv/Scripts/python experiments/rds-2p_mujoco_wasm/tools/check_vision_quality.py --model /path/to/model.onnx --split test --output /path/to/quality.json
+python experiments/rds-2p_mujoco_wasm/tools/check_vision_scene.py --url http://localhost:8085
+```
+
+Обучение использует train-часть, выбор checkpoint — val-часть. Для обоих
+используются прямоугольные тензоры 480×640, совпадающие с рабочим входом.
+Итоговую test-часть проверяют отдельно. В отчёте качества для каждого класса
+показаны precision/recall при рабочих порогах confidence=0,35 и IoU=0,5,
+а также AP50 и AP50–95 по детекциям после NMS (не более 50 рамок на кадр).
+
+Для адаптации к реальному обзору Astra RGB (H62°/V49°) используется дополнительный
+синтетический набор из `collect_native_dataset.py`. В нём все семь классов
+размечаются по видимым маскам отдельных объектов, включая перекрытия и обрезку
+границами кадра. Эти сведения доступны только сборщику обучающих данных;
+рабочий детектор по-прежнему получает только RGB.
+
+```bash
+python experiments/rds-2p_mujoco_wasm/tools/collect_native_dataset.py --count 180
+.venv/Scripts/python experiments/rds-2p_mujoco_wasm/tools/merge_vision_datasets.py --dataset experiments/rds-2p_mujoco_wasm/.test/vision_training/dataset --dataset experiments/rds-2p_mujoco_wasm/.test/vision_regression/native_dataset --output experiments/rds-2p_mujoco_wasm/.test/vision_regression/combined_dataset
+.venv/Scripts/python experiments/rds-2p_mujoco_wasm/tools/finetune_ball_yolo.py --checkpoint /path/to/first-stage/best.pt --data experiments/rds-2p_mujoco_wasm/.test/vision_regression/combined_dataset/data.yaml --epochs 4 --name native_camera_62x49
+```
+
+Объединение сохраняет принадлежность кадров к train/val/test и отклоняет
+совпадающие хеши изображений в разных частях набора.
+
+При сравнении с предыдущей рабочей моделью используйте `--model baseline.onnx
+--model candidate.onnx --require-no-regression`: проверка завершится ошибкой,
+если AP50 любого из семи классов или recall деревьев, кустов, камней и цветов
+ниже исходной модели на том же наборе кадров. Итоговые результаты поставляемых
+весов записаны в `models/quality_report.json`.
+
+## Проверка «куст или шарик»
+
+Старый четырёхклассовый учитель мог назвать зелёный шарик кустом. При добавлении
+точной маски шарика это давало две противоречивые метки одного объекта.
+Сборщик `collect_ball_dataset.py` теперь исключает такие псевдометки учителя;
+точные маски шариков сохраняются. Проверка фильтра — `tools/check_training_labels.py`.
+
+Для направленных примеров `collect_native_dataset.py --focus-bushes` снимает
+кусты без шариков, рядом с зелёным шариком и рядом с шариками всех трёх цветов.
+Все семь классов размечаются масками объектов. Порог confidence не понижается,
+а рабочему детектору не передаются координаты или типы объектов сцены.
+
+```bash
+python experiments/rds-2p_mujoco_wasm/tools/collect_native_dataset.py --focus-bushes --count 240 --seed 2093117 --output experiments/rds-2p_mujoco_wasm/.test/bush_ball/focused_dataset
+python experiments/rds-2p_mujoco_wasm/tools/check_bush_ball_browser.py --url http://localhost:8085
+.venv/Scripts/python experiments/rds-2p_mujoco_wasm/tools/check_bush_ball_quality.py --model ros_packages/src/rds_2p_vision/models/yolov8n_balls.onnx --data /path/to/data.yaml --split test --require-no-swaps --output /path/to/bush-ball-report.json
+```
+
+Браузерная проверка требует правильного распознавания исходного куста,
+куста без шариков в трёх ракурсах и куста рядом с каждым из трёх настоящих
+шариков. Обнаружить куст где-нибудь в сцене для прохождения этого теста недостаточно.
+
+Почти совпадающие рамки разных классов (IoU > 0,8) объединяются: остаётся метка
+с большей уверенностью. Для одного класса сохраняется порог NMS 0,45.
+Это одинаково реализовано в браузере и ROS; соседние отдельные объекты не
+переименовываются. Результаты парной проверки — `models/bush_ball_report.json`.
 Для дообучения на размеченных реальных кадрах задайте `--data /path/to/data.yaml`
 с теми же семью классами и независимой реальной test-выборкой.
 

@@ -19,6 +19,16 @@ ROOT = Path(__file__).resolve().parents[1]
 NAMES = ['tree', 'bush', 'rock', 'flower', 'blue_ball', 'red_ball', 'green_ball']
 
 
+def exclude_ball_pseudo_labels(scenery, balls):
+    """Precise ball masks take precedence over contradictory teacher guesses."""
+    def overlap(a, b):
+        _, ax, ay, aw, ah = a
+        _, bx, by, bw, bh = b
+        intersection = max(0, min(ax+aw/2,bx+bw/2)-max(ax-aw/2,bx-bw/2)) * max(0,min(ay+ah/2,by+bh/2)-max(ay-ah/2,by-bh/2))
+        return intersection/max(aw*ah+bw*bh-intersection,1e-9)
+    return [row for row in scenery if not any(overlap(row, ball)>=.5 for ball in balls)]
+
+
 def teacher_labels(session, encoded):
     image = Image.open(io.BytesIO(encoded)).convert('RGB')
     w, h = image.size
@@ -132,7 +142,7 @@ def main():
             seed = 317123 + index * 7919
             result = page.evaluate('(seed) => window.collectFrame(seed)', seed)
             encoded = base64.b64decode(result['jpeg'])
-            labels = teacher_labels(teacher, encoded) + result['labels']
+            labels = exclude_ball_pseudo_labels(teacher_labels(teacher, encoded), result['labels']) + result['labels']
             (root/'images'/split/f'{seed}.jpg').write_bytes(encoded)
             (root/'labels'/split/f'{seed}.txt').write_text(''.join(' '.join(map(str,row))+'\n' for row in labels))
             for row in labels:

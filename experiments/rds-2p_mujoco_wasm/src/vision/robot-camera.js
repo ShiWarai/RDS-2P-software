@@ -1,12 +1,13 @@
 
 import * as THREE from "three";
+import { ASTRA_MINI_PRO, DEPTH_RANGE } from "./astra-mini-pro.js";
 
 export const CAMERA_CONFIG = {
   name: "camera",
-  // MJCF/URDF: <camera name="camera" resolution="640 480"> (480p).
-  width: 640,
-  height: 480,
-  fov: 90,
+  width: ASTRA_MINI_PRO.width,
+  height: ASTRA_MINI_PRO.height,
+  fov: ASTRA_MINI_PRO.rgb.verticalFov,
+  horizontalFov: ASTRA_MINI_PRO.rgb.horizontalFov,
   near: 0.001,
   far: 100,
   position: [0.152412, 0.002539, 0.004207],
@@ -14,6 +15,28 @@ export const CAMERA_CONFIG = {
   // MuJoCo MJCF quaternion: w, x, y, z.
   quaternion: [-0.5, -0.5, 0.5, 0.5],
 };
+
+export const DEPTH_CAMERA_CONFIG = {
+  ...CAMERA_CONFIG,
+  fov: ASTRA_MINI_PRO.depth.verticalFov,
+  horizontalFov: ASTRA_MINI_PRO.depth.horizontalFov,
+  // Render close occluders too; range filtering happens after readback.
+  // Keep the near plane positive for perspective projection, and the far
+  // plane beyond the working range so exactly 2 m remains measurable.
+  near: 0.001,
+  far: DEPTH_RANGE.max + 1,
+};
+
+class SensorCamera extends THREE.PerspectiveCamera {
+  updateProjectionMatrix() {
+    super.updateProjectionMatrix();
+    if (this.horizontalFov) {
+      // The published H/V angles are independent of the 4:3 pixel aspect.
+      this.projectionMatrix.elements[0] = 1 / Math.tan(THREE.MathUtils.degToRad(this.horizontalFov / 2));
+      this.projectionMatrixInverse.copy(this.projectionMatrix).invert();
+    }
+  }
+}
 
 /**
  * Создаёт камеру в локальной системе base_link.
@@ -24,7 +47,7 @@ export const CAMERA_CONFIG = {
  * Для камеры используется умножение S * R_camera,
  * поскольку локальная камера Three.js смотрит вдоль -Z.
  */
-export function createRobotVisionCamera(sim) {
+export function createRobotVisionCamera(sim, config = CAMERA_CONFIG) {
   const baseBody = Object.values(sim.bodies).find(
     (body) => body?.name === "base_link"
   );
@@ -33,14 +56,13 @@ export function createRobotVisionCamera(sim) {
     throw new Error("Не найдено тело base_link в MuJoCo-сцене");
   }
 
-  const config = CAMERA_CONFIG;
-
-  const camera = new THREE.PerspectiveCamera(
+  const camera = new SensorCamera(
     config.fov,
     config.width / config.height,
     config.near,
     config.far
   );
+  camera.horizontalFov = config.horizontalFov;
 
   camera.name = "robot-vision-camera";
 

@@ -47,11 +47,19 @@ def main():
         page.route_web_socket(lambda url:'robot.test:9090' in url,connect)
         page.goto('http://localhost:8085/',wait_until='domcontentloaded')
         page.wait_for_function('window.__panda?.sim?.ballFollower')
+        # These experimental controls are intentionally hidden in the production stylesheet.
+        # Expose them only in the fixture to exercise the existing ROS transport.
+        page.add_style_tag(content='#robot-connection { display: block; }')
         page.locator('#robot-connection summary').click()
         page.locator('#robot-rosbridge-url').fill('ws://robot.test:9090')
         page.locator('#btn-robot-connect').click()
         page.wait_for_function('window.__panda.sim.ballFollower.remote?.connected')
         assert not state['enabled'],'connection alone must not start the real robot'
+        page.locator('#btn-depth-map').click()
+        page.wait_for_function('window.__panda.depthMap.metrics.frameCount>2')
+        assert page.evaluate("__panda.depthMap.camera.parent.name==='base_link'"),'depth source must stay simulation'
+        assert 'Симулятор' in page.locator('[data-depth-status]').inner_text()
+        page.locator('[data-depth-close]').click()
         page.locator('#tab-btn-cv').click()
         page.locator('#btn-follow-blue').click()
         page.wait_for_function('window.__panda.sim.ballFollower.active')
