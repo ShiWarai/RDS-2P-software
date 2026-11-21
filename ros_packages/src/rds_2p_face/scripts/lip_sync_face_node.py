@@ -383,11 +383,9 @@ class LipSyncFaceNode(Node):
 
         now = self.get_clock().now()
         dt = (now - self._last_pub_mono).nanoseconds / 1e9
-        if (
-            self._last_level_id is not None
-            and dt < self._min_pub_period
-            and level_id == self._last_level_id
-        ):
+        if level_id == self._last_level_id:
+            return
+        if self._last_level_id is not None and dt < self._min_pub_period:
             return
 
         self._publish_face(level_id)

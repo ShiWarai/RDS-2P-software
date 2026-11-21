@@ -177,6 +177,7 @@ def _setup(context, *_args, **_kwargs):
             "face_topic": LaunchConfiguration("lip_sync_face_topic"),
             "manifest_path": LaunchConfiguration("lip_sync_manifest_path"),
             "max_face_hz": LaunchConfiguration("lip_sync_max_face_hz"),
+            "log_level": LaunchConfiguration("lip_sync_log_level"),
         }.items(),
     )
 
@@ -307,6 +308,11 @@ def generate_launch_description():
                 "lip_sync_max_face_hz",
                 default_value="24.0",
                 description="Макс. частота кадров лица у lip_sync_face",
+            ),
+            DeclareLaunchArgument(
+                "lip_sync_log_level",
+                default_value="info",
+                description="Лог-уровень lip_sync_face: debug | info | warn | error",
             ),
         ]
         + [OpaqueFunction(function=_setup)]

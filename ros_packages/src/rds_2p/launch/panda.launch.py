@@ -67,8 +67,8 @@ def generate_launch_description():
             "mtf02p_log_level", default_value="warn",
             description="Лог-уровень mtf02p_odom/odom_fusion"),
         DeclareLaunchArgument(
-            "face_log_level", default_value="warn",
-            description="Лог-уровень face_with_touchpad"),
+            "face_log_level", default_value="info",
+            description="Лог-уровень face_with_touchpad/display_face"),
         DeclareLaunchArgument(
             "dance_joy_log_level", default_value="warn",
             description="Лог-уровень dance_joy_controller"),
@@ -93,6 +93,9 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "commands_config", default_value="commands.yaml",
             description="Какой commands.yaml грузить command_parser"),
+        DeclareLaunchArgument(
+            "lip_sync_log_level", default_value="info",
+            description="Лог-уровень lip_sync_face"),
         DeclareLaunchArgument(
             "rag_enabled", default_value="true",
             description="Начальное состояние входа RAG (сервис /mirea_rag/enable)"),
@@ -156,6 +159,8 @@ def generate_launch_description():
                 "capturer_device": LaunchConfiguration("capturer_device"),
                 "vad_enabled": LaunchConfiguration("vad_enabled"),
                 "denoise": LaunchConfiguration("denoise"),
+                "lip_sync_log_level": LaunchConfiguration(
+                    "lip_sync_log_level"),
             }.items(),
         ),
         IncludeLaunchDescription(

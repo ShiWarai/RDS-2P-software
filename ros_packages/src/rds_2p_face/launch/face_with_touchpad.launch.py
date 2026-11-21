@@ -72,22 +72,8 @@ def generate_launch_description():
         }.items()
     )
     
-    # Нода-обработчик изображений
-    image_processor_node = Node(
-        package='rds_2p_face',
-        executable='image_processor',
-        name='image_processor',
-        output='screen',
-        parameters=[{
-            'input_topic': '/joy/drawing',
-            'output_topic': '/face/image',
-            'output_width': LaunchConfiguration('output_width'),
-            'output_height': LaunchConfiguration('output_height'),
-        }],
-        arguments=['--ros-args', '--log-level', LaunchConfiguration('log_level')],
-    )
-    
-    # Включение display_face.launch.py
+    # image_processor уже запускается внутри display_face.launch.py;
+    # второй экземпляр создавал двух публикаторов /face/image.
     display_face_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution([
@@ -98,6 +84,8 @@ def generate_launch_description():
         ),
         launch_arguments={
             'log_level': LaunchConfiguration('log_level'),
+            'output_width': LaunchConfiguration('output_width'),
+            'output_height': LaunchConfiguration('output_height'),
         }.items()
     )
     
@@ -107,7 +95,6 @@ def generate_launch_description():
         output_height_arg,
         ps4_joystick_launch,
         touchpad_drawer_launch,
-        image_processor_node,
         display_face_launch,
     ])
 
