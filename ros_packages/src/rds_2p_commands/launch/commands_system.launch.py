@@ -24,6 +24,12 @@ def generate_launch_description():
         description='Уровень логирования: debug, info, warn, error, fatal'
     )
     
+    config_file_arg = DeclareLaunchArgument(
+        'config_file',
+        default_value='commands.yaml',
+        description='Имя файла конфигурации команд в share/rds_2p_commands/config/'
+    )
+
     transcription_topics_arg = DeclareLaunchArgument(
         'transcription_topics',
         default_value="['/audio/input/transcription', '/telegram/audio/transcription']",
@@ -103,6 +109,7 @@ def generate_launch_description():
         ]),
         launch_arguments={
             'log_level': LaunchConfiguration('log_level'),
+            'config_file': LaunchConfiguration('config_file'),
             'transcription_topics': LaunchConfiguration('transcription_topics'),
             'command_debounce_sec': LaunchConfiguration('command_debounce_sec'),
             'panda_llm_tts_enabled': LaunchConfiguration('panda_llm_tts_enabled'),
@@ -122,6 +129,7 @@ def generate_launch_description():
     # Собираем launch описание
     launch_description = LaunchDescription([
         log_level_arg,
+        config_file_arg,
         transcription_topics_arg,
         debounce_arg,
         panda_llm_tts_arg,

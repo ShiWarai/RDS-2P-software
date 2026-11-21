@@ -88,6 +88,12 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "system_one_url", default_value="http://127.0.0.1:18477"),
         DeclareLaunchArgument(
+            "commands_log_level", default_value="info",
+            description="Лог-уровень command_parser/unified_action_server"),
+        DeclareLaunchArgument(
+            "commands_config", default_value="commands.yaml",
+            description="Какой commands.yaml грузить command_parser"),
+        DeclareLaunchArgument(
             "rag_enabled", default_value="true",
             description="Начальное состояние входа RAG (сервис /mirea_rag/enable)"),
         DeclareLaunchArgument(
@@ -179,6 +185,8 @@ def generate_launch_description():
                     FindPackageShare("rds_2p_commands"), "launch",
                     "commands_system.launch.py"])]),
             launch_arguments={
+                "log_level": LaunchConfiguration("commands_log_level"),
+                "config_file": LaunchConfiguration("commands_config"),
                 "transcription_topics": "['/audio/input/transcription']",
                 "command_debounce_sec": "3.0",
                 "panda_llm_tts_enabled": "false",
