@@ -2,7 +2,7 @@
 """
 Launch файл для запуска Command Parser Node.
 
-Подписка на транскрипции и Telegram; разбор по keywords из commands.yaml; LLM+Paroli — **llm_commands.py**.
+Подписка на транскрипции и Telegram; разбор по keywords из commands.yaml; LLM+TTS — **llm_commands.py**.
 """
 
 from launch import LaunchDescription
@@ -67,14 +67,14 @@ def generate_launch_description():
         default_value='/rkllm_ros/clear_kv_cache',
         description='Сервис сброса KV rkllm (пустая строка — не создавать клиент)',
     )
-    paroli_speak_arg = DeclareLaunchArgument(
-        'paroli_speak_service',
-        default_value='/paroli_ros/speak',
+    tts_speak_arg = DeclareLaunchArgument(
+        'tts_speak_service',
+        default_value='/audio/output/speak',
         description='Сервис Paroli Speak (пустая строка — отключить озвучку)',
     )
-    paroli_stop_speech_arg = DeclareLaunchArgument(
-        'paroli_stop_speech_service',
-        default_value='/paroli_ros/stop_speech',
+    tts_stop_speech_arg = DeclareLaunchArgument(
+        'tts_stop_speech_service',
+        default_value='/audio/output/stop_speech',
         description='std_srvs/Trigger — прервать синтез Paroli (команда «хватит» и т.п.)',
     )
     rkllm_wait_arg = DeclareLaunchArgument(
@@ -82,10 +82,10 @@ def generate_launch_description():
         default_value='5.0',
         description='Таймаут ожидания action-сервера rkllm (сек)',
     )
-    paroli_wait_arg = DeclareLaunchArgument(
-        'paroli_wait_service_sec',
+    tts_wait_arg = DeclareLaunchArgument(
+        'tts_wait_service_sec',
         default_value='3.0',
-        description='Таймаут ожидания сервиса Paroli speak (сек)',
+        description='Таймаут ожидания сервиса TTS speak (сек)',
     )
     rkllm_keep_hist_arg = DeclareLaunchArgument(
         'rkllm_keep_history',
@@ -109,11 +109,11 @@ def generate_launch_description():
             'Сколько первых символов ответа LLM печатать в одной INFO-строке-сводке (0 — весь текст)'
         ),
     )
-    paroli_speak_log_arg = DeclareLaunchArgument(
-        'paroli_speak_log_max_chars',
+    tts_speak_log_arg = DeclareLaunchArgument(
+        'tts_speak_log_max_chars',
         default_value='0',
         description=(
-            'Сколько символов печатать в каждой строке «Paroli /speak фр.» (0 — весь фрагмент, как в req.text)'
+            'Сколько символов печатать в каждой строке «TTS /audio/output/speak фр.» (0 — весь фрагмент, как в req.text)'
         ),
     )
 
@@ -134,13 +134,13 @@ def generate_launch_description():
             'panda_llm_trigger_substring': LaunchConfiguration('panda_llm_trigger_substring'),
             'rkllm_complete_action': LaunchConfiguration('rkllm_complete_action'),
             'rkllm_clear_kv_service': LaunchConfiguration('rkllm_clear_kv_service'),
-            'paroli_speak_service': LaunchConfiguration('paroli_speak_service'),
-            'paroli_stop_speech_service': LaunchConfiguration('paroli_stop_speech_service'),
+            'tts_speak_service': LaunchConfiguration('tts_speak_service'),
+            'tts_stop_speech_service': LaunchConfiguration('tts_stop_speech_service'),
             'rkllm_wait_server_sec': ParameterValue(
                 LaunchConfiguration('rkllm_wait_server_sec'), value_type=float
             ),
-            'paroli_wait_service_sec': ParameterValue(
-                LaunchConfiguration('paroli_wait_service_sec'), value_type=float
+            'tts_wait_service_sec': ParameterValue(
+                LaunchConfiguration('tts_wait_service_sec'), value_type=float
             ),
             'rkllm_keep_history': ParameterValue(
                 LaunchConfiguration('rkllm_keep_history'), value_type=bool
@@ -154,8 +154,8 @@ def generate_launch_description():
             'llm_reply_log_max_chars': ParameterValue(
                 LaunchConfiguration('llm_reply_log_max_chars'), value_type=int
             ),
-            'paroli_speak_log_max_chars': ParameterValue(
-                LaunchConfiguration('paroli_speak_log_max_chars'), value_type=int
+            'tts_speak_log_max_chars': ParameterValue(
+                LaunchConfiguration('tts_speak_log_max_chars'), value_type=int
             ),
         }],
         arguments=['--ros-args', '--log-level', LaunchConfiguration('log_level')],
@@ -172,15 +172,15 @@ def generate_launch_description():
         panda_llm_trigger_arg,
         rkllm_complete_action_arg,
         rkllm_clear_kv_arg,
-        paroli_speak_arg,
-        paroli_stop_speech_arg,
+        tts_speak_arg,
+        tts_stop_speech_arg,
         rkllm_wait_arg,
-        paroli_wait_arg,
+        tts_wait_arg,
         rkllm_keep_hist_arg,
         rkllm_clear_before_arg,
         rkllm_max_tok_arg,
         llm_reply_log_arg,
-        paroli_speak_log_arg,
+        tts_speak_log_arg,
         command_parser_node,
     ])
 

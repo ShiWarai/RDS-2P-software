@@ -8,7 +8,7 @@ choice-варианты собираются из name/examples, ответ ма
 Исполнение:
   command -> /robot/panda_command (PandaCommand) или /cmd_vel/voice для motion_commands;
   wait    -> пауза;
-  say     -> /paroli_ros/speak.
+  say     -> /audio/output/speak.
 
 Launch: ros2 launch rds_2p_commands panda_commands.launch.py
 """
@@ -58,7 +58,7 @@ class PandaCommandsNode(Node):
         self.declare_parameter('min_confidence', 0.0)
         self.declare_parameter('timeout_sec', 30.0)
         self.declare_parameter('panda_action', '/robot/panda_command')
-        self.declare_parameter('speak_service', '/paroli_ros/speak')
+        self.declare_parameter('speak_service', '/audio/output/speak')
         self.declare_parameter('say_enabled', True)
         self.declare_parameter('publish_cmd_vel', True)
         self.declare_parameter('cmd_vel_topic', '/cmd_vel/voice')
@@ -426,7 +426,7 @@ class PandaCommandsNode(Node):
             next_node()
             return
         if not self._speak_client.wait_for_service(timeout_sec=0.5):
-            self.get_logger().warn(f'Paroli недоступен, SAY пропущен: {text!r}')
+            self.get_logger().warn(f'TTS недоступен, SAY пропущен: {text!r}')
             next_node()
             return
 
@@ -444,10 +444,10 @@ class PandaCommandsNode(Node):
         try:
             response = future.result()
         except Exception as exc:  # noqa: BLE001
-            self.get_logger().warn(f'Paroli: {exc}')
+            self.get_logger().warn(f'TTS: {exc}')
         else:
             if response is not None and not response.success:
-                self.get_logger().warn(f'Paroli: {response.message}')
+                self.get_logger().warn(f'TTS: {response.message}')
         self.get_logger().info(f'SAY: {text!r}')
         next_node()
 

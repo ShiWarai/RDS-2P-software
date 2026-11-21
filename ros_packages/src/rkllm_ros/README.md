@@ -41,15 +41,12 @@ ros2 run rkllm_ros example_vision.py "Что видишь? Ответь крат
 
 Нужны запущенная камера (или корректный топик `sensor_msgs/Image`) и путь к кадру в правильной кодировке — см. примеры с **`--topic`** и **`--image`** ниже.
 
-### Смотреть поток токенов в ROS (пока идёт генерация)
+### Смотреть ответ
 
-В отдельном терминале:
-
-```bash
-ros2 topic echo /rkllm_ros/text_chunks
-# после успешного goal полный текст также в:
-ros2 topic echo /rkllm_ros/text --once
-```
+Отдельных топиков `/text` и `/text_chunks` больше нет: поток токенов идёт в
+**feedback action** `/rkllm_ros/complete`, итоговый текст — в **result**.
+Финальный ответ также пишется в INFO-лог ноды (обрезается параметром
+**`answer_log_max_chars`**, по умолчанию 500 символов; `0` — весь ответ).
 
 ### Что вызывается под капотом
 
@@ -64,8 +61,6 @@ ros2 topic echo /rkllm_ros/text --once
 |-----------|-----|----------|
 | `~/complete` | `llm_msgs_ros/action/ChatCompletion` | **Goal:** `user_message` (перед infer санитизируется: trim и снятие ведущих префиксов `user:` / `robot:`); **`image`** опционально (multimodal: к промпту добавляется `<image>`). **`keep_history`**: при **`persist_session_kv:=true`** на ноде поле **не управляет** накоплением KV в RKLLM (infer всегда с «памятью»); сброс только **`~/clear_kv_cache`**. При **`persist_session_kv:=false`** — прежняя семантика: очистка KV и флаг infer берутся из goal. `max_new_tokens` в goal (>0) переопределяет лимит на один запрос (`RKLLMInferParam.max_new_tokens`); 0 — значение init-time. Фидбек/result — поток и итоговый текст + метрики. |
 | `~/clear_kv_cache` | `std_srvs/Trigger` | Сброс KV на стороне RKLLM (простой диалог без наследия контекста прошлого клиента). Отказ, если нода занята goal. CLI: `ros2 run rkllm_ros clear_kv_cache.py`. |
-| `~/text_chunks` | `std_msgs/String` | Чанки генерации |
-| `~/text` | `std_msgs/String` | Полный ответ после успешного goal |
 
 Полноценный OpenAI-массив `messages[]` в ROS 2 потребовал бы своих `.msg`; здесь **один user-turn за goal**. Клиент **`example_chat.py`** по умолчанию шлёт **одну реплику за раз** с **`keep_history=true`** (согласовано с **`persist_session_kv:=true`** на ноде). Режим **`--replay`** восстанавливает повтор всего диалога в **`user_message`** и **`keep_history=false`** — совместим с **`persist_session_kv:=false`**.
 

@@ -2,7 +2,7 @@
 # kind: start -> question(choice) -> options[].then:
 #   kind: command — routine_id для /robot/panda_command (или движение из motion_commands)
 #   kind: wait    — пауза ms
-#   kind: say     — фраза в /paroli_ros/speak
+#   kind: say     — фраза в /audio/output/speak
 #
 # Классификация: system_one_ros/srv/Ask (llm_msgs_ros/srv/Ask), один POST
 # /v1/systemone на фразу. Ключи criteria — name варианта, значения — examples.

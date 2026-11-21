@@ -77,10 +77,10 @@ class CommandParserNode(Node):
         self.declare_parameter('panda_llm_trigger_substring', 'панда')
         self.declare_parameter('rkllm_complete_action', '/rkllm_ros/complete')
         self.declare_parameter('rkllm_clear_kv_service', '/rkllm_ros/clear_kv_cache')
-        self.declare_parameter('paroli_speak_service', '/paroli_ros/speak')
-        self.declare_parameter('paroli_stop_speech_service', '/paroli_ros/stop_speech')
+        self.declare_parameter('tts_speak_service', '/audio/output/speak')
+        self.declare_parameter('tts_stop_speech_service', '/audio/output/stop_speech')
         self.declare_parameter('rkllm_wait_server_sec', 5.0)
-        self.declare_parameter('paroli_wait_service_sec', 3.0)
+        self.declare_parameter('tts_wait_service_sec', 3.0)
         self.declare_parameter('rkllm_keep_history', True)
         self.declare_parameter('rkllm_clear_kv_before_query', False)
         self.declare_parameter('rkllm_max_new_tokens', 0)
@@ -88,7 +88,7 @@ class CommandParserNode(Node):
         self.declare_parameter('llm_sanitize_user_and_reply', True)
         self.declare_parameter('llm_stream_min_chunk_chars', 2)
         self.declare_parameter('llm_reply_log_max_chars', 280)
-        self.declare_parameter('paroli_speak_log_max_chars', 0)
+        self.declare_parameter('tts_speak_log_max_chars', 0)
 
         self._llm = LlmCommands(self)
 
@@ -207,7 +207,7 @@ class CommandParserNode(Node):
 
         if self._llm.busy:
             self.get_logger().info(
-                f'Пропуск ({source}): занят диалог LLM/озвучка Paroli (ключи panda_dialog_interrupt — стоп)'
+                f'Пропуск ({source}): занят диалог LLM/озвучка TTS (ключи panda_dialog_interrupt — стоп)'
             )
             return
 
@@ -231,7 +231,7 @@ class CommandParserNode(Node):
 
         if self._llm.should_run(text):
             self.get_logger().info(
-                f'Рутина не распознана, триггер {self._llm.enabled_trigger!r} — только LLM+Paroli'
+                f'Рутина не распознана, триггер {self._llm.enabled_trigger!r} — только LLM+TTS'
             )
             self._llm.dispatch(text)
             return

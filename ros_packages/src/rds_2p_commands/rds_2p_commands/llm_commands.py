@@ -1,4 +1,4 @@
-"""rkllm (ChatCompletion) + Paroli /speak: стрим, очередь фраз, прерывание диалога."""
+"""rkllm (ChatCompletion) + TTS /audio/output/speak: стрим, очередь фраз, прерывание диалога."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from std_srvs.srv import Trigger
 
 
 class LlmCommands:
-    """LLM+Paroli; параметры на node должны быть объявлены до __init__."""
+    """LLM+TTS; параметры на node должны быть объявлены до __init__."""
 
     def __init__(self, node: Node) -> None:
         self._node = node
@@ -25,19 +25,19 @@ class LlmCommands:
         clear_kv_name = (
             node.get_parameter('rkllm_clear_kv_service').get_parameter_value().string_value or ''
         ).strip()
-        paroli_name = (
-            node.get_parameter('paroli_speak_service').get_parameter_value().string_value or ''
+        tts_name = (
+            node.get_parameter('tts_speak_service').get_parameter_value().string_value or ''
         ).strip()
         stop_speech_name = (
-            node.get_parameter('paroli_stop_speech_service').get_parameter_value().string_value or ''
+            node.get_parameter('tts_stop_speech_service').get_parameter_value().string_value or ''
         ).strip()
 
         self._rkllm_wait_sec = node.get_parameter('rkllm_wait_server_sec').get_parameter_value().double_value
         if self._rkllm_wait_sec <= 0.0:
             self._rkllm_wait_sec = 5.0
-        self._paroli_wait_sec = node.get_parameter('paroli_wait_service_sec').get_parameter_value().double_value
-        if self._paroli_wait_sec <= 0.0:
-            self._paroli_wait_sec = 3.0
+        self._tts_wait_sec = node.get_parameter('tts_wait_service_sec').get_parameter_value().double_value
+        if self._tts_wait_sec <= 0.0:
+            self._tts_wait_sec = 3.0
 
         self._rkllm_keep_history = (
             node.get_parameter('rkllm_keep_history').get_parameter_value().bool_value
@@ -64,8 +64,8 @@ class LlmCommands:
         self._llm_reply_log_max_chars = int(
             node.get_parameter('llm_reply_log_max_chars').get_parameter_value().integer_value
         )
-        self._paroli_speak_log_max_chars = int(
-            node.get_parameter('paroli_speak_log_max_chars').get_parameter_value().integer_value
+        self._tts_speak_log_max_chars = int(
+            node.get_parameter('tts_speak_log_max_chars').get_parameter_value().integer_value
         )
 
         self._panda_llm_tts_enabled = (
@@ -82,10 +82,10 @@ class LlmCommands:
         self._clear_kv_client = (
             node.create_client(Trigger, clear_kv_name) if clear_kv_name else None
         )
-        self._paroli_speak_client = (
-            node.create_client(Speak, paroli_name) if paroli_name else None
+        self._tts_speak_client = (
+            node.create_client(Speak, tts_name) if tts_name else None
         )
-        self._paroli_stop_client = (
+        self._tts_stop_client = (
             node.create_client(Trigger, stop_speech_name) if stop_speech_name else None
         )
 
@@ -97,7 +97,7 @@ class LlmCommands:
         self._stream_flush_upto = 0
         self._llm_stream_complete = False
         self._tts_session = 0
-        self._tts_paroli_seq = 0
+        self._tts_seq = 0
 
     @property
     def busy(self) -> bool:
@@ -116,8 +116,8 @@ class LlmCommands:
         return self._rkllm_action_client is not None
 
     @property
-    def paroli_client_ok(self) -> bool:
-        return self._paroli_speak_client is not None
+    def tts_client_ok(self) -> bool:
+        return self._tts_speak_client is not None
 
     def sanitize_llm_text(self, s: Optional[str]) -> str:
         if s is None:
@@ -142,7 +142,7 @@ class LlmCommands:
             return False
         if not self._panda_llm_trigger:
             return False
-        if self._rkllm_action_client is None or self._paroli_speak_client is None:
+        if self._rkllm_action_client is None or self._tts_speak_client is None:
             return False
         return self._panda_llm_trigger.lower() in (text or '').lower()
 
@@ -150,13 +150,13 @@ class LlmCommands:
         log = self._node.get_logger()
         if self.enabled:
             log.info(
-                f'LLM+Paroli: вкл; триггер подстрока {self._panda_llm_trigger!r}; '
+                f'LLM+TTS: вкл; триггер подстрока {self._panda_llm_trigger!r}; '
                 f"rkllm={'да' if self._rkllm_action_client else 'нет'} "
-                f"paroli={'да' if self._paroli_speak_client else 'нет'}"
+                f"tts={'да' if self._tts_speak_client else 'нет'}"
             )
 
-    def _log_paroli_speak_payload(self, seq: int, text: str) -> None:
-        lim = self._paroli_speak_log_max_chars
+    def _log_tts_speak_payload(self, seq: int, text: str) -> None:
+        lim = self._tts_speak_log_max_chars
         n = len(text)
         if lim <= 0:
             preview = text
@@ -164,7 +164,7 @@ class LlmCommands:
         else:
             preview = text[:lim]
             clipped = '…' if n > lim else ''
-        self._node.get_logger().info(f'Paroli /speak фр.{seq} ({n} симв.): {preview}{clipped}')
+        self._node.get_logger().info(f'TTS /audio/output/speak фр.{seq} ({n} симв.): {preview}{clipped}')
 
     @staticmethod
     def _split_stream_chunks_tail(tail: str, min_chunk: int) -> Tuple[List[str], int]:
@@ -208,7 +208,7 @@ class LlmCommands:
         self._tts_inflight = False
         self._stream_flush_upto = 0
         self._llm_stream_complete = False
-        self._tts_paroli_seq = 0
+        self._tts_seq = 0
 
     def _process_llm_stream_accum(self, raw_accum: str) -> None:
         if self._abort_dialog or not self._llm_stream_tts_enabled:
@@ -223,7 +223,7 @@ class LlmCommands:
             self._tts_chunk_queue.append(c)
         if chunks:
             self._node.get_logger().debug(
-                f'LLM stream → Paroli: +{len(chunks)} фраз(ы) из накопленного текста'
+                f'LLM stream → TTS: +{len(chunks)} фраз(ы) из накопленного текста'
             )
         self._pump_tts_queue()
 
@@ -253,8 +253,8 @@ class LlmCommands:
             preview = body[:lim]
             clipped = '…' if len(body) > lim else ''
         self._node.get_logger().info(
-            f'Ответ LLM: {len(body)} симв., в очереди Paroli {pending} фр. '
-            f'(в динамик пойдёт текст из строк «Paroli /speak фр.»); '
+            f'Ответ LLM: {len(body)} симв., в очереди TTS {pending} фр. '
+            f'(в динамик пойдёт текст из строк «TTS /audio/output/speak фр.»); '
             f'сводка ответа: {preview}{clipped}'
         )
         self._pump_tts_queue()
@@ -267,21 +267,21 @@ class LlmCommands:
         if not self._tts_chunk_queue:
             self._try_release_after_stream_done()
             return
-        cli = self._paroli_speak_client
+        cli = self._tts_speak_client
         if cli is None:
             self._tts_chunk_queue.clear()
             self._llm_stream_complete = True
             self._release_busy()
             return
-        if not cli.wait_for_service(timeout_sec=self._paroli_wait_sec):
-            self._node.get_logger().warn('Paroli /speak: сервис недоступен')
+        if not cli.wait_for_service(timeout_sec=self._tts_wait_sec):
+            self._node.get_logger().warn('TTS /audio/output/speak: сервис недоступен')
             self._tts_chunk_queue.clear()
             self._llm_stream_complete = True
             self._release_busy()
             return
         chunk = self._tts_chunk_queue.popleft()
-        self._tts_paroli_seq += 1
-        self._log_paroli_speak_payload(self._tts_paroli_seq, chunk)
+        self._tts_seq += 1
+        self._log_tts_speak_payload(self._tts_seq, chunk)
         sid = self._tts_session
         self._tts_inflight = True
         req = Speak.Request()
@@ -294,16 +294,16 @@ class LlmCommands:
             try:
                 res = fut.result()
             except Exception as exc:
-                self._node.get_logger().error(f'Paroli speak: {exc}')
+                self._node.get_logger().error(f'TTS speak: {exc}')
                 self._pump_tts_queue()
                 return
             if sid != self._tts_session:
                 self._node.get_logger().debug(
-                    f'Paroli speak: ответ для устаревшей сессии {sid} (текущая {self._tts_session}), '
+                    f'TTS speak: ответ для устаревшей сессии {sid} (текущая {self._tts_session}), '
                     'продолжаю очередь'
                 )
             elif not res.success:
-                self._node.get_logger().warn(f'Paroli speak: {res.message}')
+                self._node.get_logger().warn(f'TTS speak: {res.message}')
             self._pump_tts_queue()
 
         sfut.add_done_callback(_on_done)
@@ -315,7 +315,7 @@ class LlmCommands:
             return
         if self._tts_inflight or self._tts_chunk_queue:
             return
-        self._node.get_logger().info('LLM+Paroli: озвучка завершена, приём команд возобновлён')
+        self._node.get_logger().info('LLM+TTS: озвучка завершена, приём команд возобновлён')
         self._release_busy()
 
     def _rkllm_feedback_callback(self, msg) -> None:
@@ -329,7 +329,7 @@ class LlmCommands:
         self._panda_dialog_busy = True
         self._reset_stream_for_new_dialog()
         self._node.get_logger().info(
-            f'LLM+Paroli: триггер по подстроке {self._panda_llm_trigger!r}, запрос к rkllm'
+            f'LLM+TTS: триггер по подстроке {self._panda_llm_trigger!r}, запрос к rkllm'
         )
         if self._rkllm_clear_kv_before and self._clear_kv_client is not None:
             if not self._clear_kv_client.wait_for_service(timeout_sec=min(2.0, self._rkllm_wait_sec)):
@@ -446,9 +446,9 @@ class LlmCommands:
                 gh.cancel_goal_async()
             except Exception as exc:
                 self._node.get_logger().warn(f'rkllm cancel_goal: {exc}')
-        if self._paroli_stop_client is not None:
-            if self._paroli_stop_client.wait_for_service(timeout_sec=0.5):
-                self._paroli_stop_client.call_async(Trigger.Request())
+        if self._tts_stop_client is not None:
+            if self._tts_stop_client.wait_for_service(timeout_sec=0.5):
+                self._tts_stop_client.call_async(Trigger.Request())
         self._release_busy()
 
     def _release_busy(self) -> None:

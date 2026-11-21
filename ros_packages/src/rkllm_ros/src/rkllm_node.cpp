@@ -24,7 +24,6 @@
 #include "llm_msgs_ros/action/chat_completion.hpp"
 #include "sensor_msgs/image_encodings.hpp"
 #include "sensor_msgs/msg/image.hpp"
-#include "std_msgs/msg/string.hpp"
 #include "std_srvs/srv/trigger.hpp"
 
 using namespace std::chrono_literals;
@@ -103,7 +102,6 @@ struct CallbackUserdata {
   rclcpp::Node * node{nullptr};
   RunSession * session{nullptr};
   std::function<void(const std::string &, const std::string &)> on_feedback;
-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr chunk_pub;
 };
 
 static int LlmCallback(RKLLMResult * result, void * userdata, LLMCallState state)
@@ -128,12 +126,6 @@ static int LlmCallback(RKLLMResult * result, void * userdata, LLMCallState state
           if (cb->node != nullptr) {
             RCLCPP_WARN(cb->node->get_logger(), "publish_feedback failed: %s", e.what());
           }
-        }
-
-        if (cb->chunk_pub) {
-          std_msgs::msg::String chunk_msg;
-          chunk_msg.data = token;
-          cb->chunk_pub->publish(chunk_msg);
         }
       }
       break;
@@ -185,6 +177,19 @@ static std::string TrimCopy(std::string s)
   return std::string(start, end);
 }
 
+/** Обрезать UTF-8 по границе символа, добавив многоточие. */
+static std::string TruncateUtf8(const std::string & s, size_t max_bytes)
+{
+  if (s.size() <= max_bytes) {
+    return s;
+  }
+  size_t end = max_bytes;
+  while (end > 0 && (static_cast<unsigned char>(s[end]) & 0xC0) == 0x80) {
+    --end;
+  }
+  return s.substr(0, end) + "…";
+}
+
 static bool StartsWith(const std::string & s, const std::string & prefix)
 {
   return s.size() >= prefix.size() &&
@@ -232,8 +237,7 @@ public:
     declare_parameter<double>("frequency_penalty", 0.0);
     declare_parameter<double>("presence_penalty", 0.0);
     declare_parameter<bool>("persist_session_kv", true);
-    declare_parameter<std::string>("text_chunk_topic", "~/text_chunks");
-    declare_parameter<std::string>("text_topic", "~/text");
+    declare_parameter<int>("answer_log_max_chars", 500);
     declare_parameter<bool>("apply_chat_template", false);
     // Если true — вызывается rkllm_set_chat_template (ОТКЛЮЧАЕТ встроенный разбор шаблона из .rkllm).
     // Для Qwen3-VL из multimodal_model_demo см. закомментированный вызов в upstream main.cpp — обычно оставляют авто-шаблон.
@@ -259,6 +263,7 @@ public:
     chat_template_prefix_ = get_parameter("chat_template_prefix").as_string();
     chat_template_postfix_ = get_parameter("chat_template_postfix").as_string();
     persist_session_kv_ = get_parameter("persist_session_kv").as_bool();
+    answer_log_max_chars_ = get_parameter("answer_log_max_chars").as_int();
     clear_kv_after_idle_sec_ = get_parameter("clear_kv_after_idle_sec").as_double();
 
     if (encoder_path_.empty() || llm_path_.empty()) {
@@ -268,12 +273,6 @@ public:
         "Задайте параметры или аргументы launch.");
       throw std::runtime_error("rkllm_ros: model paths not set");
     }
-
-    chunk_pub_ = create_publisher<std_msgs::msg::String>(
-      get_parameter("text_chunk_topic").as_string(), 10);
-    text_pub_ = create_publisher<std_msgs::msg::String>(
-      get_parameter("text_topic").as_string(),
-      rclcpp::QoS(1).transient_local());
 
     if (!LoadModels()) {
       throw std::runtime_error("rkllm_ros: LoadModels failed");
@@ -684,8 +683,6 @@ private:
         feedback->text = accum;
         goal_handle->publish_feedback(feedback);
       };
-    userdata.chunk_pub = chunk_pub_;
-
     std::atomic<bool> poll_stop{false};
     std::thread cancel_poll([this, goal_handle, &poll_stop]() {
       while (rclcpp::ok() && !poll_stop.load(std::memory_order_acquire)) {
@@ -762,9 +759,14 @@ private:
     result->success = true;
     result->message = "ok";
 
-    std_msgs::msg::String full_msg;
-    full_msg.data = result->text;
-    text_pub_->publish(full_msg);
+    const size_t log_limit = answer_log_max_chars_ > 0
+      ? static_cast<size_t>(answer_log_max_chars_)
+      : result->text.size();
+    std::string answer_for_log = TruncateUtf8(result->text, log_limit);
+    std::replace(answer_for_log.begin(), answer_for_log.end(), '\n', ' ');
+    RCLCPP_INFO(
+      get_logger(), "LLM answer (%zu chars): %s",
+      result->text.size(), answer_for_log.c_str());
 
     goal_handle->succeed(result);
   }
@@ -797,6 +799,7 @@ private:
   rclcpp::TimerBase::SharedPtr idle_timer_;
 
   bool persist_session_kv_{true};
+  int answer_log_max_chars_{500};
 
   bool apply_chat_template_{false};
   bool manual_template_active_{false};
@@ -805,9 +808,6 @@ private:
   std::string chat_template_system_;
   std::string chat_template_prefix_;
   std::string chat_template_postfix_;
-
-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr chunk_pub_;
-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr text_pub_;
 
   rclcpp_action::Server<ChatCompletion>::SharedPtr action_server_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr clear_kv_srv_;

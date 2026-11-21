@@ -77,8 +77,8 @@ ros2 launch rds_2p llm_layer.launch.py stt:=gigaam vad_enabled:=true \
 
 ## Проверено (RK3588, ROS 2 Humble, domain 1)
 Живой тракт `audio_capturer(/audio/input) → vad_node → gigaam_node → /audio/input/transcription`
-при параллельно работающем `paroli_ros`. `ros2 topic pub --once /speak_text std_msgs/msg/String
-"{data: 'привет как дела'}"` → робот произносит → микрофон слышит самоэхо →
+при параллельно работающем `paroli_ros`. `ros2 service call /audio/output/speak rds_2p_audio/srv/Speak
+"{text: 'привет как дела', volume: 1.5}"` → робот произносит → микрофон слышит самоэхо →
 распознано (`…как дело`, вторая фраза «ты меня слышишь» — точно). `librknnrt` из `/usr/lib`.
 Начало фразы иногда срезано порогом VAD — при необходимости поднимите `preroll_sec`
 (`vad.launch.py preroll_sec:=0.5`).

@@ -88,8 +88,9 @@ def generate_launch_description():
             default_value='',
             description='Строка system для rkllm_set_chat_template: пробрасывается в chat_template_system (если пусто — дефолт ноды). Имеет смысл при apply_chat_template:=true.',
         ),
-        DeclareLaunchArgument('text_chunk_topic', default_value='text_chunks'),
-        DeclareLaunchArgument('text_topic', default_value='text'),
+        DeclareLaunchArgument(
+            'answer_log_max_chars', default_value='500',
+            description='Сколько символов финального ответа писать в INFO-лог (0 — весь ответ)'),
         Node(
             package='rkllm_ros',
             executable='rkllm_node',
@@ -126,10 +127,8 @@ def generate_launch_description():
                     LaunchConfiguration('apply_chat_template'), value_type=bool),
                 'chat_template_system': ParameterValue(
                     LaunchConfiguration('system_prompt'), value_type=str),
-                'text_chunk_topic': ParameterValue(
-                    LaunchConfiguration('text_chunk_topic'), value_type=str),
-                'text_topic': ParameterValue(
-                    LaunchConfiguration('text_topic'), value_type=str),
+                'answer_log_max_chars': ParameterValue(
+                    LaunchConfiguration('answer_log_max_chars'), value_type=int),
             }],
         ),
     ])

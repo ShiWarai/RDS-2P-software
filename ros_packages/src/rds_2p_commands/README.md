@@ -82,13 +82,13 @@ ros2 launch rds_2p_commands commands_system.launch.py
 1. Если рутина **есть** — как обычно отправляется **`PandaCommand`** (звук, моторы, морда).
 2. Если рутины **нет** — **`PandaCommand` не шлётся**, только диалог.
 3. В обоих случаях тот же текст уходит в **`rkllm_ros`** (`ChatCompletion`, `user_message` = фраза пользователя).
-4. Поле **`result.text`** озвучивается через **`/paroli_ros/speak`**.
+4. Поле **`result.text`** озвучивается через **`/audio/output/speak`**.
 
-**Блокировка:** с момента старта запроса к LLM до опустошения очереди озвучки новые фразы **не** обрабатываются (ни рутины по YAML, ни второй LLM). Это **не** однопоточность executor: узел по-прежнему получает транскрипты, но в лог пишется **`Пропуск … занят диалог LLM/озвучка`**. Пока играет динамик, Vosk часто выдаёт **обрывки своей же речи** (как в вашем логе) — это акустическое эхо. После последней фразы Paroli смотрите **`LLM+Paroli: озвучка завершена, приём команд возобновлён`** — до этой строки парсер сознательно «молчит» по командам. Прервать: ключи **`panda_dialog_interrupt`** (см. ниже); в железе — тише динамик, микрофон дальше от динамика, AEC при наличии.
+**Блокировка:** с момента старта запроса к LLM до опустошения очереди озвучки новые фразы **не** обрабатываются (ни рутины по YAML, ни второй LLM). Это **не** однопоточность executor: узел по-прежнему получает транскрипты, но в лог пишется **`Пропуск … занят диалог LLM/озвучка`**. Пока играет динамик, Vosk часто выдаёт **обрывки своей же речи** (как в вашем логе) — это акустическое эхо. После последней фразы Paroli смотрите **`LLM+TTS: озвучка завершена, приём команд возобновлён`** — до этой строки парсер сознательно «молчит» по командам. Прервать: ключи **`panda_dialog_interrupt`** (см. ниже); в железе — тише динамик, микрофон дальше от динамика, AEC при наличии.
 
-**«Хватит»:** фразы из **`panda_dialog_interrupt.keywords`** проверяются **первыми** и **вне** блокировки: отменяется goal rkllm (если был), вызывается **`/paroli_ros/stop_speech`**, снимается блокировка. Отдельного **`PandaCommand`** нет.
+**«Хватит»:** фразы из **`panda_dialog_interrupt.keywords`** проверяются **первыми** и **вне** блокировки: отменяется goal rkllm (если был), вызывается **`/audio/output/stop_speech`**, снимается блокировка. Отдельного **`PandaCommand`** нет.
 
-Раньше пункты 3–4 срабатывали только при успешно распознанной рутине; для фраз вроде «панда, ты меня слышишь» без ключевых слов теперь вызывается только LLM+Paroli.
+Раньше пункты 3–4 срабатывали только при успешно распознанной рутине; для фраз вроде «панда, ты меня слышишь» без ключевых слов теперь вызывается только LLM+TTS.
 
 Параметры узла **`command_parser`** (и одноимённые аргументы в `command_parser.launch.py` / `commands_system.launch.py`):
 
@@ -98,19 +98,19 @@ ros2 launch rds_2p_commands commands_system.launch.py
 | `panda_llm_trigger_substring` | Подстрока-триггер (по умолчанию `панда`). |
 | `rkllm_complete_action` | Action, по умолчанию `/rkllm_ros/complete`. |
 | `rkllm_clear_kv_service` | `std_srvs/Trigger`, по умолчанию `/rkllm_ros/clear_kv_cache`; пустая строка — клиент не создаётся. |
-| `paroli_speak_service` | По умолчанию `/paroli_ros/speak`; пустая строка — без озвучки. |
-| `paroli_stop_speech_service` | `std_srvs/Trigger`, по умолчанию `/paroli_ros/stop_speech` — прерывание TTS (команда «хватит»). |
+| `tts_speak_service` | По умолчанию `/audio/output/speak`; пустая строка — без озвучки. |
+| `tts_stop_speech_service` | `std_srvs/Trigger`, по умолчанию `/audio/output/stop_speech` — прерывание TTS (команда «хватит»). |
 | `rkllm_clear_kv_before_query` | Перед запросом сбросить KV (см. README `rkllm_ros` / `persist_session_kv`). |
 | `rkllm_keep_history`, `rkllm_max_new_tokens`, таймауты | Как в declare в коде. |
 | `llm_stream_tts_by_punctuation` | `true` (по умолчанию): по **feedback** rkllm копится текст; на `. , ; : ! ? …` фрагменты ставятся в очередь `/speak` — раньше старт озвучки. |
 | `llm_sanitize_user_and_reply` | `true`: в LLM и в TTS только буквы (Unicode), цифры, пробелы, пунктуация; эмодзи убираются; **markdown-символы `*` `_` `` ` `` `#` `|`** выкидываются отдельным шагом (иначе `*` остаётся как знак препинания Unicode). |
 | `llm_stream_min_chunk_chars` | Мин. длина фрагмента для разбиения по запятой/точке с запятой (не считая `! ? …`). |
 | `llm_reply_log_max_chars` | Длина сводки ответа LLM в INFO (0 — без обрезки сводки). |
-| `paroli_speak_log_max_chars` | Длина строки «Paroli /speak фр.» в логе (0 — весь текст фрагмента). |
+| `tts_speak_log_max_chars` | Длина строки «TTS /audio/output/speak фр.» в логе (0 — весь текст фрагмента). |
 
 Отключить поведение: `panda_llm_tts_enabled:=false` или сменить/очистить триггер. Потоковую нарезку: `llm_stream_tts_by_punctuation:=false`.
 
-**Логи:** транскрипт — **INFO**; фрагменты в Paroli — **`Paroli /speak фр.N`**; сводка ответа после rkllm — **INFO**.
+**Логи:** транскрипт — **INFO**; фрагменты в Paroli — **`TTS /audio/output/speak фр.N`**; сводка ответа после rkllm — **INFO**.
 
 ### 7. LLM-прослойка: команда или разговор (`llm_layer`)
 
@@ -136,7 +136,7 @@ ros2 launch rds_2p_commands commands_system.launch.py \
   transcription_topics:="['/audio/command_transcription']"
 ```
 
-Ключевые параметры ноды: **`classifier_json`** (`instructions` / `criteria` / `actions` / `say`; есть одноимённый launch-аргумент), **`min_confidence`** (0 = порог выключен), **`announce_commands`**, **`post_speech_cooldown_sec`**, **`announce_timeout_sec`**, **`dialog_interrupt_keywords`**, **`look_trigger_substrings`**, **`camera_topic`**, **`camera_stale_sec`**, **`llm_system_prompt`**, **`system_one_service`**, **`command_topic`**, **`input_topic`**; клиентские `rkllm_*` / `paroli_*` / `llm_stream_*` — как у `command_parser`.
+Ключевые параметры ноды: **`classifier_json`** (`instructions` / `criteria` / `actions` / `say`; есть одноимённый launch-аргумент), **`min_confidence`** (0 = порог выключен), **`announce_commands`**, **`post_speech_cooldown_sec`**, **`announce_timeout_sec`**, **`dialog_interrupt_keywords`**, **`look_trigger_substrings`**, **`camera_topic`**, **`camera_stale_sec`**, **`llm_system_prompt`**, **`system_one_service`**, **`command_topic`**, **`input_topic`**; клиентские `rkllm_*` / `tts_*` / `llm_stream_*` — как у `command_parser`.
 
 Отладка без микрофона:
 
@@ -165,7 +165,7 @@ ros2 launch rds_2p_commands panda_commands.launch.py \
 - `unified_action_server` — исполнитель `PandaCommand`;
 - `panda_commands` — подписка на `/audio/input/transcription`, классификация и выполнение `command` / `wait` / `say`.
 
-`command` с `routine_id` уходит в `/robot/panda_command`; `step_forward`, `stop_running` и другие `motion_commands` — в `/cmd_vel/voice` (вход `cmd_vel_mux`, нужен `rds_2p_inference`); `say` — в `/paroli_ros/speak`. Ответ классификатора публикуется в `/panda_commands/decision` (JSON). `dry_run:=true` — только классификация без действий.
+`command` с `routine_id` уходит в `/robot/panda_command`; `step_forward`, `stop_running` и другие `motion_commands` — в `/cmd_vel/voice` (вход `cmd_vel_mux`, нужен `rds_2p_inference`); `say` — в `/audio/output/speak`. Ответ классификатора публикуется в `/panda_commands/decision` (JSON). `dry_run:=true` — только классификация без действий.
 
 Проверка без микрофона:
 
@@ -189,7 +189,7 @@ ros2 topic echo /panda_commands/decision --qos-durability transient_local --once
 | [config/panda_poses.yaml](src/rds_2p_commands/config/panda_poses.yaml) | Позы: секция **`poses`**, каждая — список из **12** нормализованных долей (как `voice_control.py`). |
 | [rds_2p_commands/servo_constants.py](src/rds_2p_commands/rds_2p_commands/servo_constants.py) | Только константа **`SERVO_IDS`** (1..12). |
 | [rds_2p_commands/llm_commands.py](src/rds_2p_commands/rds_2p_commands/llm_commands.py) | rkllm + очередь `/speak` Paroli, прерывание диалога. |
-| [rds_2p_commands/llm_layer_node.py](src/rds_2p_commands/rds_2p_commands/llm_layer_node.py) | Прослойка: транскрипт → system-one-классификация → команда (`/audio/command_transcription`) или диалог LLM+Paroli (см. п.7). |
+| [rds_2p_commands/llm_layer_node.py](src/rds_2p_commands/rds_2p_commands/llm_layer_node.py) | Прослойка: транскрипт → system-one-классификация → команда (`/audio/command_transcription`) или диалог LLM+TTS (см. п.7). |
 | [rds_2p_commands/unified_action_server.py](src/rds_2p_commands/rds_2p_commands/unified_action_server.py) | Сервер `PandaCommand`; при `allow_parallel_same_class:=false` новая цель отменяет предыдущую в слоте `motors`. |
 
 ### Параметры `RobotRoutineHandler` (у `unified_action_server`)

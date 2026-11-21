@@ -45,7 +45,7 @@ def generate_launch_description():
     panda_llm_tts_arg = DeclareLaunchArgument(
         'panda_llm_tts_enabled',
         default_value='true',
-        description='При подстроке в тексте — rkllm + озвучка Paroli параллельно PandaCommand',
+        description='При подстроке в тексте — rkllm + озвучка TTS параллельно PandaCommand',
     )
     panda_llm_trigger_arg = DeclareLaunchArgument(
         'panda_llm_trigger_substring',
@@ -60,16 +60,16 @@ def generate_launch_description():
         'rkllm_clear_kv_service',
         default_value='/rkllm_ros/clear_kv_cache',
     )
-    paroli_speak_arg = DeclareLaunchArgument(
-        'paroli_speak_service',
-        default_value='/paroli_ros/speak',
+    tts_speak_arg = DeclareLaunchArgument(
+        'tts_speak_service',
+        default_value='/audio/output/speak',
     )
-    paroli_stop_speech_arg = DeclareLaunchArgument(
-        'paroli_stop_speech_service',
-        default_value='/paroli_ros/stop_speech',
+    tts_stop_speech_arg = DeclareLaunchArgument(
+        'tts_stop_speech_service',
+        default_value='/audio/output/stop_speech',
     )
     rkllm_wait_arg = DeclareLaunchArgument('rkllm_wait_server_sec', default_value='5.0')
-    paroli_wait_arg = DeclareLaunchArgument('paroli_wait_service_sec', default_value='3.0')
+    tts_wait_arg = DeclareLaunchArgument('tts_wait_service_sec', default_value='3.0')
     rkllm_keep_hist_arg = DeclareLaunchArgument('rkllm_keep_history', default_value='true')
     rkllm_clear_before_arg = DeclareLaunchArgument(
         'rkllm_clear_kv_before_query',
@@ -116,10 +116,10 @@ def generate_launch_description():
             'panda_llm_trigger_substring': LaunchConfiguration('panda_llm_trigger_substring'),
             'rkllm_complete_action': LaunchConfiguration('rkllm_complete_action'),
             'rkllm_clear_kv_service': LaunchConfiguration('rkllm_clear_kv_service'),
-            'paroli_speak_service': LaunchConfiguration('paroli_speak_service'),
-            'paroli_stop_speech_service': LaunchConfiguration('paroli_stop_speech_service'),
+            'tts_speak_service': LaunchConfiguration('tts_speak_service'),
+            'tts_stop_speech_service': LaunchConfiguration('tts_stop_speech_service'),
             'rkllm_wait_server_sec': LaunchConfiguration('rkllm_wait_server_sec'),
-            'paroli_wait_service_sec': LaunchConfiguration('paroli_wait_service_sec'),
+            'tts_wait_service_sec': LaunchConfiguration('tts_wait_service_sec'),
             'rkllm_keep_history': LaunchConfiguration('rkllm_keep_history'),
             'rkllm_clear_kv_before_query': LaunchConfiguration('rkllm_clear_kv_before_query'),
             'rkllm_max_new_tokens': LaunchConfiguration('rkllm_max_new_tokens'),
@@ -136,10 +136,10 @@ def generate_launch_description():
         panda_llm_trigger_arg,
         rkllm_complete_action_arg,
         rkllm_clear_kv_arg,
-        paroli_speak_arg,
-        paroli_stop_speech_arg,
+        tts_speak_arg,
+        tts_stop_speech_arg,
         rkllm_wait_arg,
-        paroli_wait_arg,
+        tts_wait_arg,
         rkllm_keep_hist_arg,
         rkllm_clear_before_arg,
         rkllm_max_tok_arg,

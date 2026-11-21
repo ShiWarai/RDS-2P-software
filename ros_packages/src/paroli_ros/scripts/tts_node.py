@@ -29,7 +29,6 @@ from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
 from rds_2p_audio.srv import Speak
 from scipy import signal
-from std_msgs.msg import String
 from std_srvs.srv import Trigger
 
 PA_INT16 = 8
@@ -298,6 +297,8 @@ class TtsNode(Node):
         self.declare_parameter("between_sentence_silence_sec", 0.12)
         # 1.0 = без изменений; 0…1 — ослабление; >1 — усиление (например 1.5), с клипом int16.
         self.declare_parameter("tts_volume", 1.0)
+        self.declare_parameter("speak_service", "/audio/output/speak")
+        self.declare_parameter("stop_speech_service", "/audio/output/stop_speech")
         # Войсморфинг (пост-обработка синтеза, длительность сохраняется):
         # voice_pitch — высота в полутонах (−12…12): >0 выше/«детский», <0 ниже/«бас».
         # voice_formant — форманты в полутонах (−12…12): меняет тембр/«размер голоса»,
@@ -316,9 +317,14 @@ class TtsNode(Node):
         )
         self._pub = self.create_publisher(AudioStamped, self.get_parameter("output_topic").value, qos)
 
-        self._srv = self.create_service(Speak, "~/speak", self._on_speak)
-        self._srv_stop = self.create_service(Trigger, "~/stop_speech", self._on_stop_speech)
-        self._sub = self.create_subscription(String, "speak_text", self._on_speak_text, 10)
+        self._srv = self.create_service(
+            Speak,
+            self.get_parameter("speak_service").value,
+            self._on_speak)
+        self._srv_stop = self.create_service(
+            Trigger,
+            self.get_parameter("stop_speech_service").value,
+            self._on_stop_speech)
 
         self._lock = threading.Lock()
         self._proc: Optional[subprocess.Popen] = None
@@ -556,8 +562,7 @@ class TtsNode(Node):
                 time.sleep(delay)
 
     def _effective_tts_gain(self, service_volume: Optional[float]) -> float:
-        """Топик speak_text (None) — параметр ноды tts_volume; сервис /speak — поле volume запроса.
-        volume<=0 (дефолт поля запроса) = не задавать явно, взять tts_volume ноды."""
+        """Поле volume запроса; volume<=0 — взять tts_volume ноды."""
         if service_volume is None or service_volume <= 0.0:
             return float(self.get_parameter("tts_volume").get_parameter_value().double_value)
         return float(service_volume)
@@ -600,17 +605,6 @@ class TtsNode(Node):
         response.success = ok
         response.message = msg
         return response
-
-    def _on_speak_text(self, msg: String) -> None:
-        if not self._lock.acquire(blocking=False):
-            self.get_logger().warn("speak_text: synth занят, сообщение отброшено")
-            return
-        try:
-            ok, err = self._speak(msg.data, None)
-            if not ok:
-                self.get_logger().error(f"speak_text: {err}")
-        finally:
-            self._lock.release()
 
 
 def main(args: Optional[list[str]] = None) -> None:

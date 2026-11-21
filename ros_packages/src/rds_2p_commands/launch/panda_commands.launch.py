@@ -54,7 +54,7 @@ def generate_launch_description():
             'panda_action', default_value='/robot/panda_command',
             description='Action rds_2p_commands/PandaCommand'),
         DeclareLaunchArgument(
-            'speak_service', default_value='/paroli_ros/speak',
+            'speak_service', default_value='/audio/output/speak',
             description='Сервис rds_2p_audio/Speak'),
         DeclareLaunchArgument(
             'say_enabled', default_value='true',

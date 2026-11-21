@@ -13,13 +13,11 @@ ROS 2 узел **Paroli** на **RK3588** (ONNX + RKNN, Piper‑совмести
 
 Другой голос: параметры **`encoder_path`**, **`decoder_path`**, **`model_config_path`**; **`espeak_data_path`** обычно общий.
 
-**Сервис `paroli_ros/speak`** → **`rds_2p_audio/srv/Speak`**: **`text`**, **`volume`** — множитель амплитуды PCM после ресемплинга (`0` — тишина, `1` — без изменений, `>1` — усиление с клипом int16). Поле **`volume` в запросе нужно задавать явно**; если в YAML оно опущено, часто приходит `0` → тишина.
+**Сервис `/audio/output/speak`** → **`rds_2p_audio/srv/Speak`**: **`text`**, **`volume`** — множитель амплитуды PCM после ресемплинга (`0` — тишина, `1` — без изменений, `>1` — усиление с клипом int16). Если **`volume <= 0`** (поле опущено/ноль), используется параметр ноды **`tts_volume`** (в launch по умолчанию **1.8**); задавай `volume` явно, чтобы не зависеть от него.
 
-**Параметр ноды `tts_volume`** используется только для топика **`~/speak_text`** (там нет поля громкости); задать: `ros2 run paroli_ros tts_node.py --ros-args -p tts_volume:=1.5`.
+**Параметр ноды `tts_volume`** — громкость по умолчанию, если в запросе `volume <= 0`; задать: `ros2 run paroli_ros tts_node.py --ros-args -p tts_volume:=1.5`.
 
-**Сервис `paroli_ros/stop_speech`** → **`std_srvs/Trigger`**: аварийно глушит **`paroli-cli`** (обрывает синтез и выдачу в `audio_player`). Вызывается парсером команд при фразах из **`panda_dialog_interrupt`** (`rds_2p_commands`).
-
-**Топик (опция):** **`~/speak_text`** (`std_msgs/String`) → **`/paroli_ros/speak_text`** — тот же синтез, что и сервис; если в этот момент уже идёт вызов `/speak`, сообщение отбрасывается (см. WARN в логе).
+**Сервис `/audio/output/stop_speech`** → **`std_srvs/Trigger`**: аварийно глушит **`paroli-cli`** (обрывает синтез и выдачу в `audio_player`). Вызывается парсером команд при фразах из **`panda_dialog_interrupt`** (`rds_2p_commands`).
 
 **Зависимости runtime:** `python3-numpy`, `python3-scipy` (ресемплинг WAV от `paroli-cli` под `output_sample_rate`) — см. **`package.xml`**.
 
@@ -42,16 +40,16 @@ ros2 launch rds_2p_audio audio.launch.py enable_capturer:=false
 
 ros2 launch paroli_ros tts.launch.py
 
-ros2 service call /paroli_ros/speak rds_2p_audio/srv/Speak "{text: 'Привет.', volume: 1.0}"
+ros2 service call /audio/output/speak rds_2p_audio/srv/Speak "{text: 'Привет.', volume: 1.0}"
 
 # громче на этом вызове
-ros2 service call /paroli_ros/speak rds_2p_audio/srv/Speak "{text: 'Привет.', volume: 1.5}"
+ros2 service call /audio/output/speak rds_2p_audio/srv/Speak "{text: 'Привет.', volume: 1.5}"
 ```
 
 В **bash** с **`!`** в тексте не используйте внешние двойные кавычки (история подставок). Надёжно:
 
 ```bash
-ros2 service call /paroli_ros/speak rds_2p_audio/srv/Speak '{text: "Привет, как дела!", volume: 1.0}'
+ros2 service call /audio/output/speak rds_2p_audio/srv/Speak '{text: "Привет, как дела!", volume: 1.0}'
 ```
 
 ### Параметры ноды (`tts_node.py`)
@@ -75,7 +73,7 @@ ros2 service call /paroli_ros/speak rds_2p_audio/srv/Speak '{text: "Привет
 | `length_scale` | **`-1`** | **`≥0`** → `--length-scale` (Piper: меньше 1 — быстрее, больше 1 — медленнее). **`-1`** — не задавать (дефолт из конфига модели). |
 | `noise_scale` | **`-1`** | **`≥0`** → `--noise-scale`; **`-1`** — не задавать. |
 | `noise_w` | **`-1`** | **`≥0`** → `--noise-w`; **`-1`** — не задавать. |
-| `tts_volume` | **`1.0`** | Громкость только для топика **`speak_text`**; для **`/speak`** задаётся полем **`volume`**. |
+| `tts_volume` | **`1.0`** в ноде, **`1.8`** в launch | Громкость по умолчанию, если `volume` в запросе **`/audio/output/speak`** `<= 0`; иначе берётся поле `volume`. |
 | `voice_pitch` | **`0.0`** | Войсморфинг: высота в полутонах (−12…12). `>0` выше/«детский», `<0` ниже/«бас». Длительность сохраняется. |
 | `voice_formant` | **`0.0`** | Войсморфинг: форманты в полутонах (−12…12). Меняет тембр/«размер голоса» **без смены высоты** (эффект «другой человек»). |
 | `voice_tempo` | **`1.0`** | Войсморфинг: темп (0.5…2.0). `>1` быстрее, `<1` медленнее; высота не меняется. |

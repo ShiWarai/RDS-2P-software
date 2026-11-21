@@ -59,7 +59,7 @@ def generate_launch_description():
         DeclareLaunchArgument("transcription_topic",
                               default_value="/audio/input/transcription"),
         DeclareLaunchArgument("speak_service",
-                              default_value="/paroli_ros/speak"),
+                              default_value="/audio/output/speak"),
         DeclareLaunchArgument("speak_echo_seconds", default_value="3.0"),
         DeclareLaunchArgument("tts_volume", default_value="3.0"),
 

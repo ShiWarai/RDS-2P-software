@@ -17,6 +17,16 @@ def generate_launch_description():
             description='Шина AudioStamped',
         ),
         DeclareLaunchArgument(
+            'speak_service',
+            default_value='/audio/output/speak',
+            description='Сервис TTS: rds_2p_audio/srv/Speak',
+        ),
+        DeclareLaunchArgument(
+            'stop_speech_service',
+            default_value='/audio/output/stop_speech',
+            description='Сервис остановки TTS: std_srvs/srv/Trigger',
+        ),
+        DeclareLaunchArgument(
             'frame_id',
             default_value='tts.paroli',
             description='header.frame_id',
@@ -83,6 +93,8 @@ def generate_launch_description():
             output='screen',
             parameters=[{
                 'output_topic': LaunchConfiguration('output_topic'),
+                'speak_service': LaunchConfiguration('speak_service'),
+                'stop_speech_service': LaunchConfiguration('stop_speech_service'),
                 'frame_id': LaunchConfiguration('frame_id'),
                 'output_sample_rate': ParameterValue(
                     LaunchConfiguration('output_sample_rate'), value_type=int),

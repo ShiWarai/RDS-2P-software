@@ -6,11 +6,11 @@
   /audio/input/transcription (rds_2p_audio/Transcription)
         → choice-классификатор /system_one/systemone (kev-0.8b, критерии classifier_json)
         ├─ метка из classifier.actions:
-        │    объявление classifier.say через Paroli /speak (например «Встаю!»),
+        │    объявление classifier.say через TTS /audio/output/speak (например «Встаю!»),
         │    затем каноническая фраза в command_topic (/audio/command_transcription)
         │    — её принимает command_parser (commands_system) при запуске с
         │    transcription_topics:=['/audio/command_transcription']
-        └─ иначе («разговор») → rkllm ChatCompletion + озвучка Paroli
+        └─ иначе («разговор») → rkllm ChatCompletion + озвучка TTS
              (см. llm_commands.LlmCommands).
 
 Пока робот генерирует или говорит (диалог либо объявление команды) транскрипции
@@ -68,7 +68,7 @@ PANDA_SYSTEM_PROMPT = (
 
 
 class LlmLayerNode(Node):
-    """Маршрутизатор: команда → Paroli-объявление + command_topic, разговор → LLM+TTS."""
+    """Маршрутизатор: команда → TTS-объявление + command_topic, разговор → LLM+TTS."""
 
     def __init__(self) -> None:
         super().__init__('llm_layer')
@@ -91,10 +91,10 @@ class LlmLayerNode(Node):
         # Параметры, которые читает LlmCommands (те же имена, что у command_parser).
         self.declare_parameter('rkllm_complete_action', '/rkllm_ros/complete')
         self.declare_parameter('rkllm_clear_kv_service', '/rkllm_ros/clear_kv_cache')
-        self.declare_parameter('paroli_speak_service', '/paroli_ros/speak')
-        self.declare_parameter('paroli_stop_speech_service', '/paroli_ros/stop_speech')
+        self.declare_parameter('tts_speak_service', '/audio/output/speak')
+        self.declare_parameter('tts_stop_speech_service', '/audio/output/stop_speech')
         self.declare_parameter('rkllm_wait_server_sec', 5.0)
-        self.declare_parameter('paroli_wait_service_sec', 3.0)
+        self.declare_parameter('tts_wait_service_sec', 3.0)
         self.declare_parameter('rkllm_keep_history', True)
         self.declare_parameter('rkllm_clear_kv_before_query', False)
         self.declare_parameter('rkllm_max_new_tokens', 0)
@@ -102,7 +102,7 @@ class LlmLayerNode(Node):
         self.declare_parameter('llm_sanitize_user_and_reply', True)
         self.declare_parameter('llm_stream_min_chunk_chars', 2)
         self.declare_parameter('llm_reply_log_max_chars', 280)
-        self.declare_parameter('paroli_speak_log_max_chars', 0)
+        self.declare_parameter('tts_speak_log_max_chars', 0)
         self.declare_parameter('panda_llm_tts_enabled', True)
         self.declare_parameter('panda_llm_trigger_substring', 'панда')
 
@@ -145,9 +145,9 @@ class LlmLayerNode(Node):
         self._classify_inflight = False
 
         self._speak_client = None
-        paroli_name = self._str_param('paroli_speak_service')
-        if paroli_name and self._announce_enabled:
-            self._speak_client = self.create_client(Speak, paroli_name)
+        tts_name = self._str_param('tts_speak_service')
+        if tts_name and self._announce_enabled:
+            self._speak_client = self.create_client(Speak, tts_name)
 
         # Блокировка «не слушаем себя» на время объявления команды.
         self._speak_guard = False
@@ -176,7 +176,7 @@ class LlmLayerNode(Node):
         self.get_logger().info(
             f'llm_layer готов: {self._input_topic} → [{", ".join(self._labels)}]; '
             f'команды в {self._command_topic}, разговор → {self._str_param("rkllm_complete_action")} '
-            f'+ Paroli; объявления команд: {"вкл" if self._say else "выкл"}; '
+            f'+ TTS; объявления команд: {"вкл" if self._say else "выкл"}; '
             f'прерывание: {self._interrupt_keywords}; '
             f'зрение: {self._look_triggers} (камера {self._str_param("camera_topic")}); '
             f'system prompt: {"вкл" if sys_prompt else "выкл"}'
@@ -318,7 +318,7 @@ class LlmLayerNode(Node):
             )
         else:
             self.get_logger().info(
-                f'Разговор ({label}, conf {conf:.3f}, {resp.latency_ms} ms; probs {probs}) → LLM+Paroli'
+                f'Разговор ({label}, conf {conf:.3f}, {resp.latency_ms} ms; probs {probs}) → LLM+TTS'
             )
         self._dispatch_talk(text)
 
@@ -327,7 +327,7 @@ class LlmLayerNode(Node):
     def _announce_then_command(self, label: str, say: str, phrase: str) -> None:
         cli = self._speak_client
         if not cli.service_is_ready() and not cli.wait_for_service(timeout_sec=1.0):
-            self.get_logger().warn('Paroli /speak недоступен — команда без объявления')
+            self.get_logger().warn('TTS /audio/output/speak недоступен — команда без объявления')
             self._publish_command(label, phrase)
             return
 
@@ -349,9 +349,9 @@ class LlmLayerNode(Node):
         try:
             res = fut.result()
             if res is not None and not res.success:
-                self.get_logger().warn(f'Paroli speak: {res.message}')
+                self.get_logger().warn(f'TTS speak: {res.message}')
         except Exception as exc:  # noqa: BLE001
-            self.get_logger().warn(f'Paroli speak: {exc}')
+            self.get_logger().warn(f'TTS speak: {exc}')
         if cancelled:
             self.get_logger().info('Команда отменена (объявление прервано «стоп»)')
             return

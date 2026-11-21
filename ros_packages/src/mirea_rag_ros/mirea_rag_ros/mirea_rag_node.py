@@ -8,11 +8,11 @@
     mirea_rag_ros.rag_client.ask_gated(..., on_token=…)  — та же ветка RAG + OSM-гат
                      │  (сырые токены по мере генерации)
                      ▼
-    /paroli_ros/speak (rds_2p_audio/srv/Speak)  — request.text = «кусок», request.volume
+    /audio/output/speak (rds_2p_audio/srv/Speak)  — request.text = «кусок», request.volume
 
 Ответ произносится ПОТОКОВО: TtsChunker режет сырой текст на куски по знакам
 препинания (первый кусок — первое предложение/запятая, не дожидаясь конца
-генерации) и шлёт их в Speak последовательно. Сервис paroli блокирует вызов
+генерации) и шлёт их в Speak последовательно. Сервис TTS блокирует вызов
 до конца озвучки куска, поэтому куски звучат по порядку без наложений.
 stream_tts:=false возвращает прежний режим «весь ответ одним вызовом».
 
@@ -166,7 +166,7 @@ class MireaRagNode(Node):
         super().__init__("mirea_rag")
 
         self.declare_parameter("transcription_topic", "/audio/input/transcription")
-        self.declare_parameter("speak_service", "/paroli_ros/speak")
+        self.declare_parameter("speak_service", "/audio/output/speak")
         self.declare_parameter("speak_echo_seconds", 3.0)
         self.declare_parameter("tts_volume", 3.0)
         self.declare_parameter("min_query_chars", 2)
@@ -333,17 +333,27 @@ class MireaRagNode(Node):
             f"{self._speak_timeout:.0f} с)")
 
     # --- приём транскрипции ------------------------------------------------
-    def _strip_wake_word(self, text: str) -> tuple[bool, str]:
-        """Вернуть (найдено ли имя, текст без имени)."""
+    @staticmethod
+    def _normalize_wake_match(m: re.Match) -> str:
+        """Банда/банды/... → Панда/панды/...; «панда» не трогаем."""
+        word = m.group(0)
+        if not word.lower().startswith("банд"):
+            return word
+        repl = "панд" + word[4:]
+        if word.isupper():
+            return repl.upper()
+        if word[0].isupper():
+            return repl[0].upper() + repl[1:]
+        return repl
+
+    def _normalize_wake_word(self, text: str) -> tuple[bool, str]:
+        """Вернуть (найдено ли обращение, текст с банда→панда)."""
         if not self._wake_required:
-            return True, text
-        m = self._wake_re.search(text)
-        if not m:
+            return True, self._wake_re.sub(self._normalize_wake_match, text)
+        found = bool(self._wake_re.search(text))
+        if not found:
             return False, text
-        cleaned = f"{text[:m.start()]} {text[m.end():]}"
-        cleaned = re.sub(r"\s+", " ", cleaned)
-        cleaned = cleaned.strip(" \t,.;:!?—–-")
-        return True, cleaned
+        return True, self._wake_re.sub(self._normalize_wake_match, text)
 
     def _reset_history(self) -> None:
         self.history.clear()
@@ -386,18 +396,20 @@ class MireaRagNode(Node):
             self._speak("История диалога очищена.", text)
             return
 
-        found, question = self._strip_wake_word(text)
+        found, question = self._normalize_wake_word(text)
         if not found:
             self.get_logger().info(
                 f"пропуск: нет обращения «панда/банда» — «{text}»")
             return
-        if not question:
+        bare = re.sub(r"\s+", " ", self._wake_re.sub("", question))
+        bare = bare.strip(" \t,.;:!?—–-")
+        if not bare:
             self.get_logger().info(f"обращение без вопроса: «{text}»")
             self._busy = True
             self._speak("Да?", text)
             return
         if question != text:
-            self.get_logger().info(f"вопрос после обращения: «{question}»")
+            self.get_logger().info(f"вопрос с обращением: «{question}»")
 
         self._busy = True
         try:
