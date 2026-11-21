@@ -60,6 +60,19 @@ def generate_launch_description():
             "include_battery_monitor", default_value="true",
             description="Поднимать battery_monitor (телеметрия батареи по моторам)"),
         DeclareLaunchArgument(
+            "base_log_level", default_value="warn",
+            description="Лог-уровень motor_controller/bridge/cmd_vel_mux: "
+                        "debug | info | warn | error | fatal"),
+        DeclareLaunchArgument(
+            "mtf02p_log_level", default_value="warn",
+            description="Лог-уровень mtf02p_odom/odom_fusion"),
+        DeclareLaunchArgument(
+            "face_log_level", default_value="warn",
+            description="Лог-уровень face_with_touchpad"),
+        DeclareLaunchArgument(
+            "dance_joy_log_level", default_value="warn",
+            description="Лог-уровень dance_joy_controller"),
+        DeclareLaunchArgument(
             "require_control_input", default_value="true",
             description="Inference не едет без свежего /cmd_vel и active cmd_vel_mux"),
         DeclareLaunchArgument(
@@ -97,7 +110,11 @@ def generate_launch_description():
                 "config_file": ftservo_config,
                 "offsets_config_file": offsets_config,
                 "is_sim": LaunchConfiguration("is_sim"),
-                "log_level": "info",
+                "log_level": LaunchConfiguration("base_log_level"),
+                "mtf02p_log_level": LaunchConfiguration("mtf02p_log_level"),
+                "face_log_level": LaunchConfiguration("face_log_level"),
+                "dance_joy_log_level": LaunchConfiguration(
+                    "dance_joy_log_level"),
             }.items(),
             condition=IfCondition(LaunchConfiguration("include_base")),
         ),

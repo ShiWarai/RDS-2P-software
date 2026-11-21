@@ -10,6 +10,7 @@
 """
 
 import sys
+import time
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
@@ -31,14 +32,24 @@ class ImagePublisher(Node):
         
         self.image_pub = self.create_publisher(
             Image,
-            '/face/raw_image',
+            '/face/image',
             qos_profile
         )
         
         self.image_path = image_path
         
+        # Ждём, пока display_face обнаружит паблишер, иначе одиночный
+        # publish уходит до discovery и теряется.
+        self._wait_for_subscribers()
+        
         # Загружаем и публикуем изображение
         self.publish_image()
+
+    def _wait_for_subscribers(self, timeout_sec: float = 3.0) -> None:
+        deadline = time.time() + timeout_sec
+        while (self.image_pub.get_subscription_count() == 0
+               and time.time() < deadline):
+            rclpy.spin_once(self, timeout_sec=0.05)
     
     def publish_image(self):
         """Загружает изображение и публикует его в топик."""
@@ -73,8 +84,12 @@ class ImagePublisher(Node):
             image_msg.step = image_width * 3  # 3 байта на пиксель (RGB)
             image_msg.data = bytes(image_data)
             
-            # Публикуем изображение
-            self.image_pub.publish(image_msg)
+            # Публикуем несколько раз — надёжно доходит после discovery
+            for _ in range(10):
+                image_msg.header.stamp = self.get_clock().now().to_msg()
+                self.image_pub.publish(image_msg)
+                rclpy.spin_once(self, timeout_sec=0.02)
+                time.sleep(0.1)
             
         except Exception as e:
             self.get_logger().error(f'Ошибка при публикации изображения: {str(e)}')
