@@ -178,6 +178,8 @@ if [ ! -d "$MPU6500_LIB_PATH" ] || [ -z "$(ls -A "$MPU6500_LIB_PATH" 2>/dev/null
     mkdir -p "src/mpu6500_ros/library"
     cd "src/mpu6500_ros/library"
     git clone https://github.com/libdriver/mpu6500.git
+    # Пиним вендора: overlay-патч сгенерирован против этого коммита.
+    git -C mpu6500 checkout -q a66ceb7a5f18473f4807daebf0c63afdc077cc4f
     cd ../../..
     echo "✅ mpu6500 библиотека скачана"
 else
