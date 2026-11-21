@@ -28,7 +28,8 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import (
+    LaunchConfiguration, PathJoinSubstitution, PythonExpression)
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -56,6 +57,9 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "include_inference", default_value="true",
             description="Поднимать inference policy (как rds_2p_inference_node.service)"),
+        DeclareLaunchArgument(
+            "motion_mode", default_value="walk",
+            description="walk — ходьба/inference; pose — стоим и слушаем команды/позы"),
         DeclareLaunchArgument(
             "include_battery_monitor", default_value="true",
             description="Поднимать battery_monitor (телеметрия батареи по моторам)"),
@@ -138,7 +142,11 @@ def generate_launch_description():
                 "control_timeout_sec": LaunchConfiguration(
                     "control_timeout_sec"),
             }.items(),
-            condition=IfCondition(LaunchConfiguration("include_inference")),
+            condition=IfCondition(PythonExpression([
+                "'", LaunchConfiguration("motion_mode"),
+                "' == 'walk' and '", LaunchConfiguration("include_inference"),
+                "'.lower() == 'true'"
+            ])),
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource([
