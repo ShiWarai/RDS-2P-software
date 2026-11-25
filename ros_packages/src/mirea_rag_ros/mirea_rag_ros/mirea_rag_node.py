@@ -176,7 +176,7 @@ class MireaRagNode(Node):
         self.declare_parameter("speak_timeout", 120.0)
         # Реагируем только на обращение по имени (STT путает «панда/банда»).
         self.declare_parameter("wake_word_required", True)
-        self.declare_parameter("force_rag", True)
+        self.declare_parameter("force_rag", False)
         self.declare_parameter(
             "wake_word_regex",
             r"(?i)\b(?:панда|панды|панде|панду|пандой|пандою|"
@@ -322,6 +322,11 @@ class MireaRagNode(Node):
             f"RAG_API={_rc.BASE} · OSM={_rc.OSM_MODEL} enabled={_rc.OSM_ENABLED} "
             f"· nospeak={_rc.NOSPEAK_MODE} (env: {_ENV_FILE or 'defaults'})")
         self.get_logger().info(f"бэкенд OSM/LLM: {self._backend.describe()}")
+        # Стиль подачи фактов зеркалим с сервера (api-режим), иначе префикс
+        # разъедется и RKLLM пересчитает весь префилл. В local-режиме /health
+        # недоступен — остаётся значение из env или glue.
+        if self._backend_name == "api":
+            _rc.sync_context_style()
         self.get_logger().info(
             f"bundle для локального режима: {bundle_dir}")
         self.get_logger().info(
@@ -435,37 +440,28 @@ class MireaRagNode(Node):
                 self._speak_chunk(chunk)
                 spoken_any = True
 
-        timings: dict = {}
         try:
-            answer, _rag_ctx, hist_user = ask_gated(
+            answer, _rag_ctx, turn_msgs = ask_gated(
                 question, self.history, on_token=on_token,
-                backend=self._backend, force_rag=self._force_rag,
-                timings_out=timings)
+                backend=self._backend, force_rag=self._force_rag)
         except Exception as e:  # noqa: BLE001
             if spoken_any:
                 self._speech_end = time.monotonic()
             self._busy = False
             self.get_logger().error(f"RAG не ответил на «{question}»: {e}")
             return
-        if timings:
-            # Разбивка по этапам в секундах: retrieval (embed/search) живёт в
-            # контейнере на CPU, prefill/decode — на LLM-сервере. Это то, чего
-            # не было видно в логах: где именно теряется время ответа.
-            self.get_logger().info(
-                f"RAG тайминги (с): "
-                f"embed={timings.get('embed', '—')} "
-                f"search={timings.get('search', '—')} "
-                f"prefill={timings.get('llm_ttft', '—')} "
-                f"decode={timings.get('llm_decode', '—')} "
-                f"всего={timings.get('total', timings.get('llm_total', '—'))}")
 
         if chunker is not None:
             for chunk in chunker.flush():
                 self._speak_chunk(chunk)
                 spoken_any = True
 
-        if hist_user is not None and answer:
-            self.history.append({"role": "user", "content": hist_user})
+        if turn_msgs is not None and answer:
+            # В историю — дословно сообщения хода (обычно echo turn_messages с
+            # сервера), assistant-реплика — сырой поток токенов. Только так
+            # LLM-сервер на следующем ходу узнаёт префикс и отдаёт reuse.
+            # Историю не режем и не переформатируем.
+            self.history.extend(turn_msgs)
             self.history.append({"role": "assistant", "content": answer})
 
         if chunker is None:

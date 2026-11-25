@@ -19,8 +19,7 @@ from .rag_client import fix_asr_aliases
 
 log = logging.getLogger(__name__)
 
-DEFAULT_TOP_K = 6
-DEFAULT_CONFIDENCE = 0.45
+DEFAULT_TOP_K = 3
 
 
 class BundleSearcher:
@@ -109,11 +108,8 @@ class BundleSearcher:
             "conf_score": best,
             "fusion": "bundle",
         }
-        if not chunks or best < DEFAULT_CONFIDENCE:
-            result["refuse"] = {
-                "answer": "Не знаю",
-                "confidence": best,
-            }
+        # Guard не блокирует генерацию: при пустом/слабом ретривале всё равно
+        # отвечает LLM (RKLLM) — честность держит system-промт.
         return result
 
     # ---- BM25 fallback --------------------------------------------------- #
@@ -148,7 +144,6 @@ class BundleSearcher:
                 "chunks": [],
                 "conf_score": 0.0,
                 "fusion": "bm25-local",
-                "refuse": {"answer": "Не знаю", "confidence": 0.0},
             }
         best = hits[0][1] or 1.0
         chunks = []

@@ -72,6 +72,27 @@ NOSPEAK_MODE = os.environ.get("NOSPEAK_MODE", "strip").strip().lower()
 if NOSPEAK_MODE not in ("strip", "unwrap", "off"):
     NOSPEAK_MODE = "strip"
 
+# Стиль подачи фактов текущего хода (glue/history). Клиент зеркалит историю в
+# том же стиле, что и сервер, иначе байты разойдутся и RKLLM пересчитает весь
+# префилл. Сервер — источник правды: стиль синхронизируется с /health при
+# старте (sync_context_style); до синхронизации — значение из env или glue.
+RAG_CONTEXT_STYLE = os.environ.get("RAG_CONTEXT_STYLE", "glue").strip().lower()
+if RAG_CONTEXT_STYLE not in ("glue", "history"):
+    RAG_CONTEXT_STYLE = "glue"
+
+
+def sync_context_style() -> str:
+    """Подтянуть стиль подачи фактов с сервера (/health) и вернуть его."""
+    global RAG_CONTEXT_STYLE
+    try:
+        with urllib.request.urlopen(f"{BASE}/health", timeout=5) as r:
+            style = json.loads(r.read().decode("utf-8")).get("rag_context_style")
+        if style in ("glue", "history"):
+            RAG_CONTEXT_STYLE = style
+    except Exception:
+        pass
+    return RAG_CONTEXT_STYLE
+
 
 def speakable(text: str) -> str:
     """Политика потребителя, применённая к тексту для показа: что видишь = что
@@ -186,7 +207,7 @@ def _post_event_stream(url, payload, timeout):
 
 def _log_turn(question: str, osm, branch: str, history: list, answer: str,
               chunks=None, sr=None, stats=None, done=None,
-              osm_ms=None, osm_err=None, timings_out=None) -> None:
+              osm_ms=None, osm_err=None) -> None:
     """Один читаемый текстовый блок на ход → ``RAG_CHAT_LOG``.
 
     Видно: решение OSM, какая ветка сработала, что вернул поиск (чанки +
@@ -260,35 +281,6 @@ def _log_turn(question: str, osm, branch: str, history: list, answer: str,
                                ("total", "всего")):
                 if isinstance(tm.get(key), (int, float)):
                     tparts.append(f"{label} {_fmt_dur(tm[key])}")
-    # Сводный словарь таймингов (с) для вызывающего: нода пишет его в ROS-лог,
-    # чтобы разбивка по этапам видна без RAG_CHAT_LOG. retrieval-этапы берём из
-    # sr (ответ /search), LLM-этапы — из done; в direct-ветке LLM-цифры из stats.
-    if timings_out is not None:
-        merged: dict = {}
-        if isinstance(sr, dict):
-            stm = sr.get("timings")
-            if isinstance(stm, dict):
-                for k in ("preprocess", "embed", "search"):
-                    v = stm.get(k)
-                    if isinstance(v, (int, float)):
-                        merged[k] = round(v, 3)
-        if isinstance(done, dict):
-            dtm = done.get("timings")
-            if isinstance(dtm, dict):
-                for k in ("preprocess", "embed", "search", "prompt",
-                          "llm_ttft", "llm_decode", "llm_total", "total"):
-                    v = dtm.get(k)
-                    if isinstance(v, (int, float)) and k not in merged:
-                        merged[k] = round(v, 3)
-        if isinstance(stats, dict):
-            if isinstance(stats.get("ttft"), (int, float)):
-                merged.setdefault("llm_ttft", round(stats["ttft"], 3))
-            if isinstance(stats.get("total"), (int, float)):
-                merged.setdefault("llm_total", round(stats["total"], 3))
-            if stats.get("n_tokens"):
-                merged["n_tokens"] = stats["n_tokens"]
-        if merged:
-            timings_out.update(merged)
     if tparts:
         lines.append("  ⏱ " + " · ".join(tparts))
     # Реальные JSON-тела, ушедшие на сервера.
@@ -338,7 +330,7 @@ def search(q, history=None, timeout=30):
     Гонится параллельно с OSM; LLM вызывается только при «да» (/ask_llm_stream).
     История уходит в запрос, чтобы сервер разрешил анафоры в поиске
     («а кто его замы?» → по прошлой реплике о директоре ИИТ)."""
-    obj = {"question": q, "history": history or [], "top_k": 6}
+    obj = {"question": q, "history": history or [], "top_k": 3}
     payload = json.dumps(obj, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(
         f"{BASE}/search", data=payload,
@@ -795,17 +787,23 @@ def _build_facts_block(chunks) -> str:
     return "\n\n---\n\n".join(kept)
 
 
-def _history_user_content(query: str, chunks) -> str:
-    """Точный текст user-реплики, каким его увидел LLM в live-ходе.
+def _turn_msgs_fallback(query: str, chunks) -> list[dict]:
+    """Фолбэк-зеркало хода, когда сервер не вернул ``turn_messages`` (старый
+    сервер) или LLM не вызывался (QA-ответ из данных).
 
-    Зеркалит серверный _build_messages(style=glue): «<материалы>…\\n\\nВопрос: …»,
-    а при пустом контексте — голый вопрос. ``query`` должен быть
-    ``clean_query`` сервера (нормализованный), а не сырой ввод.
+    В обычном пути клиент кладёт в историю ДОСЛОВНО ``turn_messages`` из
+    done-события сервера — это гарантирует байт-в-байт при любом стиле. Этот
+    фолбэк собирает те же сообщения сам, в стиле ``RAG_CONTEXT_STYLE``
+    (синхронизирован с сервером через /health). ``query`` — ``clean_query``
+    сервера (нормализованный), а не сырой ввод.
     """
     facts = _build_facts_block(chunks) if chunks else ""
     if not facts:
-        return query
-    return f"{facts}\n\nВопрос: {query}"
+        return [{"role": "user", "content": query}]
+    if RAG_CONTEXT_STYLE == "history":
+        return [{"role": "assistant", "content": facts},
+                {"role": "user", "content": query}]
+    return [{"role": "user", "content": f"{facts}\n\nВопрос: {query}"}]
 
 
 def _emit_rag_two_stage(q: str, history: list, sr: dict,
@@ -861,25 +859,23 @@ def _emit_rag_two_stage(q: str, history: list, sr: dict,
 
 
 def ask_gated(q: str, history: list, on_token=None,
-              backend=None, force_rag: bool = False,
-              timings_out=None) -> tuple[str, list | None, str | None]:
+              backend=None, force_rag: bool = False
+              ) -> tuple[str, list | None, list[dict] | None]:
     """RAG-поток сквозь OSM-гат, двухэтапный: OSM и /search (только ретривал,
     CPU) гонятся ПАРАЛЛЕЛЬНО, но LLM-запрос уходит ТОЛЬКО если OSM ответил
     «да» (LLM-ветка по найденным чанкам). При «нет» — direct-чат, а слот модели
     на общем LLM-шлюзе свободен. OSM выключен/таймаут/ошибка или /search
-    недоступен → полный /ask_stream как usual.
+     недоступен → полный /ask_stream как usual.
 
-    ``backend`` — обёртка над OSM и LLM (см. ``backends.py``): ``api`` — старый
+     ``backend`` — обёртка над OSM и LLM (см. ``backends.py``): ``api`` — старый
     HTTP RAG API, ``local`` — локальные ROS OSM (system-one) и RKLLM. По
     умолчанию API-бэкенд, поведение прежнее.
 
-    Возвращает (ответ, чанки_хода, user-реплика_для_истории). Третий элемент —
-    дословный текст user-реплики, каким её увидел LLM в этом ходе; клиент кладёт
-    его в историю без изменений, чтобы следующий ход совпал по префиксу и
-    LLM-сервер отдал reuse KV-кэша. None — LLM не вызывался (отказ/ошибка),
-    поэтому историю дополнять нельзя. Факты RAG-хода живут в промпте в
-    хронологическом порядке — продолжение («а кто его замы?») отвечается по
-    прошлому контексту, а не повторным поиском и не sticky-обходом гейта.
+    Возвращает (ответ, чанки_хода, сообщения_хода_для_истории). Третий элемент —
+    список сообщений (user/assistant), которыми LLM увидел этот ход; клиент
+    кладёт их в историю ДОСЛОВНО (обычно это echo ``turn_messages`` с сервера),
+    чтобы следующий ход совпал по префиксу и LLM-сервер отдал reuse KV-кэша.
+    None — LLM не вызывался (отказ/ошибка), поэтому историю дополнять нельзя.
     ``on_token`` — необязательный колбэк на каждый сырой кусок ответа (для
     потокового TTS в ROS-мосте); вызывается синхронно из этого же потока."""
     backend = backend or _API_BACKEND
@@ -888,6 +884,38 @@ def ask_gated(q: str, history: list, on_token=None,
     sr_state = {"res": None, "err": None}
     t_start = time.time()
     gate_timeout = float(backend.osm_gate_timeout)
+    res = None
+
+    def _direct(branch: str, skip_reason: str | None = None):
+        """Ответ без RAG-контекста (OSM «нет», поиск отключён/недоступен)."""
+        if skip_reason:
+            print(meta_style(f"      {skip_reason}"))
+        try:
+            answer, stats, done_ev = backend.chat_stream(q, history, on_token)
+        except Exception as e:
+            print(err_style(f"      ошибка LLM: {e}"))
+            print()
+            return "", None, None
+        parts = []
+        osm_ms = osm_state.get("ms")
+        if isinstance(osm_ms, (int, float)):
+            parts.append(f"osm {_fmt_dur(osm_ms / 1000)}")
+        if stats.get("ttft") is not None:
+            parts.append(f"первый токен {stats['ttft']:.1f} с")
+        parts.append(f"llm {stats['total']:.1f} с")
+        if stats.get("n_tokens"):
+            parts.append(f"{stats['n_tokens']} ток.")
+        parts.append(f"всего {time.time() - t_start:.1f} с")
+        print()
+        print(dim("      ⏱ " + " · ".join(parts)))
+        print(dim("─" * min(width(), 72)))
+        _log_turn(q, res, branch, history, answer,
+                  stats=stats, osm_ms=osm_ms, done=done_ev)
+        # direct-чат получает голый вопрос без нормализации; сервер echo'ит его
+        # в turn_messages. Фолбэк (local-бэкенд) — дословно q.
+        turn_msgs = (done_ev or {}).get("turn_messages") or [
+            {"role": "user", "content": q}]
+        return answer, None, turn_msgs
 
     def osm_worker():
         if force_rag or not backend.osm_enabled:
@@ -922,36 +950,6 @@ def ask_gated(q: str, history: list, on_token=None,
         decided = not osm_t.is_alive()
         res = osm_state.get("res")
 
-    def _direct(branch: str, skip_reason: str | None = None):
-        """Ответ без RAG-контекста (OSM «нет» или поиск отключён/недоступен)."""
-        if skip_reason:
-            print(meta_style(f"      {skip_reason}"))
-        try:
-            answer, stats, done_ev = backend.chat_stream(q, history, on_token)
-        except Exception as e:
-            print(err_style(f"      ошибка LLM: {e}"))
-            print()
-            return "", None, None
-        parts = []
-        osm_ms = osm_state.get("ms")
-        if isinstance(osm_ms, (int, float)):
-            parts.append(f"osm {_fmt_dur(osm_ms / 1000)}")
-        if stats.get("ttft") is not None:
-            parts.append(f"первый токен {stats['ttft']:.1f} с")
-        parts.append(f"llm {stats['total']:.1f} с")
-        if stats.get("n_tokens"):
-            parts.append(f"{stats['n_tokens']} ток.")
-        parts.append(f"всего {time.time() - t_start:.1f} с")
-        print()
-        print(dim("      ⏱ " + " · ".join(parts)))
-        print(dim("─" * min(width(), 72)))
-        _log_turn(q, res, branch, history, answer,
-                  stats=stats, osm_ms=osm_ms, done=done_ev,
-                  timings_out=timings_out)
-        # direct-чат получает голый вопрос без нормализации, поэтому в
-        # историю — дословно q.
-        return answer, None, q
-
     if (backend.osm_enabled or force_rag) and res and decided:
         if not force_rag:
             print_osm(res)
@@ -975,15 +973,15 @@ def ask_gated(q: str, history: list, on_token=None,
                 llm_stream=backend.ask_llm_stream)
             _log_turn(q, res, f"RAG двухэтапный ({backend.name})",
                       history, answer, sr=sr,
-                      done=done_state or None, osm_ms=osm_state.get("ms"),
-                      timings_out=timings_out)
+                      done=done_state or None, osm_ms=osm_state.get("ms"))
             if sr.get("refuse") or done_state.get("type") == "refused":
                 # LLM не вызывался — сервер свою историю не менял, значит и
                 # клиент не должен её дополнять: иначе на следующем ходе
                 # префикс разъедется и reuse не случится.
                 return answer, chunks, None
-            return (answer, chunks,
-                    _history_user_content(sr.get("clean_query") or q, chunks))
+            turn_msgs = done_state.get("turn_messages") or _turn_msgs_fallback(
+                sr.get("clean_query") or q, chunks)
+            return answer, chunks, turn_msgs
         print(dim(f"      /search недоступен ({sr_state.get('err')}) — "
                   f"прямой ответ ({backend.name})"))
         return _direct(f"direct-чат ({backend.name}, /search недоступен)")
@@ -1020,12 +1018,12 @@ def ask_gated(q: str, history: list, on_token=None,
     answer = emit(events, ctx_out, on_token)
     _log_turn(q, res, f"полный пайплайн /ask_stream ({backend.name})", history,
               answer, chunks=ctx_out or None, done=done_state or None,
-              osm_ms=osm_state.get("ms"), osm_err=osm_state.get("err"),
-              timings_out=timings_out)
+              osm_ms=osm_state.get("ms"), osm_err=osm_state.get("err"))
     if done_state.get("type") == "refused":
         return answer, (ctx_out or None), None
-    return (answer, (ctx_out or None),
-            _history_user_content(done_state.get("query") or q, ctx_out))
+    turn_msgs = done_state.get("turn_messages") or _turn_msgs_fallback(
+        done_state.get("query") or q, ctx_out)
+    return answer, (ctx_out or None), turn_msgs
 
 
 class _ApiBackend:
@@ -1080,6 +1078,8 @@ def banner() -> None:
     sm = server_model()
     if sm:
         print(dim(f"LLM: {sm}  (обе ветки — RAG и direct-чат — через сервер)"))
+    style = sync_context_style()
+    print(dim(f"факты текущего хода: {style}"))
     print(dim("exit / выход — выйти    /clear — забыть диалог    /help — справку"))
     print()
 
@@ -1121,18 +1121,18 @@ def main() -> None:
 
         print()
         try:
-            answer, _rag_ctx, hist_user = ask_gated(q, history)
+            answer, _rag_ctx, turn_msgs = ask_gated(q, history)
         except Exception as e:
             print(err_style(f"ошибка  {e}"))
             print()
             continue
 
-        if answer and hist_user is not None:
-            # В историю — дословно то, что видел LLM: user-реплика уже
-            # собрана (нормализованный запрос + блок материалов в серверном
-            # формате), assistant-реплика — сырой поток токенов. Только так
-            # LLM-сервер на следующем ходу узнаёт префикс и отдаёт reuse.
-            history.append({"role": "user", "content": hist_user})
+        if answer and turn_msgs is not None:
+            # В историю — дословно то, что видел LLM: сообщения хода (обычно
+            # echo turn_messages с сервера), assistant-реплика — сырой поток
+            # токенов. Только так LLM-сервер на следующем ходу узнаёт префикс
+            # и отдаёт reuse. Историю не режем и не переформатируем.
+            history.extend(turn_msgs)
             history.append({"role": "assistant", "content": answer})
         print()
 

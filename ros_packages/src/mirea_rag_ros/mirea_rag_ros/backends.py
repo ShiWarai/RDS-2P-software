@@ -31,15 +31,24 @@ log = logging.getLogger(__name__)
 from . import rag_client as rc
 
 # Персона локального RKLLM. Пустая строка — не менять system-промпт ноды RKLLM.
+# Согласована с серверным SYSTEM_PROMPT (src/rag/answer.py): сведения — только
+# если отвечают на вопрос, нерелевантные не пересказывать, не выдумывать.
 DEFAULT_LOCAL_SYSTEM_PROMPT = (
-    "Ты робот-панда, помощник для студентов и абитуриентов РТУ МИРЭА. "
-    "Отвечай кратко, без Markdown и списков. Не придумывай точную информацию."
+    "Ты - робот-панда, помощник для студентов и абитуриентов РТУ МИРЭА. "
+    "Отвечай кратко по-русски, без Markdown и списков: сразу суть. "
+    "Используй историю диалога и материалы перед вопросом, только если они "
+    "отвечают на текущий вопрос; не пересказывай материалы, которые к нему не относятся. "
+    "Если вопрос - продолжение диалога, отвечай по истории. "
+    "Не выдумывай имена, должности, даты, телефоны, суммы и адреса. "
+    "Если ответа нет, честно скажи, что не знаешь. "
+    "Не называй себя ботом и не пиши как языковая модель - ты робот-панда."
 )
 
 # Короткая инструкция для RAG-ветки: факты лежат в user-сообщении.
 _RAG_INSTRUCTION = (
-    "Ответь на вопрос по материалам ниже. Отвечай кратко, одним-двумя "
-    "предложениями, без Markdown, списков и пересказа материалов. "
+    "Ответь на текущий вопрос, используя материалы ниже, только если они "
+    "отвечают на вопрос. Отвечай кратко, одним-двумя предложениями, без "
+    "Markdown, списков и пересказа материалов. Не выдумывай факты. "
     "Если ответа в материалах нет, скажи, что не знаешь."
 )
 
@@ -452,63 +461,7 @@ class LocalBackend:
             return base
         return self._history_prompt(base, history)
 
-    @staticmethod
-    def _qa_stems(text: str) -> set[str]:
-        stop = {"что", "такое", "это", "как", "чем", "кто", "где", "когда",
-                "расскажи", "можешь", "про", "для", "или", "если", "есть"}
-        words = re.findall(r"[а-яa-z0-9]+", (text or "").lower().replace("ё", "е"))
-        return {w[:6] for w in words if len(w) >= 5 and w not in stop}
-
-
-    @staticmethod
-    def _norm_qa(text: str) -> str:
-        text = (text or "").lower().replace("ё", "е")
-        text = re.sub(r"[^а-яa-z0-9 ]+", " ", text)
-        return re.sub(r"\s+", " ", text).strip()
-
-    def _direct_qa_answer(self, question: str, sr: dict) -> str | None:
-        """Точный вопрос из QA-пары → отдать готовый ответ без LLM.
-
-        RKLLM на коротких вопросах любит выбрать соседний чанк и пересказать
-        не то мероприятие. Если вопрос дословно совпал с вопросом QA-пары,
-        ответ уже проверен и его не нужно перегенерировать.
-        """
-        qn = self._norm_qa(question)
-        if not qn:
-            return None
-        best: str | None = None
-        for chunk in (sr or {}).get("chunks") or []:
-            text = str(chunk.get("text") or "")
-            m = re.match(r"(?s)\s*Вопрос:\s*(.*?)\n\s*Ответ:\s*(.*)", text)
-            if not m:
-                continue
-            title = self._norm_qa(m.group(1))
-            if (title == qn
-                    or (len(title) >= 15 and title in qn)
-                    or len(self._qa_stems(title) & self._qa_stems(qn)) >= 2):
-                answer = m.group(2).strip()
-                if answer and (best is None or len(answer) > len(best)):
-                    best = answer
-        if best:
-            log.info("direct QA answer: %d chars", len(best))
-        return best
-
     def ask_llm_stream(self, question: str, sr: dict, history: list):
-        direct = self._direct_qa_answer(question, sr)
-        if direct:
-            yield {"type": "token", "content": direct}
-            yield {
-                "type": "done",
-                "answer": direct,
-                "ttft": 0.0,
-                "generation_time": 0.0,
-                "n_tokens": len(direct.split()),
-                "timings": {"llm_ttft": 0.0, "llm_decode": 0.0,
-                            "total": 0.0},
-                "confidence_score": (sr or {}).get("conf_score"),
-                "query": (sr or {}).get("clean_query") or question,
-            }
-            return
         prompt = self._prompt(question, history, sr)
         for event in self._llm_events(prompt):
             if event.get("type") == "done":
