@@ -256,7 +256,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "vad_hangover_sec",
-                default_value="2.0",
+                default_value="1.0",
                 description="Хвост тишины (с), добавляемый к фразе перед распознаванием",
             ),
             DeclareLaunchArgument(
@@ -266,7 +266,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "vad_preroll_sec",
-                default_value="0.5",
+                default_value="1.0",
                 description="Буфер (с) до старта речи: больше — не проглатывает начало слов",
             ),
             DeclareLaunchArgument(

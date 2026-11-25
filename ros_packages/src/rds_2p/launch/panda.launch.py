@@ -1,4 +1,4 @@
-"""ROS-only стек панды: voice_system + commands_system + RAG (local) + база моторов.
+"""ROS-only стек панды: voice_system + команды (OSM/regex) + RAG (local) + база моторов.
 
 Запускать вместо ``voice-control.service`` (он держит микрофон/динамик/ttysS7)::
 
@@ -11,7 +11,9 @@
   * inference_node — политика ходьбы (как rds_2p_inference_node.service);
   * rds_2p voice_system — audio + GigaAM + Paroli + lip_sync;
   * rkllm_ros — локальная LLM; system_one_ros — локальный OSM;
-  * rds_2p_commands commands_system — команды всегда, на /audio/input/transcription;
+  * rds_2p_commands — команды на /audio/input/transcription: ``commands_mode:=regex``
+    (command_parser + commands.yaml) или ``commands_mode:=osm``
+    (panda_commands + system-one, panda_commands.yaml);
   * mirea_rag_ros — RAG+LLM на том же топике, но команды он игнорирует.
 
 RAG можно временно заблокировать/разблокировать сервисом::
@@ -101,8 +103,18 @@ def generate_launch_description():
             "commands_log_level", default_value="info",
             description="Лог-уровень command_parser/unified_action_server"),
         DeclareLaunchArgument(
+            "commands_mode", default_value="osm",
+            description="regex — command_parser по commands.yaml; "
+                        "osm — panda_commands + system-one (локальная OSM)"),
+        DeclareLaunchArgument(
             "commands_config", default_value="commands.yaml",
-            description="Какой commands.yaml грузить command_parser"),
+            description="Какой commands.yaml грузить command_parser (regex)"),
+        DeclareLaunchArgument(
+            "osm_config", default_value="panda_commands.yaml",
+            description="Сценарий panda_commands (OSM) в share/rds_2p_commands/config/"),
+        DeclareLaunchArgument(
+            "osm_min_confidence", default_value="0.0",
+            description="Порог confidence OSM-классификатора (0 = выключен)"),
         DeclareLaunchArgument(
             "lip_sync_log_level", default_value="info",
             description="Лог-уровень lip_sync_face"),
@@ -199,7 +211,7 @@ def generate_launch_description():
             }.items(),
         ),
 
-        # --- команды (всегда) ----------------------------------------------
+        # --- команды: regex или локальная OSM --------------------------------
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource([
                 PathJoinSubstitution([
@@ -212,6 +224,25 @@ def generate_launch_description():
                 "command_debounce_sec": "3.0",
                 "panda_llm_tts_enabled": "false",
             }.items(),
+            condition=IfCondition(PythonExpression([
+                "'", LaunchConfiguration("commands_mode"), "' == 'regex'"])),
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([
+                PathJoinSubstitution([
+                    FindPackageShare("rds_2p_commands"), "launch",
+                    "panda_commands.launch.py"])]),
+            launch_arguments={
+                "include_system_one": "false",
+                "include_action_server": "true",
+                "config_file": LaunchConfiguration("osm_config"),
+                "input_topic": "/audio/input/transcription",
+                "system_one_service": "/system_one_client/ask",
+                "min_confidence": LaunchConfiguration("osm_min_confidence"),
+                "log_level": LaunchConfiguration("commands_log_level"),
+            }.items(),
+            condition=IfCondition(PythonExpression([
+                "'", LaunchConfiguration("commands_mode"), "' == 'osm'"])),
         ),
 
         # --- RAG на том же входе, команды фильтруются -----------------------

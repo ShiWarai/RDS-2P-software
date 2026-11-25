@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Полный пресет «Команды Панды»: классификация через system_one_ros.
+Компактный пресет «Команды Панды»: классификация через system_one_ros.
 
 panda_commands исполняет then-цепочку (PandaCommand / cmd_vel / Paroli).
 Запускает:

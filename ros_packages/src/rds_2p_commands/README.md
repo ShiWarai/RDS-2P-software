@@ -146,13 +146,18 @@ ros2 topic echo /audio/command_transcription --field text   # 'Встаю!' в �
 ros2 topic pub --once /audio/input/transcription rds_2p_audio/msg/Transcription "{text: 'стоп'}"  # прервать
 ```
 
-### 8. Полный пресет «Команды Панды» (`panda_commands`)
+### 8. Компактный пресет «Команды Панды» (`panda_commands`)
 
-Нода **`panda_commands`** (launch: **`rds_2p_commands/panda_commands.launch.py`**) реализует пресет `COMMANDS_EXAMPLE`: один choice-вопрос `q_commands_full` с 12 вариантами из [`config/panda_commands.yaml`](src/rds_2p_commands/config/panda_commands.yaml). Классификация — через **`system_one_ros`** (`llm_msgs_ros/srv/Ask`, HTTP-порт **18477**), без `command_parser`.
+Нода **`panda_commands`** (launch: **`rds_2p_commands/panda_commands.launch.py`**) реализует компактный пресет: один choice-вопрос `q_commands` из [`config/panda_commands.yaml`](src/rds_2p_commands/config/panda_commands.yaml) — 7 реально исполняемых `routine_id` из [`config/commands.yaml`](src/rds_2p_commands/config/commands.yaml) (`give_paw`, `stand_at_attention`, `dismiss`, `lie_down`, `rotate`, `pray`, `reconnect_joystick`) плюс метка **`Не команда`** с пустой веткой. Классификатор всегда выбирает один из вариантов; «ничего не делать» — это выбор `no_command`, а не отсутствие ответа. При заданном `min_confidence` ветка не выполняется, если уверенность ниже порога. Классификация — через **`system_one_ros`** (`llm_msgs_ros/srv/Ask`, HTTP-порт **18477**), без `command_parser` и regex.
+
+В общем стеке `rds_2p/launch/panda.launch.py` режим выбирается аргументом **`commands_mode`**: `osm` (по умолчанию, `panda_commands` + system-one) или `regex` (старый `command_parser` + `commands.yaml`).
 
 ```bash
 # контейнер system-one-rknn уже поднят на 18477
 ros2 launch rds_2p_commands panda_commands.launch.py
+
+# в общем стеке (OSM по умолчанию):
+ros2 launch rds_2p panda.launch.py motion_mode:=pose stt:=gigaam commands_mode:=osm
 
 # если system_one client и unified_action_server уже запущены отдельно:
 ros2 launch rds_2p_commands panda_commands.launch.py \
@@ -165,7 +170,7 @@ ros2 launch rds_2p_commands panda_commands.launch.py \
 - `unified_action_server` — исполнитель `PandaCommand`;
 - `panda_commands` — подписка на `/audio/input/transcription`, классификация и выполнение `command` / `wait` / `say`.
 
-`command` с `routine_id` уходит в `/robot/panda_command`; `step_forward`, `stop_running` и другие `motion_commands` — в `/cmd_vel/voice` (вход `cmd_vel_mux`, нужен `rds_2p_inference`); `say` — в `/audio/output/speak`. Ответ классификатора публикуется в `/panda_commands/decision` (JSON). `dry_run:=true` — только классификация без действий.
+`command` с `routine_id` уходит в `/robot/panda_command`; `say` — в `/audio/output/speak`. Ответ классификатора публикуется в `/panda_commands/decision` (JSON). В логе решение видно строкой `q_commands: <метка> → <option id> (conf ..., ... ms)`. `dry_run:=true` — только классификация без действий. Механизм `motion_commands` (шаги через `/cmd_vel/voice`) поддерживается нодой, но в компактный пресет не включён: шаги выполнимы только при запущенном `rds_2p_inference` (`motion_mode:=walk`).
 
 Проверка без микрофона:
 
@@ -176,7 +181,7 @@ ros2 topic echo /panda_commands/decision --qos-durability transient_local --once
 
 `dry_run:=true` не отключает классификацию: запрос в system_one_rknn выполняется, решение публикуется в `/panda_commands/decision`, но `command`/`wait`/`say` не исполняются.
 
-Ключевые аргументы: `config_file`, `input_topic`, `system_one_service`, `model`, `min_confidence`, `dry_run`, `include_system_one`, `include_action_server`, `say_enabled`, `publish_cmd_vel`, `interrupt_keywords`. `rotate_right` пока отсутствует в `commands.yaml` — команда классифицируется, но action вернёт «Неизвестный routine_id».
+Ключевые аргументы: `config_file`, `input_topic`, `system_one_service`, `model`, `min_confidence`, `dry_run`, `include_system_one`, `include_action_server`, `say_enabled`, `publish_cmd_vel`, `interrupt_keywords`.
 
 ---
 
