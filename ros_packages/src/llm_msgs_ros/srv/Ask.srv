@@ -1,0 +1,12 @@
+# Произвольное тело POST /v1/systemone: один или несколько questions, любые поля API.
+# state может быть строкой, объектом или массивом — как на стороне сервера.
+
+string request_json  # JSON-объект тела запроса, например {"model": "...", "state": "...", "questions": {...}}
+
+---
+
+bool success          # HTTP 200 и корректный JSON-ответ
+string message        # "ok" или текст ошибки
+uint32 http_status    # HTTP-код system-one (0 — ответа не было)
+string response_json  # тело ответа как есть (JSON)
+uint32 latency_ms     # HTTP round-trip по часам ноды

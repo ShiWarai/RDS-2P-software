@@ -3,23 +3,48 @@
 ## Основные launch файлы
 
 ### 🤖 Визуализация робота
-- **`display.launch.py`** - Визуализация робота для реальных моторов и датчиков
+- **`sim/display.launch.py`** - Визуализация робота для реальных моторов и датчиков
   ```bash
-  ros2 launch rds_2p display.launch.py
+  ros2 launch rds-2p sim/display.launch.py
   ```
 
 ### 🔧 Дополнительные файлы
 - **`bridge_motors_to_joints.launch.py`** - Только мост мотор-сустав (без визуализации)
   ```bash
-  ros2 launch rds_2p bridge_motors_to_joints.launch.py
+  ros2 launch rds-2p bridge_motors_to_joints.launch.py
   ```
-- **`fake_imu.launch.py`** - Фейковый IMU паблишер для разработки без железа
+- **`sim/fake_imu.launch.py`** - Фейковый IMU паблишер для разработки без железа
   ```bash
-  ros2 launch rds_2p fake_imu.launch.py
+  ros2 launch rds-2p sim/fake_imu.launch.py
   ```
-- **`description.launch.py`** - Запуск robot_state_publisher (используется другими launch файлами)
-- **`controllers.launch.py`** - Контроллеры суставов
-- **`gazebo_sim.launch.py`** - Симуляция в Gazebo
+- **`sim/description.launch.py`** - Запуск robot_state_publisher (используется другими launch файлами)
+- **`sim/controllers.launch.py`** - Контроллеры суставов
+- **`sim/gazebo_sim.launch.py`** - Симуляция в Gazebo
+
+### 🗣️ Голос + LLM
+- **`voice_system.launch.py`** - голосовой контур: audio + STT (Vosk/GigaAM) + Paroli + lip_sync.
+  Выбор распознавателя: `stt:=vosk` (по умолчанию, CPU) или `stt:=gigaam` (RKNN NPU).
+  LLM (`rkllm_ros`/`system_one`/`llm_layer`) сюда не входит — только распознавание, синтез и «рот».
+  ```bash
+  ros2 launch rds_2p voice_system.launch.py                 # Vosk
+  ros2 launch rds_2p voice_system.launch.py stt:=gigaam     # GigaAM
+  ```
+- **`llm_layer.launch.py`** - LLM-прослойка: транскрипции выбранного STT (Vosk/GigaAM) → классификатор system-one (kev-0.8b)
+  → команда в `/audio/command_transcription` (её принимает `commands_system` при
+  `transcription_topics:=['/audio/command_transcription']`) либо разговор через rkllm+Paroli.
+  Поднимает `voice_system` (audio+STT+Paroli+lip_sync), `rkllm_ros` (по умолчанию Qwen3.5-2B),
+  `system_one` и ноду `llm_layer` («посмотри …» → кадр камеры + текст в LLM;
+  `llm_system_prompt` — персона робота-панды). VAD-шлюз (`vosk_ros/vad_node`) есть, но
+  **по умолчанию выключен** — `vad_enabled:=false`, STT слушает микрофон напрямую (у ES8388
+  низкий SNR); включение: `vad_enabled:=true vosk_audio_topic:=/audio/vad`
+  (для `stt:=gigaam` добавьте `gigaam_reliable_audio:=true`).
+  `include_voice:=false` — отладка без микрофона/динамика.
+  Контейнер system-one-rknn поднять заранее: `ros2 run rkllm_ros system_one_docker.sh run`.
+  ```bash
+  ros2 launch rds_2p llm_layer.launch.py                 # STT=Vosk
+  ros2 launch rds_2p llm_layer.launch.py stt:=gigaam     # STT=GigaAM (RKNN NPU)
+  ```
+  Подробности — README `rds_2p_commands` (п.7), `vosk_ros` (VAD-шлюз) и `rkllm_ros` (System One).
 
 ## Схема использования
 
@@ -32,20 +57,20 @@ ros2 run ftservo_ros motor_controller_node --ros-args \
   -p is_sim:=false
 
 # Терминал 2: Мост + визуализация
-ros2 launch rds_2p bridge_motors_to_joints.launch.py
-ros2 launch rds_2p display.launch.py
+ros2 launch rds-2p bridge_motors_to_joints.launch.py
+ros2 launch rds-2p sim/display.launch.py
 ```
 
 ### Для разработки без железа:
 ```bash
 # Фейковый IMU для разработки
-ros2 launch rds_2p fake_imu.launch.py
+ros2 launch rds-2p sim/fake_imu.launch.py
 
 # Визуализация робота
-ros2 launch rds_2p display.launch.py
+ros2 launch rds-2p sim/display.launch.py
 ```
 
 ### Для симуляции:
 ```bash
-ros2 launch rds_2p gazebo_sim.launch.py
+ros2 launch rds-2p sim/gazebo_sim.launch.py
 ```

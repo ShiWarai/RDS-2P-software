@@ -210,7 +210,9 @@ private:
                 // Сохраняем полное состояние для telemetry callback
                 cached_states_[joint_name] = state;
             } else {
-                RCLCPP_WARN(get_logger(), "Failed to read state from motor %s", joint_name.c_str());
+                RCLCPP_WARN_THROTTLE(
+                    get_logger(), *get_clock(), 5000,
+                    "Failed to read state from motor %s", joint_name.c_str());
             }
         }
         
@@ -257,7 +259,9 @@ private:
     
     void controlCommandCallback(const ftservo_ros::msg::MotorCommands::SharedPtr msg) {
         if (initialization_failed_) {
-            RCLCPP_WARN(get_logger(), "Node not properly initialized, ignoring control command");
+            RCLCPP_WARN_THROTTLE(
+                get_logger(), *get_clock(), 5000,
+                "Node not properly initialized, ignoring control command");
             return;
         }
         
@@ -273,13 +277,17 @@ private:
             
             auto joint_it = motor_id_to_joint_.find(motor_id);
             if (joint_it == motor_id_to_joint_.end()) {
-                RCLCPP_WARN(get_logger(), "Received control command for unknown motor ID: %d", motor_id);
+                RCLCPP_WARN_THROTTLE(
+                    get_logger(), *get_clock(), 5000,
+                    "Received control command for unknown motor ID: %d", motor_id);
                 continue;
             }
             
             auto controller_it = controllers_.find(joint_it->second);
             if (controller_it == controllers_.end()) {
-                RCLCPP_WARN(get_logger(), "Controller not found for motor ID: %d", motor_id);
+                RCLCPP_WARN_THROTTLE(
+                    get_logger(), *get_clock(), 5000,
+                    "Controller not found for motor ID: %d", motor_id);
                 continue;
             }
 
@@ -291,7 +299,9 @@ private:
             }
             
             motor_ids.push_back(controller->getMotorId());
-            positions.push_back(controller->radiansToMotorUnits(cmd.target_position));
+            positions.push_back(cmd.ignore_limits
+                ? controller->radiansToMotorUnitsUnclamped(cmd.target_position)
+                : controller->radiansToMotorUnits(cmd.target_position));
             speeds.push_back(controller->radiansPerSecToMotorUnits(cmd.target_velocity));
             accelerations.push_back(static_cast<uint8_t>(controller->accelerationToMotorUnits(cmd.target_acceleration)));
         }
@@ -301,10 +311,10 @@ private:
             bool is_sim = get_parameter("is_sim").as_bool();
 
             for(size_t i = 0; i < motor_ids.size(); i++) {
-                RCLCPP_INFO(get_logger(), "motor_ids: %u", motor_ids[i]);
-                RCLCPP_INFO(get_logger(), "positions: %u", positions[i]);
-                RCLCPP_INFO(get_logger(), "speeds: %u", speeds[i]);
-                RCLCPP_INFO(get_logger(), "accelerations: %u", accelerations[i]);
+                RCLCPP_DEBUG(
+                    get_logger(),
+                    "motor_ids: %u positions: %u speeds: %u accelerations: %u",
+                    motor_ids[i], positions[i], speeds[i], accelerations[i]);
             }
 
             if (is_sim) {
@@ -322,7 +332,7 @@ private:
                                 continue;
                             }
                             
-                            controller->setTargetPosition(cmd.target_position);
+                            controller->setTargetPosition(cmd.target_position, cmd.ignore_limits);
                             controller->setTargetVelocity(cmd.target_velocity);
                             controller->setTargetAcceleration(cmd.target_acceleration);
                         }
@@ -377,7 +387,9 @@ private:
     
     void motorParamsCallback(const ftservo_ros::msg::MotorParams::SharedPtr msg) {
         if (initialization_failed_) {
-            RCLCPP_WARN(get_logger(), "Node not properly initialized, ignoring motor params");
+            RCLCPP_WARN_THROTTLE(
+                get_logger(), *get_clock(), 5000,
+                "Node not properly initialized, ignoring motor params");
             return;
         }
         
@@ -388,13 +400,17 @@ private:
             
             auto joint_it = motor_id_to_joint_.find(motor_id);
             if (joint_it == motor_id_to_joint_.end()) {
-                RCLCPP_WARN(get_logger(), "Received params for unknown motor ID: %d", motor_id);
+                RCLCPP_WARN_THROTTLE(
+                    get_logger(), *get_clock(), 5000,
+                    "Received params for unknown motor ID: %d", motor_id);
                 continue;
             }
             
             auto controller_it = controllers_.find(joint_it->second);
             if (controller_it == controllers_.end()) {
-                RCLCPP_WARN(get_logger(), "Controller not found for motor ID: %d", motor_id);
+                RCLCPP_WARN_THROTTLE(
+                    get_logger(), *get_clock(), 5000,
+                    "Controller not found for motor ID: %d", motor_id);
                 continue;
             }
 

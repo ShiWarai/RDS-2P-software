@@ -1,0 +1,182 @@
+diff --git a/interface/driver_mpu6500_interface.h b/interface/driver_mpu6500_interface.h
+index 2ed6313..9d5c180 100644
+--- a/interface/driver_mpu6500_interface.h
++++ b/interface/driver_mpu6500_interface.h
+@@ -103,6 +103,46 @@ uint8_t mpu6500_interface_iic_write(uint8_t addr, uint8_t reg, uint8_t *buf, uin
+  */
+ uint8_t mpu6500_interface_spi_init(void);
+ 
++/**
++ * @brief  set the iic device name used by mpu6500_interface_iic_init
++ * @param[in] *name pointer to the device name
++ * @return     status code
++ *             - 0 success
++ *             - 1 name is null
++ * @note   overridable at runtime (e.g. from a ROS2 parameter)
++ */
++uint8_t mpu6500_interface_set_iic_device(const char *name);
++
++/**
++ * @brief  set the spi device name used by mpu6500_interface_spi_init
++ * @param[in] *name pointer to the device name
++ * @return     status code
++ *             - 0 success
++ *             - 1 name is null
++ * @note   overridable at runtime (e.g. from a ROS2 parameter)
++ */
++uint8_t mpu6500_interface_set_spi_device(const char *name);
++
++/**
++ * @brief  set the spi mode used by mpu6500_interface_spi_init
++ * @param[in] mode spi mode (0-3, matches SPI_MODE_0..SPI_MODE_3)
++ * @return     status code
++ *             - 0 success
++ *             - 1 mode is invalid
++ * @note   overridable at runtime (e.g. from a ROS2 parameter)
++ */
++uint8_t mpu6500_interface_set_spi_mode(uint8_t mode);
++
++/**
++ * @brief  set the spi speed used by mpu6500_interface_spi_init
++ * @param[in] hz spi running frequency in Hz
++ * @return     status code
++ *             - 0 success
++ *             - 1 hz is zero
++ * @note   overridable at runtime (e.g. from a ROS2 parameter)
++ */
++uint8_t mpu6500_interface_set_spi_speed(uint32_t hz);
++
+ /**
+  * @brief  interface spi bus deinit
+  * @return status code
+diff --git a/project/raspberrypi4b/driver/src/raspberrypi4b_driver_mpu6500_interface.c b/project/raspberrypi4b/driver/src/raspberrypi4b_driver_mpu6500_interface.c
+index e1f8786..63e03c9 100644
+--- a/project/raspberrypi4b/driver/src/raspberrypi4b_driver_mpu6500_interface.c
++++ b/project/raspberrypi4b/driver/src/raspberrypi4b_driver_mpu6500_interface.c
+@@ -38,26 +38,103 @@
+ #include "iic.h"
+ #include "spi.h"
+ #include <stdarg.h>
++#include <string.h>
+ 
+ /**
+- * @brief iic device name definition
++ * @brief iic device name definition (default value, overridable at runtime)
+  */
+ #define IIC_DEVICE_NAME "/dev/i2c-1"        /**< iic device name */
+ 
+ /**
+- * @brief spi device name definition
++ * @brief spi device name definition (default value, overridable at runtime)
+  */
+ #define SPI_DEVICE_NAME "/dev/spidev0.0"    /**< spi device name */
+ 
+ /**
+- * @brief iic device handle definition
++ * @brief  runtime-overridable device names
++ * @note   initialised to the #define defaults; change with mpu6500_interface_set_*_device
+  */
++static char gs_iic_device[] = IIC_DEVICE_NAME;
++
++static char gs_spi_device[] = SPI_DEVICE_NAME;
++
++static spi_mode_type_t gs_spi_mode = SPI_MODE_TYPE_3;   /**< runtime-overridable spi mode */
++
++static uint32_t gs_spi_speed = 1000 * 1000;             /**< runtime-overridable spi speed (Hz) */
++
+ static int gs_iic_fd;                       /**< iic handle */
+ 
++static int gs_spi_fd;                       /**< spi handle */
++
+ /**
+- * @brief spi device handle definition
++ * @brief  set the iic device name used by mpu6500_interface_iic_init
++ * @param[in] *name pointer to the device name
++ * @return     status code
++ *             - 0 success
++ *             - 1 name is null
+  */
+-static int gs_spi_fd;                       /**< spi handle */
++uint8_t mpu6500_interface_set_iic_device(const char *name)
++{
++    if (name == NULL)
++    {
++        return 1;
++    }
++    strncpy(gs_iic_device, name, sizeof(gs_iic_device) - 1);
++    gs_iic_device[sizeof(gs_iic_device) - 1] = '\0';
++    return 0;
++}
++
++/**
++ * @brief  set the spi device name used by mpu6500_interface_spi_init
++ * @param[in] *name pointer to the device name
++ * @return     status code
++ *             - 0 success
++ *             - 1 name is null
++ */
++uint8_t mpu6500_interface_set_spi_device(const char *name)
++{
++    if (name == NULL)
++    {
++        return 1;
++    }
++    strncpy(gs_spi_device, name, sizeof(gs_spi_device) - 1);
++    gs_spi_device[sizeof(gs_spi_device) - 1] = '\0';
++    return 0;
++}
++
++/**
++ * @brief  set the spi mode used by mpu6500_interface_spi_init
++ * @param[in] mode spi mode (0-3, matches SPI_MODE_0..SPI_MODE_3)
++ * @return     status code
++ *             - 0 success
++ *             - 1 mode is invalid
++ */
++uint8_t mpu6500_interface_set_spi_mode(uint8_t mode)
++{
++    if (mode > 3)
++    {
++        return 1;
++    }
++    gs_spi_mode = (spi_mode_type_t)mode;
++    return 0;
++}
++
++/**
++ * @brief  set the spi speed used by mpu6500_interface_spi_init
++ * @param[in] hz spi running frequency in Hz
++ * @return     status code
++ *             - 0 success
++ *             - 1 hz is zero
++ */
++uint8_t mpu6500_interface_set_spi_speed(uint32_t hz)
++{
++    if (hz == 0)
++    {
++        return 1;
++    }
++    gs_spi_speed = hz;
++    return 0;
++}
+ 
+ /**
+  * @brief  interface iic bus init
+@@ -68,7 +145,7 @@ static int gs_spi_fd;                       /**< spi handle */
+  */
+ uint8_t mpu6500_interface_iic_init(void)
+ {
+-    return iic_init(IIC_DEVICE_NAME, &gs_iic_fd);
++    return iic_init(gs_iic_device, &gs_iic_fd);
+ }
+ 
+ /**
+@@ -124,7 +201,7 @@ uint8_t mpu6500_interface_iic_write(uint8_t addr, uint8_t reg, uint8_t *buf, uin
+  */
+ uint8_t mpu6500_interface_spi_init(void)
+ {
+-    return spi_init(SPI_DEVICE_NAME, &gs_spi_fd, SPI_MODE_TYPE_3, 1000 * 1000);
++    return spi_init(gs_spi_device, &gs_spi_fd, gs_spi_mode, gs_spi_speed);
+ }
+ 
+ /**

@@ -1,0 +1,38 @@
+import unittest
+from types import SimpleNamespace
+
+import numpy as np
+from rds_2p_vision.detector import follow_command, image_to_rgb, select_blue
+
+
+class DetectorContractTests(unittest.TestCase):
+    def test_neural_target_only(self):
+        blue=dict(label='blue_ball',confidence=.9,x1=280,y1=200,x2=360,y2=280)
+        self.assertIsNone(select_blue([dict(blue,label='red_ball')],640,480))
+        self.assertIsNone(select_blue([dict(blue,confidence=.1)],640,480))
+        target=select_blue([blue],640,480)
+        self.assertEqual(target['centerX'],.5)
+        self.assertGreater(follow_command(target,.1)[0],0)
+        self.assertLess(follow_command(dict(target,centerX=.7),.1)[2],0)
+        self.assertGreater(follow_command(dict(target,centerX=.3),.1)[2],0)
+
+    def test_stop_for_lost_stale_or_close_target(self):
+        target=dict(centerX=.5,relativeWidth=.1)
+        self.assertEqual(follow_command(None,.1),[0.,0.,0.])
+        self.assertEqual(follow_command(target,.701),[0.,0.,0.])
+        self.assertEqual(follow_command(dict(target,relativeWidth=.2),.1),[0.,0.,0.])
+
+    def test_actual_ros_image_channel_order_and_padding(self):
+        # Two BGR pixels plus two padding bytes per row.
+        msg=SimpleNamespace(encoding='bgr8',width=2,height=1,step=8,data=bytes([255,0,0,0,0,255,77,88]))
+        rgb=image_to_rgb(msg)
+        np.testing.assert_array_equal(rgb,np.array([[[0,0,255],[255,0,0]]],dtype=np.uint8))
+        msg.encoding='mono8';msg.step=3;msg.data=bytes([40,80,99])
+        np.testing.assert_array_equal(image_to_rgb(msg),[[[40]*3,[80]*3]])
+        msg.encoding='yuv422'
+        with self.assertRaises(ValueError):
+            image_to_rgb(msg)
+
+
+if __name__=='__main__':
+    unittest.main()

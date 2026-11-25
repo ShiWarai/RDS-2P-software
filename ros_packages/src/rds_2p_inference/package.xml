@@ -2,9 +2,9 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>rds_2p_inference</name>
-  <version>0.0.0</version>
-  <description>ROS2 bridge that receives sensor data and publishes joint commands from inference service</description>
-  <maintainer email="zhuravlev.p.r@edu.mirea.ru">ubuntu</maintainer>
+  <version>1.0.0</version>
+  <description>Мост ROS 2: приём состояния сенсоров и публикация команд суставов от выносного inference-сервиса для RDS-2P</description>
+  <maintainer email="zhuravlev.p.r@edu.mirea.ru">ShiWarai</maintainer>
   <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
@@ -14,8 +14,9 @@
   <depend>sensor_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>
-  <depend>rds_2p</depend>
   <depend>std_msgs</depend>
+
+  <exec_depend>rds_2p_cmd_vel_mux</exec_depend>
 
   <member_of_group>rosidl_interface_packages</member_of_group>
 

@@ -97,7 +97,7 @@ std::optional<std::pair<double, double>> LegKinematics::computeMotorAngles(doubl
     double motor2_angle = (theta_hip + 2.0 * M_PI) * RAD_TO_DEG;
     double motor3_angle = theta_dvigatel_3 * RAD_TO_DEG;
     
-    return std::make_pair(motor2_angle, motor3_angle);
+    return std::pair<double, double>{motor2_angle, motor3_angle};
 }
 
 InverseKinematicsResult LegKinematics::inverseKinematics(double target_x, double target_y) {
