@@ -45,6 +45,12 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "stt", default_value="gigaam",
             description="STT для voice_system: gigaam | vosk"),
+        DeclareLaunchArgument(
+            "vosk_model_path", default_value="",
+            description="Каталог модели Vosk; пусто — модель из share/vosk_ros"),
+        DeclareLaunchArgument(
+            "gigaam_model_path", default_value="",
+            description="Каталог/файл модели GigaAM; пусто — модель из share/gigaam_ros"),
         DeclareLaunchArgument("capturer_device", default_value="-1"),
         DeclareLaunchArgument("vad_enabled", default_value="false"),
         DeclareLaunchArgument("denoise", default_value="none"),
@@ -164,6 +170,8 @@ def generate_launch_description():
                     "voice_system.launch.py"])]),
             launch_arguments={
                 "stt": LaunchConfiguration("stt"),
+                "vosk_model_path": LaunchConfiguration("vosk_model_path"),
+                "gigaam_model_path": LaunchConfiguration("gigaam_model_path"),
                 "capturer_device": LaunchConfiguration("capturer_device"),
                 "vad_enabled": LaunchConfiguration("vad_enabled"),
                 "denoise": LaunchConfiguration("denoise"),
