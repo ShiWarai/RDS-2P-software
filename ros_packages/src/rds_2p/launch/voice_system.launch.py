@@ -271,7 +271,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "vad_threshold",
-                default_value="0.5",
+                default_value="0.35",
                 description="Порог вероятности речи VAD: ниже — раньше стартует, но больше ложных",
             ),
             DeclareLaunchArgument(

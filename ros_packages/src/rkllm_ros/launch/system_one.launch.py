@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Launch system_one_node — тонкая HTTP-обёртка system-one-rknn (POST /v1/systemone).
 
-Сервис инференса поднимается отдельно контейнером (scripts/system_one_docker.sh run).
+HTTP-клиент к внешнему system-one-rknn; нативный Kev — в system_one_ros.
 """
 
 from launch import LaunchDescription

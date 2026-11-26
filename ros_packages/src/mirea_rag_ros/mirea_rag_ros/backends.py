@@ -5,8 +5,8 @@
 
 ``local`` — локальный ROS-стек:
   * OSM  — сервис system-one: ``llm_msgs_ros/srv/SystemOne``
-           (``/system_one/systemone``) или ``llm_msgs_ros/srv/Ask``
-           (``/system_one_client/ask``); выбирается автоматически/параметром;
+           (``/system_one/ask``) или legacy ``/system_one/systemone``
+           (``/system_one/ask``); выбирается автоматически/параметром;
   * LLM  — action ``llm_msgs_ros/action/ChatCompletion``
            (``/rkllm_ros/complete``), токены идут в feedback;
   * поиск — локальный BM25 по запечённому bundle
@@ -151,6 +151,7 @@ class LocalBackend:
         self._bundle_dir = (bundle_dir or os.environ.get(
             "MIREA_RAG_BUNDLE", "")).strip()
         self._local_search = None
+        self._search_lock = threading.Lock()
 
         # OSM-клиенты. auto + пустое имя — пробуем оба штатных сервиса;
         # auto + явное имя — клиенты обоих типов на этом имени.
@@ -165,7 +166,7 @@ class LocalBackend:
                 self._add_osm("systemone", osm_service)
         else:
             if kind in ("auto", "ask"):
-                self._add_osm("ask", "/system_one_client/ask")
+                self._add_osm("ask", "/system_one/ask")
             if kind in ("auto", "systemone"):
                 self._add_osm("systemone", "/system_one/systemone")
             if not self._osm_clients:
@@ -220,11 +221,13 @@ class LocalBackend:
 
     def _searcher(self):
         if self._local_search is None:
-            if not self._bundle_dir:
-                raise RuntimeError(
-                    "MIREA_RAG_BUNDLE не задан: локальный поиск недоступен")
-            from .local_search import BundleSearcher
-            self._local_search = BundleSearcher(self._bundle_dir)
+            with self._search_lock:
+                if self._local_search is None:
+                    if not self._bundle_dir:
+                        raise RuntimeError(
+                            "MIREA_RAG_BUNDLE не задан: локальный поиск недоступен")
+                    from .local_search import BundleSearcher
+                    self._local_search = BundleSearcher(self._bundle_dir)
         return self._local_search
 
     def search(self, question: str, history: list) -> dict:
@@ -315,6 +318,41 @@ class LocalBackend:
             "RKLLM clear_kv")
         if not result.success:
             raise RuntimeError(f"RKLLM clear_kv: {result.message}")
+
+    def warmup_search(self) -> None:
+        """Загрузить эмбеддер/индекс заранее, а не на первом вопросе."""
+        if not self.search_enabled:
+            return
+        self._searcher()
+        self.search("привет", [])
+
+    def warmup_llm(self) -> None:
+        """Короткий goal с system prompt: прогреть и оставить system prompt в KV.
+
+        Dummy-ход минимальный (max_new_tokens=1), чтобы не тратить время;
+        system prompt остаётся в KV, и первый реальный вопрос не префилит его заново.
+        """
+        cli = self._llm_client
+        if not self._wait_llm_server():
+            raise RuntimeError(f"RKLLM action {self._llm_action} недоступен")
+        goal = self._ChatCompletion.Goal()
+        goal.user_message = "."
+        goal.keep_history = True
+        goal.max_new_tokens = 1
+        if self._system_prompt:
+            goal.system_prompt = self._system_prompt
+        send_future = cli.send_goal_async(goal)
+        sent = threading.Event()
+        send_future.add_done_callback(lambda _f: sent.set())
+        if not sent.wait(self._wait_server_sec + 10.0):
+            raise RuntimeError("warmup: goal не отправлен")
+        handle = send_future.result()
+        if handle is None or not handle.accepted:
+            raise RuntimeError("warmup: goal отклонён")
+        finished = threading.Event()
+        handle.get_result_async().add_done_callback(lambda _f: finished.set())
+        if not finished.wait(self._llm_timeout):
+            raise RuntimeError("warmup: LLM не ответил")
 
     def _llm_body(self, prompt: str, keep_history: bool) -> dict:
         goal = {

@@ -54,6 +54,10 @@ def generate_launch_description():
     local_llm_timeout = LaunchConfiguration("local_llm_timeout")
     local_bundle_dir = LaunchConfiguration("local_bundle_dir")
     local_search_backend = LaunchConfiguration("local_search_backend")
+    filler_enabled = LaunchConfiguration("filler_enabled")
+    filler_text = LaunchConfiguration("filler_text")
+    warmup_on_start = LaunchConfiguration("warmup_on_start")
+    osm_gate_enabled = LaunchConfiguration("osm_gate_enabled")
 
     return LaunchDescription([
         DeclareLaunchArgument("transcription_topic",
@@ -69,8 +73,7 @@ def generate_launch_description():
             description="api (HTTP RAG API) | local (ROS OSM + RKLLM)"),
         DeclareLaunchArgument(
             "local_osm_service", default_value="",
-            description="Сервис OSM; пусто — авто (/system_one_client/ask "
-                        "или /system_one/systemone)"),
+            description="Сервис OSM; пусто — авто /system_one/ask (legacy /system_one/systemone)"),
         DeclareLaunchArgument(
             "local_osm_service_type", default_value="auto",
             description="auto | ask | systemone"),
@@ -101,6 +104,17 @@ def generate_launch_description():
             "local_search_backend", default_value="bundle",
             description="bundle/bm25 — локальный BM25; api — удалённый "
                         "/search; none — без ретривала"),
+        DeclareLaunchArgument(
+            "filler_enabled", default_value="true",
+            description="Говорить короткое «Хм...» параллельно с расчётом LLM"),
+        DeclareLaunchArgument("filler_text", default_value="Хм..."),
+        DeclareLaunchArgument(
+            "warmup_on_start", default_value="true",
+            description="Прогреть OSM, RAG-поиск и LLM при старте"),
+        DeclareLaunchArgument(
+            "osm_gate_enabled", default_value="true",
+            description="true — OSM-гат «это про МИРЭА?»; false — быстрый путь "
+                        "по уверенности локального поиска"),
 
         Node(
             package="mirea_rag_ros",
@@ -139,6 +153,13 @@ def generate_launch_description():
                     local_llm_timeout, value_type=float),
                 "local_bundle_dir": local_bundle_dir,
                 "local_search_backend": local_search_backend,
+                "filler_enabled": ParameterValue(
+                    filler_enabled, value_type=bool),
+                "filler_text": filler_text,
+                "warmup_on_start": ParameterValue(
+                    warmup_on_start, value_type=bool),
+                "osm_gate_enabled": ParameterValue(
+                    osm_gate_enabled, value_type=bool),
             }],
         ),
     ])

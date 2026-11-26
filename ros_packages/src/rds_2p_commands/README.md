@@ -130,7 +130,7 @@ ros2 launch rds_2p_commands commands_system.launch.py
 Командная система запускается **отдельно** и подписывается на выход прослойки:
 
 ```bash
-ros2 run rkllm_ros system_one_docker.sh run   # контейнер system-one-rknn (GHCR), порт 8080
+ros2 launch system_one_ros system_one.launch.py  # нативный Kev на NPU
 ros2 launch rds_2p llm_layer.launch.py         # include_voice:=false — отладка без микрофона/динамика
 ros2 launch rds_2p_commands commands_system.launch.py \
   transcription_topics:="['/audio/command_transcription']"
@@ -148,12 +148,11 @@ ros2 topic pub --once /audio/input/transcription rds_2p_audio/msg/Transcription 
 
 ### 8. Компактный пресет «Команды Панды» (`panda_commands`)
 
-Нода **`panda_commands`** (launch: **`rds_2p_commands/panda_commands.launch.py`**) реализует компактный пресет: один choice-вопрос `q_commands` из [`config/panda_commands.yaml`](src/rds_2p_commands/config/panda_commands.yaml) — 7 реально исполняемых `routine_id` из [`config/commands.yaml`](src/rds_2p_commands/config/commands.yaml) (`give_paw`, `stand_at_attention`, `dismiss`, `lie_down`, `rotate`, `pray`, `reconnect_joystick`) плюс метка **`Не команда`** с пустой веткой. Классификатор всегда выбирает один из вариантов; «ничего не делать» — это выбор `no_command`, а не отсутствие ответа. При заданном `min_confidence` ветка не выполняется, если уверенность ниже порога. Классификация — через **`system_one_ros`** (`llm_msgs_ros/srv/Ask`, HTTP-порт **18477**), без `command_parser` и regex.
+Нода **`panda_commands`** (launch: **`rds_2p_commands/panda_commands.launch.py`**) реализует компактный пресет: один choice-вопрос `q_commands` из [`config/panda_commands.yaml`](src/rds_2p_commands/config/panda_commands.yaml) — 7 реально исполняемых `routine_id` из [`config/commands.yaml`](src/rds_2p_commands/config/commands.yaml) (`give_paw`, `stand_at_attention`, `dismiss`, `lie_down`, `rotate`, `pray`, `reconnect_joystick`) плюс метка **`Не команда`** с пустой веткой. Классификатор всегда выбирает один из вариантов; «ничего не делать» — это выбор `no_command`, а не отсутствие ответа. При заданном `min_confidence` ветка не выполняется, если уверенность ниже порога. Классификация — через нативный **`system_one_ros`** (`llm_msgs_ros/srv/Ask`, сервис **`/system_one/ask`**), без `command_parser` и regex.
 
 В общем стеке `rds_2p/launch/panda.launch.py` режим выбирается аргументом **`commands_mode`**: `osm` (по умолчанию, `panda_commands` + system-one) или `regex` (старый `command_parser` + `commands.yaml`).
 
 ```bash
-# контейнер system-one-rknn уже поднят на 18477
 ros2 launch rds_2p_commands panda_commands.launch.py
 
 # в общем стеке (OSM по умолчанию):
@@ -166,7 +165,7 @@ ros2 launch rds_2p_commands panda_commands.launch.py \
 
 Что запускает launch:
 
-- `system_one_ros/system_one.launch.py` — клиент `/system_one_client/ask`;
+- `system_one_ros/system_one.launch.py` — нативный Kev `/system_one/ask`;
 - `unified_action_server` — исполнитель `PandaCommand`;
 - `panda_commands` — подписка на `/audio/input/transcription`, классификация и выполнение `command` / `wait` / `say`.
 

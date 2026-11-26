@@ -32,7 +32,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         '--file', help='файл с JSON-телом (альтернатива позиционному аргументу)')
     parser.add_argument(
-        '--service', default='/system_one_client/ask', help='имя сервиса Ask')
+        '--service', default='/system_one/ask', help='имя сервиса Ask')
     parser.add_argument(
         '--timeout', type=float, default=30.0,
         help='ожидание сервиса и ответа, с')

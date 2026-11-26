@@ -3,7 +3,7 @@
 <package format="3">
   <name>system_one_ros</name>
   <version>1.1.0</version>
-  <description>ROS 2 client for the system-one-rknn HTTP service (Kev-0.8B decisions on RK3588 NPU).</description>
+  <description>Native ROS 2 server for Kev-0.8B decisions on RK3588 NPU (optional HTTP client).</description>
   <maintainer email="zhuravliov.pav@yandex.ru">RDS-2P</maintainer>
   <license>MIT</license>
 

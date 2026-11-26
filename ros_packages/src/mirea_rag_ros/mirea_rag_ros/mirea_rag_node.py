@@ -174,9 +174,19 @@ class MireaRagNode(Node):
         self.declare_parameter("stream_tts", True)
         self.declare_parameter("tts_min_chunk_chars", 20)
         self.declare_parameter("speak_timeout", 120.0)
+        # «Хм...» параллельно с расчётом LLM, чтобы не было тишины.
+        self.declare_parameter("filler_enabled", True)
+        self.declare_parameter("filler_text", "Хм...")
+        # Прогрев тяжёлых моделей при старте, а не на первом вопросе.
+        self.declare_parameter("warmup_on_start", True)
+        self.declare_parameter("warmup_search", True)
+        self.declare_parameter("warmup_llm", True)
         # Реагируем только на обращение по имени (STT путает «панда/банда»).
         self.declare_parameter("wake_word_required", True)
         self.declare_parameter("force_rag", False)
+        # OSM-гат «это про МИРЭА?» стоит 1.5–2.5 с. Для wake-word фраз он не нужен:
+        # роль гата играет уверенность локального поиска.
+        self.declare_parameter("osm_gate_enabled", True)
         self.declare_parameter(
             "wake_word_regex",
             r"(?i)\b(?:панда|панды|панде|панду|пандой|пандою|"
@@ -227,10 +237,22 @@ class MireaRagNode(Node):
                            .get_parameter_value().integer_value)
         self._speak_timeout = (self.get_parameter("speak_timeout")
                                .get_parameter_value().double_value)
+        self._filler_enabled = (self.get_parameter("filler_enabled")
+                                .get_parameter_value().bool_value)
+        self._filler_text = (self.get_parameter("filler_text")
+                             .get_parameter_value().string_value or "").strip()
+        self._warmup_enabled = (self.get_parameter("warmup_on_start")
+                                .get_parameter_value().bool_value)
+        self._warmup_search = (self.get_parameter("warmup_search")
+                               .get_parameter_value().bool_value)
+        self._warmup_llm = (self.get_parameter("warmup_llm")
+                            .get_parameter_value().bool_value)
         self._wake_required = (self.get_parameter("wake_word_required")
                                .get_parameter_value().bool_value)
         self._force_rag = (self.get_parameter("force_rag")
                            .get_parameter_value().bool_value)
+        self._osm_gate_enabled = (self.get_parameter("osm_gate_enabled")
+                                  .get_parameter_value().bool_value)
         wake_regex = (self.get_parameter("wake_word_regex")
                       .get_parameter_value().string_value or "")
         forget_regex = (self.get_parameter("forget_regex")
@@ -336,6 +358,35 @@ class MireaRagNode(Node):
             f"поточный TTS: {'вкл' if self._stream_tts else 'выкл'} "
             f"(кусок от {self._min_chunk} симв., таймаут озвучки "
             f"{self._speak_timeout:.0f} с)")
+        if self._warmup_enabled:
+            threading.Thread(
+                target=self._warmup_models, daemon=True,
+                name="mirea_rag_warmup").start()
+
+    def _warmup_models(self) -> None:
+        """Заранее загрузить/прогреть поиск и LLM, чтобы первый вопрос не ждал."""
+        if getattr(self._backend, "osm_enabled", False):
+            self.get_logger().info("прогрев: OSM...")
+            try:
+                self._backend.osm_classify("привет", 5.0)
+                self.get_logger().info("прогрев: OSM готов")
+            except Exception as e:  # noqa: BLE001
+                self.get_logger().warn(f"прогрев OSM не удался: {e}")
+        if self._warmup_search and hasattr(self._backend, "warmup_search"):
+            self.get_logger().info("прогрев: RAG-поиск...")
+            try:
+                self._backend.warmup_search()
+                self.get_logger().info("прогрев: RAG-поиск готов")
+            except Exception as e:  # noqa: BLE001
+                self.get_logger().warn(f"прогрев RAG-поиска не удался: {e}")
+        if self._warmup_llm and hasattr(self._backend, "warmup_llm"):
+            self.get_logger().info("прогрев: LLM...")
+            try:
+                self._backend.warmup_llm()
+                self.get_logger().info("прогрев: LLM готов")
+            except Exception as e:  # noqa: BLE001
+                self.get_logger().warn(f"прогрев LLM не удался: {e}")
+        self.get_logger().info("прогрев моделей завершён")
 
     # --- приём транскрипции ------------------------------------------------
     @staticmethod
@@ -418,16 +469,64 @@ class MireaRagNode(Node):
 
         self._busy = True
         try:
-            self._process(question)
+            # Обращение («панда/банда») — это триггер, а не часть вопроса:
+            # иначе OSM-гат видит «панда» и чаще отвечает «не МИРЭА»,
+            # а поиск получает лишний токен.
+            self._process(bare)
         except Exception as e:  # noqa: BLE001 — узел должен пережить любую ошибку
             self._busy = False
             self.get_logger().error(f"ошибка обработки «{text}»: {e}")
+
+    def _start_filler(self, done: threading.Event) -> None:
+        """Сказать короткое «Хм...» и не ждать его — LLM считается параллельно."""
+        try:
+            if not self._filler_enabled or not self._filler_text:
+                done.set()
+                return
+            cli = self._speak_client
+            if cli is None or not cli.service_is_ready():
+                done.set()
+                return
+            req = Speak.Request()
+            req.text = self._filler_text
+            req.volume = self._volume
+            self.get_logger().info(
+                f"произносим: «{self._filler_text}» (пока LLM считает)")
+            future = cli.call_async(req)
+
+            def _finished(fut) -> None:
+                done.set()
+                try:
+                    res = fut.result()
+                except Exception as e:  # noqa: BLE001
+                    self.get_logger().warn(f"TTS filler: {e}")
+                    return
+                if res is not None and not res.success:
+                    self.get_logger().warn(f"Paroli filler: {res.message}")
+
+            future.add_done_callback(_finished)
+        except Exception as e:  # noqa: BLE001
+            done.set()
+            self.get_logger().warn(f"filler: {e}")
 
     # --- генерация ответа и произнесение -----------------------------------
     def _process(self, question: str) -> None:
         self.get_logger().info(f"вопрос: «{question}»")
         chunker = TtsChunker(self._min_chunk) if self._stream_tts else None
         spoken_any = False
+        filler_done = threading.Event()
+        filler_started = False
+
+        def start_filler() -> None:
+            nonlocal filler_started
+            if filler_started:
+                return
+            filler_started = True
+            self._start_filler(filler_done)
+
+        # «Хм...» сразу при входе в RAG/LLM-ветку, не дожидаясь OSM-гата/поиска:
+        # дальше Speak идёт параллельно с классификацией и поиском.
+        start_filler()
 
         def on_token(piece: str) -> None:
             # Вызывается синхронно из ask_gated по мере генерации: кусок,
@@ -437,13 +536,17 @@ class MireaRagNode(Node):
             if chunker is None or not piece:
                 return
             for chunk in chunker.feed(piece):
+                if not spoken_any and not filler_done.is_set():
+                    filler_done.wait(timeout=3.0)
                 self._speak_chunk(chunk)
                 spoken_any = True
 
         try:
             answer, _rag_ctx, turn_msgs = ask_gated(
                 question, self.history, on_token=on_token,
-                backend=self._backend, force_rag=self._force_rag)
+                backend=self._backend, force_rag=self._force_rag,
+                on_llm_start=start_filler,
+                skip_osm_gate=not self._osm_gate_enabled)
         except Exception as e:  # noqa: BLE001
             if spoken_any:
                 self._speech_end = time.monotonic()
@@ -453,6 +556,8 @@ class MireaRagNode(Node):
 
         if chunker is not None:
             for chunk in chunker.flush():
+                if not spoken_any and not filler_done.is_set():
+                    filler_done.wait(timeout=3.0)
                 self._speak_chunk(chunk)
                 spoken_any = True
 
@@ -466,6 +571,8 @@ class MireaRagNode(Node):
 
         if chunker is None:
             # Прежний режим: весь ответ одним асинхронным вызовом.
+            if not filler_done.is_set():
+                filler_done.wait(timeout=3.0)
             spoken = _tts_clean(speakable(answer or ""))
             if not spoken:
                 self.get_logger().warning(f"пустой ответ на «{question}» — не произносим")

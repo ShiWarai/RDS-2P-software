@@ -1,19 +1,17 @@
 # system_one_ros
 
-ROS 2 (Humble) клиент HTTP API [system-one-rknn](https://github.com/ShiWarai/system-one-rknn): решения **Kev-0.8B** на NPU RK3588 (`choice` / `noul` / `score`) без генерации текста.
-
-Пакет — только клиент. Сервер инференса поднимается отдельным контейнером из GHCR; для него выбран **нестандартный порт 18477**, чтобы не пересекаться с другими сервисами на 8080.
+ROS 2 (Humble) сервер решений **Kev-0.8B** на NPU RK3588 (`choice` / `noul` / `score`)
+без генерации текста. По умолчанию Kev/RKLLM работает **внутри ROS 2 ноды**:
+ни Docker, ни HTTP.
 
 ## Интерфейсы
 
 | Интерфейс | Тип | Описание |
 |-----------|-----|----------|
-| `~/ask` | `llm_msgs_ros/srv/Ask` | Произвольное тело `POST /v1/systemone`: один или несколько вопросов, любые поля API |
-| `~/health` | `std_srvs/srv/Trigger` | `GET /health`: `success`, модели и задержка в `message` |
-| `~/server_ok` | `std_msgs/Bool` | Последний результат health-check (transient local) |
-| `~/models` | `std_msgs/String` | JSON-массив моделей сервера (transient local) |
+| `/system_one/ask` | `llm_msgs_ros/srv/Ask` | JSON `{model, state, questions}` — как `POST /v1/systemone` |
+| `/system_one/health` | `std_srvs/srv/Trigger` | `success`, модели и каталог модели в `message` |
 
-`Ask` принимает готовый JSON-объект с `model`, `state` и `questions`, поэтому один вызов покрывает и один вопрос, и пакет из нескольких — за один инференс. Поля `.srv`:
+`Ask` принимает один или несколько вопросов за вызов. Поля `.srv`:
 
 ```
 string request_json
@@ -25,47 +23,58 @@ string response_json
 uint32 latency_ms
 ```
 
-Узел: **`system_one_client`**. Параметры: `server_url` (`http://127.0.0.1:18477`), `timeout_sec` (`30.0`), `health_timeout_sec` (`3.0`), `health_period_sec` (`10.0`, `0` — выключить).
+## Native-узел
 
-Проверка здоровья без отдельного типа сообщения:
+Узел **`system_one`** сам грузит `KevEngine` из
+`system-one-rknn` и вызывает RKLLM напрямую. Параметры:
 
-```bash
-ros2 service call /system_one_client/health std_srvs/srv/Trigger '{}'
-ros2 topic echo /system_one_client/models --qos-durability transient_local --once
-```
+| Параметр | По умолчанию |
+|----------|--------------|
+| `model_root` | `/home/orangepi/models/kev-0.8b-rknn` |
+| `rkllm_lib` | `/opt/npu/librkllmrt-1.3.1.so` |
+| `rknpu_lib` | `/opt/npu/librknnrt-2.3.2.so` |
+| `model` | `kev-0.8b` |
 
-## Сервер (Docker)
+В `model_root` нужны `kev-0.8b-w8a8-opt0-ctx320.rkllm`, `tokenizer.json`,
+`pointer.json`, `q_weight.npy`, `q_bias.npy`, `k_weight.npy`, `k_bias.npy`.
 
-Образ из GHCR, локальная сборка не нужна:
-
-```bash
-ros2 run system_one_ros system_one_server.sh pull   # ghcr.io/shiwarai/system-one-rknn:rk3588-main
-ros2 run system_one_ros system_one_server.sh run    # контейнер system-one-rknn-kev, порт 18477
-ros2 run system_one_ros system_one_server.sh wait   # ждать /health после загрузки модели
-ros2 run system_one_ros system_one_server.sh health
-ros2 run system_one_ros system_one_server.sh status
-ros2 run system_one_ros system_one_server.sh logs
-ros2 run system_one_ros system_one_server.sh stop
-```
-
-`run` монтирует веса из `KEV_MODELS_DIR` (по умолчанию `/home/orangepi/models/kev-0.8b-rknn`) в `/models/kev:ro`, включает `MODELS=kev` и пробрасывает NPU-устройства `/dev/dri`, `/dev/dma_heap`, `/dev/mpp_service`, `/dev/rga`. Порт по умолчанию слушается только на `127.0.0.1`; для доступа из сети задайте `BIND_ADDR=0.0.0.0`.
-
-Переменные скрипта: `IMAGE`, `CONTAINER` (`system-one-rknn-kev`), `PORT` (`18477`), `BIND_ADDR`, `MODELS`, `KEV_MODELS_DIR`, `SYSTEM_ONE_ENGINE`, `WAIT_SEC`.
-
-## Сборка и запуск узла
+Сборка и запуск:
 
 ```bash
 cd ~/RDS-2P-software/ros_packages
 source /opt/ros/humble/setup.bash
-colcon build --packages-select system_one_ros --symlink-install
+colcon build --packages-select system_one_ros
 source install/setup.bash
-
 ros2 launch system_one_ros system_one.launch.py
-# другой сервер/порт:
-# ros2 launch system_one_ros system_one.launch.py server_url:=http://127.0.0.1:18477
 ```
 
-## Пример: три вопроса за один вызов
+Другие модель/библиотеки:
+
+```bash
+ros2 launch system_one_ros system_one.launch.py \
+  model_root:=/path/to/kev rkllm_lib:=/path/to/librkllmrt.so
+```
+
+Проверка:
+
+```bash
+ros2 service call /system_one/health std_srvs/srv/Trigger '{}'
+ros2 run system_one_ros example_ask '{"model":"kev-0.8b","state":"привет","questions":{"q":{"type":"noul"}}}'
+```
+
+## HTTP fallback
+
+Для удалённого/старого сервера system-one-rknn оставлен HTTP-клиент:
+
+```bash
+ros2 launch system_one_ros system_one.launch.py \
+  mode:=http server_url:=http://127.0.0.1:18477
+```
+
+Он создаёт те же `/system_one/ask` и `/system_one/health`, но внутри делает HTTP.
+Локальный контейнер этим пакетом больше не поднимается.
+
+## Пример: несколько вопросов за один вызов
 
 ```bash
 cat >/tmp/systemone_request.json <<'JSON'
@@ -81,10 +90,7 @@ cat >/tmp/systemone_request.json <<'JSON'
         "billing": "Invoices, payments, refunds"
       }
     },
-    "is_urgent": {
-      "type": "noul",
-      "instructions": "Does this issue require immediate attention?"
-    },
+    "is_urgent": {"type": "noul", "instructions": "Requires immediate attention?"},
     "severity": {
       "type": "score",
       "instructions": "Rate the incident severity.",
@@ -93,64 +99,25 @@ cat >/tmp/systemone_request.json <<'JSON'
   }
 }
 JSON
-
 ros2 run system_one_ros example_ask --file /tmp/systemone_request.json
-```
-
-Ответ:
-
-```json
-{
-  "success": true,
-  "message": "ok",
-  "http_status": 200,
-  "latency_ms": 3251,
-  "response": {
-    "model": "kev-0.8b",
-    "answers": {
-      "intent": {
-        "type": "choice",
-        "choice": "infrastructure",
-        "confidence": 0.9189,
-        "probabilities": {"infrastructure": 0.9595, "billing": 0.0405}
-      },
-      "is_urgent": {"type": "noul", "noul": 0.8892},
-      "severity": {
-        "type": "score",
-        "score": 1.5827,
-        "confidence": 0.374,
-        "legend": {"0": "Low", "1": "Medium", "2": "High"},
-        "probabilities": {"0": 0.0735, "1": 0.2702, "2": 0.6562}
-      }
-    },
-    "usage": {"input_tokens": 124, "output_tokens": 0}
-  }
-}
 ```
 
 Другие формы вызова:
 
 ```bash
-# JSON-строкой
 ros2 run system_one_ros example_ask '{"model":"kev-0.8b","state":"…","questions":{"q":{"type":"noul"}}}'
-
-# из stdin
 cat /tmp/systemone_request.json | ros2 run system_one_ros example_ask
-
-# напрямую через ROS-сервис (JSON без одинарных кавычек)
-ros2 service call /system_one_client/ask llm_msgs_ros/srv/Ask \
+ros2 service call /system_one/ask llm_msgs_ros/srv/Ask \
   "{request_json: '{\"model\":\"kev-0.8b\",\"state\":\"…\",\"questions\":{\"q\":{\"type\":\"noul\"}}}'}"
 ```
 
-`state` в `Ask` может быть строкой, объектом или массивом — сервер принимает все три формы. Все вопросы одного запроса используют один и тот же `state`; для разных состояний делайте отдельные вызовы.
-
 ## Ошибки
 
-Валидация JSON, HTTP-ошибки и таймауты возвращаются как `success=false`, `message` и `http_status` (0 — ответа не было). При HTTP-ошибке `response_json` всё равно содержит тело ответа сервера.
+Валидация JSON/модели — `success=false`, `http_status` 422, `response_json` с `detail`.
+Ошибка инференса — `http_status` 500.
 
 ## Замечания
 
-- `system-one-rknn` использует `MODELS=kev`; другие модели (`laya`) этим пакетом не запрашиваются, но `model` в JSON можно переопределить.
-- Health-check по умолчанию раз в 10 с; `~/server_ok` и `~/models` обновляются только при изменении состояния.
-- Сервер сериализует инференс внутри контейнера; параллельные `Ask`-вызовы встают в очередь на его стороне.
-- Если на 8080 уже работает другой экземпляр `system-one-rknn`, этот пакет его не трогает: контейнер называется `system-one-rknn-kev` и слушает 18477.
+- Инференс сериализуется внутри ноды: параллельные `Ask` встают в очередь.
+- Native-режим использует модель `ctx320` (`kev-0.8b-w8a8-opt0-ctx320.rkllm`).
+- Для native нужны RKLLM 1.3.1 / RKNN 2.3.2 и доступ к `/dev/dri`, `/dev/dma_heap`.

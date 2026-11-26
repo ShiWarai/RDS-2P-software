@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from typing import Optional
 
 import numpy as np
@@ -34,6 +35,7 @@ class BundleSearcher:
         self._model = None
         self._bm25 = None
         self._payloads = None
+        self._load_lock = threading.Lock()
         if not os.path.isdir(self.bundle_dir):
             raise FileNotFoundError(f"bundle не найден: {self.bundle_dir}")
         if self.mode == "bm25":
@@ -41,23 +43,26 @@ class BundleSearcher:
 
     # ---- full retrieval -------------------------------------------------- #
     def _ensure_full(self) -> None:
-        if self._retriever is not None:
+        if self._retriever is not None and self._model is not None:
             return
-        from .bundle_retriever import BundleRetriever
-        from sentence_transformers import SentenceTransformer
+        with self._load_lock:
+            if self._retriever is not None and self._model is not None:
+                return
+            from .bundle_retriever import BundleRetriever
+            from sentence_transformers import SentenceTransformer
 
-        log.info("local RAG: loading bundle %s", self.bundle_dir)
-        self._retriever = BundleRetriever(
-            self.bundle_dir,
-            weights=config.BUNDLE_WEIGHTS,
-            rrf_k=config.BUNDLE_RRF_K,
-            pool_factor=config.BUNDLE_POOL_FACTOR,
-            correct=config.BUNDLE_CORRECT,
-            q_alpha=config.BUNDLE_Q_ALPHA,
-            s_alpha=config.BUNDLE_S_ALPHA,
-        )
-        log.info("local RAG: loading embedder %s", config.EMBEDDING_MODEL)
-        self._model = SentenceTransformer(config.EMBEDDING_MODEL, device="cpu")
+            log.info("local RAG: loading embedder %s", config.EMBEDDING_MODEL)
+            self._model = SentenceTransformer(config.EMBEDDING_MODEL, device="cpu")
+            log.info("local RAG: loading bundle %s", self.bundle_dir)
+            self._retriever = BundleRetriever(
+                self.bundle_dir,
+                weights=config.BUNDLE_WEIGHTS,
+                rrf_k=config.BUNDLE_RRF_K,
+                pool_factor=config.BUNDLE_POOL_FACTOR,
+                correct=config.BUNDLE_CORRECT,
+                q_alpha=config.BUNDLE_Q_ALPHA,
+                s_alpha=config.BUNDLE_S_ALPHA,
+            )
 
     def _encode(self, query: str):
         prefixed = f"{config.EMBED_QUERY_PREFIX}{query}"

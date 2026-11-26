@@ -4,7 +4,7 @@ HTTP-клиент system-one-rknn: POST /v1/systemone и GET /health как ROS 
 
 Сервер инференса (Kev-0.8B на NPU) поднимается отдельно контейнером:
 
-    ros2 run system_one_ros system_one_server.sh run
+    ros2 launch system_one_ros system_one.launch.py mode:=http server_url:=...
 
 Интерфейсы узла:
 
@@ -40,7 +40,7 @@ class SystemOneClient(Node):
     """Тонкая обёртка HTTP API system-one-rknn без сторонних зависимостей."""
 
     def __init__(self) -> None:
-        super().__init__('system_one_client')
+        super().__init__('system_one')
 
         self.declare_parameter('server_url', 'http://127.0.0.1:18477')
         self.declare_parameter('timeout_sec', 30.0)
@@ -68,7 +68,7 @@ class SystemOneClient(Node):
                 self.health_period_sec, self._publish_health, callback_group=self._group)
 
         self.get_logger().info(
-            f'system_one_client готов: {self.server_url}/v1/systemone '
+            f'system_one готов: {self.server_url}/v1/systemone '
             f'(timeout={self.timeout_sec:.0f} с)'
         )
 
@@ -171,7 +171,7 @@ class SystemOneClient(Node):
             else:
                 self.get_logger().warn(
                     f'health недоступен: {message} '
-                    '(ros2 run system_one_ros system_one_server.sh run)')
+                    '(нужен внешний system-one-rknn)')
             self._last_health = state
         return ok, models, message, latency
 

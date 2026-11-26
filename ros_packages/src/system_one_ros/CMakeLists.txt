@@ -9,10 +9,21 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}/launch
 )
 
+install(DIRECTORY
+  osm_app/
+  DESTINATION lib/${PROJECT_NAME}/osm_app
+)
+
 install(PROGRAMS
   scripts/system_one_client.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME system_one_client
+)
+
+install(PROGRAMS
+  scripts/system_one_native.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME system_one_native
 )
 
 install(PROGRAMS
@@ -21,10 +32,6 @@ install(PROGRAMS
   RENAME example_ask
 )
 
-install(PROGRAMS
-  scripts/system_one_server.sh
-  DESTINATION lib/${PROJECT_NAME}
-)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

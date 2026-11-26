@@ -4,7 +4,7 @@
 
 panda_commands исполняет then-цепочку (PandaCommand / cmd_vel / Paroli).
 Запускает:
-- system_one_ros/system_one.launch.py — HTTP-клиент Kev-0.8B на порту 18477;
+- system_one_ros/system_one.launch.py — нативный Kev-0.8B на NPU (/system_one/ask);
 - unified_action_server — исполнитель PandaCommand;
 - panda_commands — классификация и сценарий.
 
@@ -24,8 +24,18 @@ from ament_index_python.packages import get_package_share_directory
 def generate_launch_description():
     args = [
         DeclareLaunchArgument(
+            'mode', default_value='native',
+            description='native — Kev в ROS 2 ноде; http — клиент контейнера'),
+        DeclareLaunchArgument(
+            'model_root', default_value='/home/orangepi/models/kev-0.8b-rknn',
+            description='Каталог Kev для native'),
+        DeclareLaunchArgument(
+            'rkllm_lib', default_value='/opt/npu/librkllmrt-1.3.1.so'),
+        DeclareLaunchArgument(
+            'rknpu_lib', default_value='/opt/npu/librknnrt-2.3.2.so'),
+        DeclareLaunchArgument(
             'server_url', default_value='http://127.0.0.1:18477',
-            description='HTTP API system-one-rknn (контейнер)'),
+            description='HTTP API system-one-rknn (только mode=http)'),
         DeclareLaunchArgument(
             'include_system_one', default_value='true',
             description='Поднимать system_one_ros/system_one.launch.py'),
@@ -39,7 +49,7 @@ def generate_launch_description():
             'input_topic', default_value='/audio/input/transcription',
             description='Топик rds_2p_audio/Transcription'),
         DeclareLaunchArgument(
-            'system_one_service', default_value='/system_one_client/ask',
+            'system_one_service', default_value='/system_one/ask',
             description='Сервис llm_msgs_ros/srv/Ask'),
         DeclareLaunchArgument(
             'model', default_value='kev-0.8b',
@@ -86,6 +96,10 @@ def generate_launch_description():
         ]),
         condition=IfCondition(LaunchConfiguration('include_system_one')),
         launch_arguments={
+            'mode': LaunchConfiguration('mode'),
+            'model_root': LaunchConfiguration('model_root'),
+            'rkllm_lib': LaunchConfiguration('rkllm_lib'),
+            'rknpu_lib': LaunchConfiguration('rknpu_lib'),
             'server_url': LaunchConfiguration('server_url'),
         }.items(),
     )

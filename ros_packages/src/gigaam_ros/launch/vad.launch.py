@@ -33,7 +33,7 @@ def generate_launch_description():
                               description='npu: путь к silero_vad.rknn'),
         DeclareLaunchArgument('rknn_lib', default_value='',
                               description='npu: путь к librknnrt.so'),
-        DeclareLaunchArgument('threshold', default_value='0.5',
+        DeclareLaunchArgument('threshold', default_value='0.35',
                               description='Порог вероятности речи VAD'),
         DeclareLaunchArgument('min_speech_duration', default_value='0.15',
                               description='Минимальная длительность речи, с'),

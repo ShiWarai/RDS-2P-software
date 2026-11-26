@@ -299,6 +299,8 @@ class TtsNode(Node):
         self.declare_parameter("tts_volume", 1.0)
         self.declare_parameter("speak_service", "/audio/output/speak")
         self.declare_parameter("stop_speech_service", "/audio/output/stop_speech")
+        # Прогрев paroli-cli/модели при старте, чтобы первый Speak не был холодным.
+        self.declare_parameter("warmup_on_start", True)
         # Войсморфинг (пост-обработка синтеза, длительность сохраняется):
         # voice_pitch — высота в полутонах (−12…12): >0 выше/«детский», <0 ниже/«бас».
         # voice_formant — форманты в полутонах (−12…12): меняет тембр/«размер голоса»,
@@ -333,6 +335,19 @@ class TtsNode(Node):
         self.get_logger().info(
             f"paroli_ros: paroli-cli; конфиг: {self.get_parameter('model_config_path').value}"
         )
+        if self.get_parameter("warmup_on_start").value:
+            threading.Thread(
+                target=self._warmup, daemon=True, name="paroli_warmup").start()
+
+    def _warmup(self) -> None:
+        """Запустить paroli-cli и синтезировать точку вхолостую (без публикации)."""
+        try:
+            self.get_logger().info("прогрев TTS...")
+            with self._lock:
+                self._synth_pcm_mono("да")
+            self.get_logger().info("прогрев TTS готов")
+        except Exception as e:  # noqa: BLE001
+            self.get_logger().warn(f"прогрев TTS не удался: {e}")
 
     def destroy_node(self) -> bool:
         self._stop_paroli()

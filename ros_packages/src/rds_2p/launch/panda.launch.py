@@ -10,7 +10,7 @@
     /imu и /joint_states, как в старом «бегать»;
   * inference_node — политика ходьбы (как rds_2p_inference_node.service);
   * rds_2p voice_system — audio + GigaAM + Paroli + lip_sync;
-  * rkllm_ros — локальная LLM; system_one_ros — локальный OSM;
+  * rkllm_ros — локальная LLM; system_one_ros — OSM нативно на NPU (/system_one/ask);
   * rds_2p_commands — команды на /audio/input/transcription: ``commands_mode:=regex``
     (command_parser + commands.yaml) или ``commands_mode:=osm``
     (panda_commands + system-one, panda_commands.yaml);
@@ -20,8 +20,8 @@ RAG можно временно заблокировать/разблокиро�
 
     ros2 service call /mirea_rag/enable std_srvs/srv/SetBool "{data: false}"
 
-Контейнер system-one-rknn должен быть поднят заранее
-(``ros2 run rkllm_ros system_one_docker.sh run``).
+OSM теперь нативный ROS 2 узел system_one_ros (без Docker/HTTP).
+Модель Kev и NPU-библиотеки задаются аргументами system_one_ros.
 """
 from pathlib import Path
 
@@ -98,7 +98,8 @@ def generate_launch_description():
             default_value="/home/orangepi/models/qwen3.5-2b-rkllm-rk3588/"
                           "qwen3.5-2b_w8a8_rk3588.rkllm"),
         DeclareLaunchArgument(
-            "system_one_url", default_value="http://127.0.0.1:18477"),
+            "system_one_url", default_value="http://127.0.0.1:18477",
+            description="HTTP fallback (mode=http); native OSM URL не использует"),
         DeclareLaunchArgument(
             "commands_log_level", default_value="info",
             description="Лог-уровень command_parser/unified_action_server"),
@@ -207,6 +208,7 @@ def generate_launch_description():
                     FindPackageShare("system_one_ros"), "launch",
                     "system_one.launch.py"])]),
             launch_arguments={
+                "mode": "native",
                 "server_url": LaunchConfiguration("system_one_url"),
             }.items(),
         ),
@@ -237,7 +239,7 @@ def generate_launch_description():
                 "include_action_server": "true",
                 "config_file": LaunchConfiguration("osm_config"),
                 "input_topic": "/audio/input/transcription",
-                "system_one_service": "/system_one_client/ask",
+                "system_one_service": "/system_one/ask",
                 "min_confidence": LaunchConfiguration("osm_min_confidence"),
                 "log_level": LaunchConfiguration("commands_log_level"),
             }.items(),
@@ -262,6 +264,7 @@ def generate_launch_description():
                     "local_search_backend"),
                 "local_bundle_dir": bundle,
                 "local_llm_clear_kv_before_query": "false",
+                "osm_gate_enabled": "false",
             }.items(),
         ),
     ])

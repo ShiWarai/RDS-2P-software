@@ -61,7 +61,7 @@ class VadNode(Node):
         self.declare_parameter('vad_model_path', '')       # cpu: silero_vad.onnx
         self.declare_parameter('vad_rknn_path', '')        # npu: silero_vad.rknn
         self.declare_parameter('rknn_lib', '')             # npu: librknnrt.so
-        self.declare_parameter('threshold', 0.5)
+        self.declare_parameter('threshold', 0.35)
         self.declare_parameter('min_silence_duration', 0.25)
         self.declare_parameter('min_speech_duration', 0.15)
         self.declare_parameter('max_speech_duration', 20.0)

@@ -810,7 +810,8 @@ def _emit_rag_two_stage(q: str, history: list, sr: dict,
                         events: "queue.Queue",
                         done_state: dict | None = None,
                         on_token=None,
-                        llm_stream=None) -> tuple[str, list | None]:
+                        llm_stream=None,
+                        on_llm_start=None) -> tuple[str, list | None]:
     """RAG-ветка «да» после /search: печатает чанки, затем стримит LLM
     (/ask_llm_stream или локальный RKLLM) по найденным чанкам. LLM не
     вызывается, если /search отказал (нет контекста / низкая уверенность /
@@ -854,12 +855,15 @@ def _emit_rag_two_stage(q: str, history: list, sr: dict,
         finally:
             events.put(None)
 
+    if on_llm_start is not None:
+        on_llm_start()
     threading.Thread(target=llm_worker, daemon=True).start()
     return emit(events, on_token=on_token), (chunks or None)
 
 
 def ask_gated(q: str, history: list, on_token=None,
-              backend=None, force_rag: bool = False
+              backend=None, force_rag: bool = False,
+              on_llm_start=None, skip_osm_gate: bool = False
               ) -> tuple[str, list | None, list[dict] | None]:
     """RAG-поток сквозь OSM-гат, двухэтапный: OSM и /search (только ретривал,
     CPU) гонятся ПАРАЛЛЕЛЬНО, но LLM-запрос уходит ТОЛЬКО если OSM ответил
@@ -890,6 +894,8 @@ def ask_gated(q: str, history: list, on_token=None,
         """Ответ без RAG-контекста (OSM «нет», поиск отключён/недоступен)."""
         if skip_reason:
             print(meta_style(f"      {skip_reason}"))
+        if on_llm_start is not None:
+            on_llm_start()
         try:
             answer, stats, done_ev = backend.chat_stream(q, history, on_token)
         except Exception as e:
@@ -918,7 +924,7 @@ def ask_gated(q: str, history: list, on_token=None,
         return answer, None, turn_msgs
 
     def osm_worker():
-        if force_rag or not backend.osm_enabled:
+        if skip_osm_gate or force_rag or not backend.osm_enabled:
             return
         t0 = time.time()
         try:
@@ -930,7 +936,7 @@ def ask_gated(q: str, history: list, on_token=None,
     def search_worker():
         if not backend.search_enabled:
             return
-        if not backend.osm_enabled and not force_rag:
+        if not backend.osm_enabled and not force_rag and not skip_osm_gate:
             return  # без гата и без force_rag — сразу LLM-ветка
         try:
             sr_state["res"] = backend.search(q, history)
@@ -941,6 +947,35 @@ def ask_gated(q: str, history: list, on_token=None,
     sr_t = threading.Thread(target=search_worker, daemon=True)
     osm_t.start()
     sr_t.start()
+
+    # Быстрый путь для wake-word: не гоняем OSM-гат (он один даёт +1.5…2.5 с).
+    # Роль гата играет сам поиск: есть уверенные чанки — RAG-ответ, иначе direct-чат.
+    if skip_osm_gate and not force_rag:
+        sr_t.join(15.0)
+        sr = sr_state.get("res")
+        conf = sr.get("conf_score") if isinstance(sr, dict) else None
+        if (isinstance(sr, dict) and not sr.get("refuse")
+                and sr.get("chunks")
+                and isinstance(conf, (int, float))
+                and conf >= MIN_CONFIDENCE):
+            done_state = {}
+            answer, chunks = _emit_rag_two_stage(
+                q, history, sr, events, done_state, on_token=on_token,
+                llm_stream=backend.ask_llm_stream,
+                on_llm_start=on_llm_start)
+            _log_turn(q, None, f"RAG без OSM-гата ({backend.name})",
+                      history, answer, sr=sr, done=done_state or None)
+            if sr.get("refuse") or done_state.get("type") == "refused":
+                return answer, chunks, None
+            turn_msgs = done_state.get("turn_messages") or _turn_msgs_fallback(
+                sr.get("clean_query") or q, chunks)
+            return answer, chunks, turn_msgs
+        if sr is None:
+            reason = f"поиск недоступен ({sr_state.get('err')})"
+        else:
+            reason = "поиск не дал уверенного контекста"
+        return _direct(
+            f"direct-чат ({backend.name}, без OSM-гата)", reason)
 
     if force_rag:
         res = {"yes": True}
@@ -970,7 +1005,8 @@ def ask_gated(q: str, history: list, on_token=None,
             sr = sr_state["res"]
             answer, chunks = _emit_rag_two_stage(
                 q, history, sr, events, done_state, on_token=on_token,
-                llm_stream=backend.ask_llm_stream)
+                llm_stream=backend.ask_llm_stream,
+                on_llm_start=on_llm_start)
             _log_turn(q, res, f"RAG двухэтапный ({backend.name})",
                       history, answer, sr=sr,
                       done=done_state or None, osm_ms=osm_state.get("ms"))
@@ -1013,6 +1049,8 @@ def ask_gated(q: str, history: list, on_token=None,
         finally:
             events.put(None)
 
+    if on_llm_start is not None:
+        on_llm_start()
     rag_t = threading.Thread(target=rag_worker_tee, daemon=True)
     rag_t.start()
     answer = emit(events, ctx_out, on_token)

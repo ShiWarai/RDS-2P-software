@@ -39,7 +39,7 @@
   низкий SNR); включение: `vad_enabled:=true vosk_audio_topic:=/audio/vad`
   (для `stt:=gigaam` добавьте `gigaam_reliable_audio:=true`).
   `include_voice:=false` — отладка без микрофона/динамика.
-  Контейнер system-one-rknn поднять заранее: `ros2 run rkllm_ros system_one_docker.sh run`.
+  OSM работает нативно в `system_one_ros` (`/system_one/ask`), контейнер не нужен.
   ```bash
   ros2 launch rds_2p llm_layer.launch.py                 # STT=Vosk
   ros2 launch rds_2p llm_layer.launch.py stt:=gigaam     # STT=GigaAM (RKNN NPU)

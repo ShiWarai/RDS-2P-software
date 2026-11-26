@@ -267,7 +267,7 @@ class LlmLayerNode(Node):
         if not cli.service_is_ready() and not cli.wait_for_service(timeout_sec=0.5):
             self.get_logger().warn(
                 'system-one недоступен — фраза пропущена '
-                '(контейнер: scripts/system_one_docker.sh run)'
+                '(нативный: system_one_ros/system_one.launch.py)'
             )
             return
 

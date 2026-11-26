@@ -6,7 +6,7 @@
     "{model: kev-0.8b, type: choice, state: '…', labels: [a, b], descriptions: ['', '']}"
 
 Нода — только HTTP-клиент (stdlib); сам сервис инференса поднимается отдельным
-контейнером (см. scripts/system_one_docker.sh и README пакета).
+внешним сервером system-one-rknn (нативный вариант — system_one_ros).
 """
 
 from __future__ import annotations
@@ -56,7 +56,7 @@ class SystemOneNode(Node):
         except Exception as exc:  # noqa: BLE001
             self.get_logger().warn(
                 f'health недоступен ({exc}); контейнер system-one-rknn поднят? '
-                '(scripts/system_one_docker.sh run)'
+                '(внешний system-one-rknn)'
             )
 
     def _build_payload(self, request: SystemOne.Request) -> dict:

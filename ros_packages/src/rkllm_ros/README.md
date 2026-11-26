@@ -232,38 +232,18 @@ ros2 service call /rkllm_ros/clear_kv_cache std_srvs/srv/Trigger
 
 ## System One (опционально): решения Kev-0.8B
 
-Отдельный **необязательный** узел **`system_one`** — тонкая HTTP-обёртка над сервисом [system-one-rknn](https://github.com/ShiWarai/system-one-rknn) (контейнер из GHCR, HTTP API на порту 8080). Один вопрос — один вызов сервиса **`llm_msgs_ros/srv/SystemOne`**: робот получает *решение* Kev-0.8B (`choice` / `noul` / `score`, вероятности/уверенность) без генерации текста. Если узел не запущен, остальной пакет работает как обычно.
-
-### Контейнер (docker, образ с гитхаба)
-
-```bash
-ros2 run rkllm_ros system_one_docker.sh pull     # ghcr.io/shiwarai/system-one-rknn:rk3588-main
-ros2 run rkllm_ros system_one_docker.sh run      # NPU-девайсы, порт 8080, kev-веса
-ros2 run rkllm_ros system_one_docker.sh health   # GET /health
-ros2 run rkllm_ros system_one_docker.sh logs     # при проблемах
-ros2 run rkllm_ros system_one_docker.sh stop
-```
-
-Путь к весам задаётся переменной **`KEV_MODELS_DIR`** (по умолчанию `/home/orangepi/models/kev-0.8b-rknn`) и монтируется в контейнер как **`/models/kev`**; модель больше нигде указывать не надо. В образе уже лежат `librknnrt 2.3.2` и `librkllmrt 1.3.1`. Другие переменные скрипта: `IMAGE`, `CONTAINER`, `PORT`, `MODELS`.
-
-### ROS-сервис
+Работает в пакете **`system_one_ros`** как нативный ROS 2 узел **`system_one`**
+(без Docker/HTTP): Kev-0.8B на RKLLM/NPU, сервис **`/system_one/ask`**.
 
 ```bash
-ros2 launch rkllm_ros system_one.launch.py      # server_url:=http://127.0.0.1:8080
-ros2 interface show llm_msgs_ros/srv/SystemOne
+ros2 launch system_one_ros system_one.launch.py
+ros2 service call /system_one/ask llm_msgs_ros/srv/Ask \
+  "{request_json: '{\"model\":\"kev-0.8b\",\"state\":\"Панда, дай лапу\",\"questions\":{\"q\":{\"type\":\"choice\",\"criteria\":{\"give_paw\":\"протянуть лапу\",\"sit\":\"сесть\"}}}}'}"
 ```
 
-Пример (choice: какая команда из рубрики панды подходит):
-
-```bash
-ros2 service call /system_one/systemone llm_msgs_ros/srv/SystemOne \
-  "{model: 'kev-0.8b', type: choice, state: 'Панда, дай лапу', \
-    labels: [give_paw, sit, dance], \
-    descriptions: ['протянуть лапу', 'сесть на задние лапы', 'станцевать']}"
-# → success: true, choice: 'give_paw', confidence, probabilities_json, latency_ms
-```
-
-Прочие формы вопроса: **`noul`** — да/нет (`noul` = вероятность «да», описания `descriptions: [нет, да]`), **`score`** — оценка по шкале (`descriptions` — пункты от младшего к старшему, ответ — ожидаемое значение `score` и `legend_json`). Ошибки валидации/HTTP/таймаута — `success=false`, `message`, `http_status`.
+Старый HTTP-клиент `rkllm_ros/system_one_node.py` оставлен только для внешнего
+system-one-rknn (`ros2 launch rkllm_ros system_one.launch.py server_url:=...`);
+локальный контейнер этим пакетом больше не поднимается.
 
 ## Контекст и грабли
 
