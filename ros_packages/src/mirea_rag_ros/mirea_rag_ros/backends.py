@@ -238,6 +238,10 @@ class LocalBackend:
             return rc.search(question, history)
         return self._searcher().search(question, history)
 
+    def osm_ready(self, timeout: float) -> bool:
+        """Дождаться, пока ROS-сервис OSM появится в графе."""
+        return bool(self._ready_osm(timeout))
+
     def osm_classify(self, question: str, timeout: float) -> dict:
         state = rc.fix_asr_aliases(question)[:self._osm_max_state_chars]
         candidates = self._ready_osm(min(self._osm_timeout, timeout))

@@ -1,14 +1,15 @@
 """Kev-0.8B w8a8 on RKLLM runtime 1.3.1. The pointer head stays on CPU."""
 import ctypes
 import json
-import math
 import os
 import time
 
 import numpy as np
 from tokenizers import Tokenizer
 
-from .kev_encode import encode_question
+from .api import LimitError
+from .kev_encode import encode_question, serving_limit
+from .kev_pointer import PointerHead
 
 RKLLM_INPUT_TOKEN = 1
 RKLLM_INFER_GET_LAST_HIDDEN_LAYER = 1
@@ -134,17 +135,18 @@ class _Callback(ctypes.Structure):
 
 class KevEngine:
     name = "kev-0.8b"
-    description = "Kev-0.8B merged into Qwen3.5-0.8B-Base, RKLLM w8a8, context 320"
+    description = "Kev-0.8B merged into Qwen3.5-0.8B-Base, RKLLM w8a8, context 16384"
     release_date = "2026-09-30"
 
     def __init__(self, root, lib_path):
+        try:
+            self._max_context = serving_limit()
+        except LimitError as exc:
+            raise SystemExit(str(exc))
+        print("kev serving max_context=%d" % self._max_context, flush=True)
         with open(os.path.join(root, "pointer.json"), encoding="utf-8") as handle:
             self._temperature_value = float(json.load(handle)["temperature"])
-        self._wq = np.load(os.path.join(root, "q_weight.npy"))
-        self._bq = np.load(os.path.join(root, "q_bias.npy"))
-        self._wk = np.load(os.path.join(root, "k_weight.npy"))
-        self._bk = np.load(os.path.join(root, "k_bias.npy"))
-        self._scale = 1.0 / math.sqrt(self._wq.shape[0])
+        self._head = PointerHead(root)
         self._tok = Tokenizer.from_file(os.path.join(root, "tokenizer.json"))
         self._captured = {}
         self._lib = ctypes.CDLL(lib_path)
@@ -167,8 +169,8 @@ class KevEngine:
         self._on_result = on_result
         self._lib.rkllm_createDefaultParam.restype = _Param
         param = self._lib.rkllm_createDefaultParam()
-        param.model_path = os.path.join(root, "kev-0.8b-w8a8-opt0-ctx320.rkllm").encode()
-        param.max_context_len = 320
+        param.model_path = os.path.join(root, "kev-0.8b-w8a8-opt0-ctx16384.rkllm").encode()
+        param.max_context_len = self._max_context
         param.max_new_tokens = 0
         param.n_keep = 0
         param.is_async = False
@@ -203,9 +205,9 @@ class KevEngine:
         return self._temperature_value
 
     def forward(self, state, item):
-        ids, decide, opt_idx = encode_question(self._tok, state, item)
+        ids, decide, opt_idx = encode_question(self._tok, state, item, self._max_context)
         hidden, shift, elapsed = self._hidden(ids)
-        logits = self._pointer(hidden, decide + shift, [index + shift for index in opt_idx])
+        logits = self._head.logits(hidden, decide + shift, [index + shift for index in opt_idx])
         return logits.tolist(), len(ids), elapsed
 
     def _hidden(self, ids):
@@ -230,8 +232,3 @@ class KevEngine:
         if self._captured["ntok"] < len(ids):
             raise RuntimeError("hidden tokens %s < %s" % (self._captured["ntok"], len(ids)))
         return hidden, self._captured["ntok"] - len(ids), elapsed
-
-    def _pointer(self, hidden, decide, opts):
-        query = hidden[decide] @ self._wq.T + self._bq
-        key = hidden[opts] @ self._wk.T + self._bk
-        return key @ query * self._scale

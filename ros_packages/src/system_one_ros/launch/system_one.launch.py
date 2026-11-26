@@ -30,6 +30,9 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'rknpu_lib', default_value='/opt/npu/librknnrt-2.3.2.so'),
         DeclareLaunchArgument('model', default_value='kev-0.8b'),
+        DeclareLaunchArgument(
+            'max_context', default_value='2048',
+            description='Потолок строки Kev (файл до 16384, ~1 MiB/токен RAM)'),
 
         # HTTP fallback (старый контейнер).
         DeclareLaunchArgument(
@@ -52,6 +55,8 @@ def generate_launch_description():
                 'rkllm_lib': LaunchConfiguration('rkllm_lib'),
                 'rknpu_lib': LaunchConfiguration('rknpu_lib'),
                 'model': LaunchConfiguration('model'),
+                'max_context': ParameterValue(
+                    LaunchConfiguration('max_context'), value_type=int),
             }],
         ),
         Node(

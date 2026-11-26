@@ -3,7 +3,7 @@
 <package format="3">
   <name>rds_2p_commands</name>
   <version>1.0.0</version>
-  <description>ROS2 пакет: парсер команд из Telegram/транскрипций, PandaCommand action-сервер, rkllm+Paroli.</description>
+  <description>ROS2 пакет: парсер команд из Telegram/транскрипций и PandaCommand action-сервер.</description>
   <maintainer email="zhuravlev.p.r@edu.mirea.ru">ShiWarai</maintainer>
   <license>MIT</license>
 

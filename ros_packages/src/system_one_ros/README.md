@@ -34,8 +34,9 @@ uint32 latency_ms
 | `rkllm_lib` | `/opt/npu/librkllmrt-1.3.1.so` |
 | `rknpu_lib` | `/opt/npu/librknnrt-2.3.2.so` |
 | `model` | `kev-0.8b` |
+| `max_context` | `2048` (файл до 16384, ~1 MiB/токен RAM) |
 
-В `model_root` нужны `kev-0.8b-w8a8-opt0-ctx320.rkllm`, `tokenizer.json`,
+Нужен `kev-0.8b-w8a8-opt0-ctx16384.rkllm` (HF `ShiWarai/kev-0.8b-rknn`), `tokenizer.json`,
 `pointer.json`, `q_weight.npy`, `q_bias.npy`, `k_weight.npy`, `k_bias.npy`.
 
 Сборка и запуск:
@@ -119,5 +120,5 @@ ros2 service call /system_one/ask llm_msgs_ros/srv/Ask \
 ## Замечания
 
 - Инференс сериализуется внутри ноды: параллельные `Ask` встают в очередь.
-- Native-режим использует модель `ctx320` (`kev-0.8b-w8a8-opt0-ctx320.rkllm`).
+- Native-режим использует `ctx16384`-файл; `max_context` по умолчанию 2048, поднимать при запасе RAM.
 - Для native нужны RKLLM 1.3.1 / RKNN 2.3.2 и доступ к `/dev/dri`, `/dev/dma_heap`.

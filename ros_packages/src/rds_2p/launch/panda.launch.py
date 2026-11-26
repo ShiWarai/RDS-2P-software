@@ -101,6 +101,9 @@ def generate_launch_description():
             "system_one_url", default_value="http://127.0.0.1:18477",
             description="HTTP fallback (mode=http); native OSM URL не использует"),
         DeclareLaunchArgument(
+            "osm_max_context", default_value="2048",
+            description="Потолок строки Kev (файл до 16384, ~1 MiB/токен RAM)"),
+        DeclareLaunchArgument(
             "commands_log_level", default_value="info",
             description="Лог-уровень command_parser/unified_action_server"),
         DeclareLaunchArgument(
@@ -210,6 +213,7 @@ def generate_launch_description():
             launch_arguments={
                 "mode": "native",
                 "server_url": LaunchConfiguration("system_one_url"),
+                "max_context": LaunchConfiguration("osm_max_context"),
             }.items(),
         ),
 
@@ -224,7 +228,6 @@ def generate_launch_description():
                 "config_file": LaunchConfiguration("commands_config"),
                 "transcription_topics": "['/audio/input/transcription']",
                 "command_debounce_sec": "3.0",
-                "panda_llm_tts_enabled": "false",
             }.items(),
             condition=IfCondition(PythonExpression([
                 "'", LaunchConfiguration("commands_mode"), "' == 'regex'"])),
@@ -264,7 +267,7 @@ def generate_launch_description():
                     "local_search_backend"),
                 "local_bundle_dir": bundle,
                 "local_llm_clear_kv_before_query": "false",
-                "osm_gate_enabled": "false",
+                "osm_gate_enabled": "true",
             }.items(),
         ),
     ])

@@ -65,12 +65,6 @@ class PandaCommandsNode(Node):
         self.declare_parameter('dry_run', False)
         self.declare_parameter('post_action_cooldown_sec', 1.5)
         self.declare_parameter('interrupt_keywords', 'стоп,хватит')
-        # Фразы с обращением «панда/банда» — ветка LLM, а не сценарий команд.
-        self.declare_parameter(
-            'wake_word_regex',
-            r'(?i)\b(?:панда|панды|панде|панду|пандой|пандою|'
-            r'пандочк\w*|банда|банды|банде|банду|бандой|бандою|'
-            r'бандочк\w*)\b')
 
         self._input_topic = self._param_str('input_topic')
         self._system_one_service = self._param_str('system_one_service')
@@ -87,11 +81,6 @@ class PandaCommandsNode(Node):
             for item in self._param_str('interrupt_keywords').split(',')
             if item.strip()
         ]
-        wake_regex = self._param_str('wake_word_regex')
-        try:
-            self._wake_re = re.compile(wake_regex) if wake_regex else None
-        except re.error:
-            self._wake_re = None
 
         self._scenario = self._load_scenario()
         self._motion_commands = dict(DEFAULT_MOTION_COMMANDS)
@@ -176,12 +165,6 @@ class PandaCommandsNode(Node):
 
         if time.monotonic() < self._cooldown_until:
             self.get_logger().info('Пропуск: пауза после сценария')
-            return
-
-        self.get_logger().info(f'Транскрипт: {text}')
-        if self._wake_re is not None and self._wake_re.search(text):
-            self.get_logger().info(
-                'Пропуск: обращение «панда/банда» — это LLM-ветка, не команда')
             return
 
         self._busy = True

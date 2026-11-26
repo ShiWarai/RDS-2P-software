@@ -48,11 +48,14 @@ class SystemOneNative(Node):
         self.declare_parameter(
             'rknpu_lib', '/opt/npu/librknnrt-2.3.2.so')
         self.declare_parameter('model', 'kev-0.8b')
+        # Потолок строки Kev; файл держит 16384, но арена ~1 MiB/токен.
+        self.declare_parameter('max_context', 2048)
 
         root = self._string_param('model_root')
         rkllm_lib = self._string_param('rkllm_lib')
         rknpu_lib = self._string_param('rknpu_lib')
         self._model = self._string_param('model') or 'kev-0.8b'
+        self._max_context = int(self.get_parameter('max_context').value)
 
         if not os.path.isdir(root):
             raise RuntimeError(f'нет каталога модели: {root}')
@@ -60,7 +63,9 @@ class SystemOneNative(Node):
             raise RuntimeError(f'нет RKLLM-библиотеки: {rkllm_lib}')
         if os.path.isfile(rknpu_lib):
             ctypes.CDLL(rknpu_lib, mode=ctypes.RTLD_GLOBAL)
-        self.get_logger().info(f'загружаю Kev из {root} ({rkllm_lib})')
+        os.environ['KEV_MAX_CONTEXT'] = str(self._max_context)
+        self.get_logger().info(
+            f'загружаю Kev из {root} ({rkllm_lib}), max_context={self._max_context}')
         self._engine = KevEngine(root, rkllm_lib)
         self._known = {self._engine.name}
         self._lock = threading.Lock()
@@ -71,7 +76,8 @@ class SystemOneNative(Node):
         self.create_service(
             Trigger, '~/health', self._on_health, callback_group=self._group)
         self.get_logger().info(
-            f'system_one native готов: /system_one/ask, model={self._model}')
+            f'system_one native готов: /system_one/ask, model={self._model}, '
+            f'max_context={self._max_context}')
 
     def _string_param(self, name: str) -> str:
         return self.get_parameter(name).get_parameter_value().string_value

@@ -73,12 +73,6 @@ install(PROGRAMS
 )
 
 install(PROGRAMS
-  rds_2p_commands/llm_layer_node.py
-  DESTINATION lib/${PROJECT_NAME}
-  RENAME llm_layer
-)
-
-install(PROGRAMS
   rds_2p_commands/panda_commands_node.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME panda_commands

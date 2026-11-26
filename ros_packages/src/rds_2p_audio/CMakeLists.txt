@@ -8,6 +8,7 @@ find_package(audio_common REQUIRED)
 find_package(audio_common_dsp REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_library(PORTAUDIO_LIB portaudio REQUIRED)
+find_library(ALSA_LIB asound REQUIRED)
 
 # Общие интерфейсы распознавания речи и TTS (vosk_ros, gigaam_ros, paroli_ros)
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -28,10 +29,17 @@ ament_target_dependencies(audio_player_node
 target_link_libraries(audio_player_node
   ${PORTAUDIO_LIB}
   audio_common_dsp::audio_common_dsp
+  ${ALSA_LIB}
 )
 install(TARGETS
   audio_player_node
   DESTINATION lib/${PROJECT_NAME}
+)
+
+install(PROGRAMS
+  scripts/music_player.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME music_player.py
 )
 
 # Установка launch файлов

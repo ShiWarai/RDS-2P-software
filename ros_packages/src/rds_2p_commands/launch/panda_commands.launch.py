@@ -34,6 +34,9 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'rknpu_lib', default_value='/opt/npu/librknnrt-2.3.2.so'),
         DeclareLaunchArgument(
+            'max_context', default_value='2048',
+            description='Потолок строки Kev (файл до 16384, ~1 MiB/токен RAM)'),
+        DeclareLaunchArgument(
             'server_url', default_value='http://127.0.0.1:18477',
             description='HTTP API system-one-rknn (только mode=http)'),
         DeclareLaunchArgument(
@@ -100,6 +103,7 @@ def generate_launch_description():
             'model_root': LaunchConfiguration('model_root'),
             'rkllm_lib': LaunchConfiguration('rkllm_lib'),
             'rknpu_lib': LaunchConfiguration('rknpu_lib'),
+            'max_context': LaunchConfiguration('max_context'),
             'server_url': LaunchConfiguration('server_url'),
         }.items(),
     )

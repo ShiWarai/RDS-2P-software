@@ -10,7 +10,7 @@
 from __future__ import annotations
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.actions import DeclareLaunchArgument, OpaqueFunction, UnsetEnvironmentVariable
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
@@ -76,6 +76,8 @@ def _opaque_audio_nodes(context, *_args, **_kwargs):
 
 def generate_launch_description():
     return LaunchDescription([
+    # headless: без X11 libpulse/xcb сыпет xcb_connection_has_error
+    UnsetEnvironmentVariable("DISPLAY"),
     DeclareLaunchArgument(
         "output_topic",
         default_value="/audio/output",

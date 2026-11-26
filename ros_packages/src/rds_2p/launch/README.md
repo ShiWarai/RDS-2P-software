@@ -24,27 +24,14 @@
 ### 🗣️ Голос + LLM
 - **`voice_system.launch.py`** - голосовой контур: audio + STT (Vosk/GigaAM) + Paroli + lip_sync.
   Выбор распознавателя: `stt:=vosk` (по умолчанию, CPU) или `stt:=gigaam` (RKNN NPU).
-  LLM (`rkllm_ros`/`system_one`/`llm_layer`) сюда не входит — только распознавание, синтез и «рот».
+  LLM (`rkllm_ros`/`system_one`/`mirea_rag`) сюда не входит — только распознавание, синтез и «рот».
   ```bash
   ros2 launch rds_2p voice_system.launch.py                 # Vosk
   ros2 launch rds_2p voice_system.launch.py stt:=gigaam     # GigaAM
   ```
-- **`llm_layer.launch.py`** - LLM-прослойка: транскрипции выбранного STT (Vosk/GigaAM) → классификатор system-one (kev-0.8b)
-  → команда в `/audio/command_transcription` (её принимает `commands_system` при
-  `transcription_topics:=['/audio/command_transcription']`) либо разговор через rkllm+Paroli.
-  Поднимает `voice_system` (audio+STT+Paroli+lip_sync), `rkllm_ros` (по умолчанию Qwen3.5-2B),
-  `system_one` и ноду `llm_layer` («посмотри …» → кадр камеры + текст в LLM;
-  `llm_system_prompt` — персона робота-панды). VAD-шлюз (`vosk_ros/vad_node`) есть, но
-  **по умолчанию выключен** — `vad_enabled:=false`, STT слушает микрофон напрямую (у ES8388
-  низкий SNR); включение: `vad_enabled:=true vosk_audio_topic:=/audio/vad`
-  (для `stt:=gigaam` добавьте `gigaam_reliable_audio:=true`).
-  `include_voice:=false` — отладка без микрофона/динамика.
+- **`mirea_rag`** - диалог/LLM: транскрипции → OSM/поиск → `rkllm_ros` + Paroli.
+  Команды идут отдельно через `rds_2p_commands` (`commands_mode:=osm|regex`).
   OSM работает нативно в `system_one_ros` (`/system_one/ask`), контейнер не нужен.
-  ```bash
-  ros2 launch rds_2p llm_layer.launch.py                 # STT=Vosk
-  ros2 launch rds_2p llm_layer.launch.py stt:=gigaam     # STT=GigaAM (RKNN NPU)
-  ```
-  Подробности — README `rds_2p_commands` (п.7), `vosk_ros` (VAD-шлюз) и `rkllm_ros` (System One).
 
 ## Схема использования
 

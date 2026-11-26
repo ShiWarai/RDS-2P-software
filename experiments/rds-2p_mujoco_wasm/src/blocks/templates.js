@@ -61,10 +61,10 @@ export const COMMANDS_EXAMPLE = {
       instructions: "Какая команда подходит к фразе?",
       options: [
         { id: "r_paw", name: "Дай лапу", examples: ["дай лапу", "лапу", "поздоровайся", "дай пять"], then: [CMD("give_paw", "дай лапу")] },
-        { id: "r_attention", name: "Равняйся", examples: ["равняйся", "стой ровно", "замри"], then: [CMD("stand_at_attention", "равняйся")] },
+        { id: "r_attention", name: "Равняйся", examples: ["равняйся", "стой ровно"], then: [CMD("stand_at_attention", "равняйся")] },
         { id: "r_dismiss", name: "Отставить", examples: ["отставить", "вставай", "свободен"], then: [CMD("dismiss", "отставить")] },
         { id: "r_lie", name: "Лежать", examples: ["лежать", "ложись", "ляг"], then: [CMD("lie_down", "лежать")] },
-        { id: "r_pray", name: "Служить", examples: ["служить", "служи", "поклон"], then: [CMD("pray", "служить")] },
+        { id: "r_pray", name: "Служить", examples: ["служить", "служи"], then: [CMD("pray", "служить")] },
         { id: "r_flip", name: "Кувырок влево", examples: ["кувырок", "кувырок влево", "перевернись", "сальто"], then: [CMD("rotate", "кувырок влево")] },
         { id: "r_flip_right", name: "Кувырок вправо", examples: ["кувырок вправо", "перевернись вправо"], then: [CMD("rotate_right", "кувырок вправо")] },
         { id: "r_run", name: "Беги", examples: ["беги", "бег", "побежали", "пошли"], then: [CMD("step_forward", "шаг вперёд")] },

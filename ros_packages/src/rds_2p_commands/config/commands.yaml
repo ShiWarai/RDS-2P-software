@@ -4,13 +4,6 @@
 # Позы приводов (12 чисел на позу) — в panda_poses.yaml (параметр panda_poses_config у unified_action_server).
 #
 # PandaCommand: один слот «motors» в command_parser и unified_action_server (см. PANDA_GOAL_CLASS / PANDA_ACTION_SLOT).
-#
-# panda_dialog_interrupt — фразы первого приоритета: прерывают rkllm+Paroli
-# и снимают блокировку новых команд, пока панда говорит или идёт запрос к LLM. PandaCommand не шлётся.
-
-panda_dialog_interrupt:
-  keywords: ['хватит']
-
 commands:
   give_paw:
     keywords: ["лапу"]

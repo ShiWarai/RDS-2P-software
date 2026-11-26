@@ -13,8 +13,11 @@
 #include <string>
 #include <vector>
 
+#include <alsa/asoundlib.h>
 #include <portaudio.h>
 #include <rclcpp/rclcpp.hpp>
+
+#include <cstdlib>
 
 #include <audio_common_dsp/multi_channel_resampler.hpp>
 #include <audio_common_msgs/msg/audio_stamped.hpp>
@@ -22,6 +25,12 @@
 using namespace std::chrono_literals;
 
 namespace {
+
+void alsa_error_silent(const char *, int, const char *, int, const char *, ...) {}
+
+bool voice_control_active() {
+  return std::system("systemctl is-active --quiet voice-control.service") == 0;
+}
 
 double now_sec() {
   using clock = std::chrono::steady_clock;
@@ -76,6 +85,12 @@ public:
                   pulse_sink_.c_str());
     }
 
+    snd_lib_error_set_handler(alsa_error_silent);
+    if (voice_control_active()) {
+      RCLCPP_ERROR(get_logger(),
+                   "voice-control.service активен — он может занимать аудиоустройство. "
+                   "Останови: sudo systemctl stop voice-control.service");
+    }
     if (Pa_Initialize() != paNoError) {
       throw std::runtime_error("Pa_Initialize failed");
     }
@@ -110,6 +125,12 @@ public:
                                 frames_per_block_, paClipOff,
                                 &AudioPlayerNode::pa_callback, this);
     if (err != paNoError) {
+      if (err == paDeviceUnavailable || err == paUnanticipatedHostError) {
+        RCLCPP_ERROR(get_logger(),
+                     "Аудиовыход занят/недоступен (%s). Проверь voice-control: "
+                     "sudo systemctl stop voice-control.service; fuser -v /dev/snd/*",
+                     Pa_GetErrorText(err));
+      }
       Pa_Terminate();
       throw std::runtime_error(std::string("Pa_OpenStream: ") + Pa_GetErrorText(err));
     }

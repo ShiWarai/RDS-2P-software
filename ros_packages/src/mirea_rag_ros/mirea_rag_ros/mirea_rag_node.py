@@ -24,6 +24,8 @@ SPEAK_ECHO_SECONDS (по умолчанию 3 с) любая транскрип�
 """
 import os
 import re
+import shutil
+import subprocess
 import threading
 import time
 from pathlib import Path
@@ -181,6 +183,12 @@ class MireaRagNode(Node):
         self.declare_parameter("warmup_on_start", True)
         self.declare_parameter("warmup_search", True)
         self.declare_parameter("warmup_llm", True)
+        # Готовность: панда-звук (или фраза), когда прогрев закончен.
+        self.declare_parameter("announce_ready", True)
+        self.declare_parameter(
+            "ready_sound", "/home/orangepi/rtulab_feetech/sound/bleat2.wav")
+        self.declare_parameter("ready_sound_gain", 0.8)
+        self.declare_parameter("ready_phrase", "Я готов.")
         # Реагируем только на обращение по имени (STT путает «панда/банда»).
         self.declare_parameter("wake_word_required", True)
         self.declare_parameter("force_rag", False)
@@ -247,6 +255,16 @@ class MireaRagNode(Node):
                                .get_parameter_value().bool_value)
         self._warmup_llm = (self.get_parameter("warmup_llm")
                             .get_parameter_value().bool_value)
+        self._announce_ready = (self.get_parameter("announce_ready")
+                                .get_parameter_value().bool_value)
+        self._ready_sound = (self.get_parameter("ready_sound")
+                             .get_parameter_value().string_value.strip())
+        self._ready_sound_gain = (self.get_parameter("ready_sound_gain")
+                                  .get_parameter_value().double_value)
+        self._ready_phrase = (self.get_parameter("ready_phrase")
+                              .get_parameter_value().string_value.strip())
+        self._warming = bool(self._warmup_enabled)
+        self._pending_text: str | None = None
         self._wake_required = (self.get_parameter("wake_word_required")
                                .get_parameter_value().bool_value)
         self._force_rag = (self.get_parameter("force_rag")
@@ -365,20 +383,51 @@ class MireaRagNode(Node):
 
     def _warmup_models(self) -> None:
         """Заранее загрузить/прогреть поиск и LLM, чтобы первый вопрос не ждал."""
+        try:
+            # Тяжёлый CPU-прогрев эмбеддера не должен душить команды/GigaAM.
+            os.nice(10)
+        except Exception:  # noqa: BLE001
+            pass
         if getattr(self._backend, "osm_enabled", False):
             self.get_logger().info("прогрев: OSM...")
             try:
-                self._backend.osm_classify("привет", 5.0)
-                self.get_logger().info("прогрев: OSM готов")
+                # Native system_one грузит Kev ~10 с; не сдаёмся через 5 с.
+                ready = True
+                if hasattr(self._backend, "osm_ready"):
+                    deadline = time.monotonic() + 45.0
+                    while not self._backend.osm_ready(0.5):
+                        if time.monotonic() >= deadline:
+                            ready = False
+                            break
+                        time.sleep(0.5)
+                if ready:
+                    self._backend.osm_classify("привет", 5.0)
+                    self.get_logger().info("прогрев: OSM готов")
+                else:
+                    self.get_logger().warn("прогрев OSM: сервис не появился за 45 с")
             except Exception as e:  # noqa: BLE001
                 self.get_logger().warn(f"прогрев OSM не удался: {e}")
         if self._warmup_search and hasattr(self._backend, "warmup_search"):
             self.get_logger().info("прогрев: RAG-поиск...")
-            try:
-                self._backend.warmup_search()
-                self.get_logger().info("прогрев: RAG-поиск готов")
-            except Exception as e:  # noqa: BLE001
-                self.get_logger().warn(f"прогрев RAG-поиска не удался: {e}")
+            search_done = threading.Event()
+
+            def _warm_search() -> None:
+                try:
+                    self._backend.warmup_search()
+                    self.get_logger().info("прогрев: RAG-поиск готов")
+                except Exception as e:  # noqa: BLE001
+                    self.get_logger().warn(f"прогрев RAG-поиска не удался: {e}")
+                finally:
+                    search_done.set()
+
+            threading.Thread(
+                target=_warm_search, daemon=True, name="mirea_rag_warm_search"
+            ).start()
+            if not search_done.wait(timeout=30.0):
+                # Не держим готовность заложником тяжёлого импорта CPU.
+                self.get_logger().warn(
+                    "прогрев RAG-поиска идёт >30 с (CPU/диск); готовность объявляю, "
+                    "поиск догрузится в фоне")
         if self._warmup_llm and hasattr(self._backend, "warmup_llm"):
             self.get_logger().info("прогрев: LLM...")
             try:
@@ -386,7 +435,20 @@ class MireaRagNode(Node):
                 self.get_logger().info("прогрев: LLM готов")
             except Exception as e:  # noqa: BLE001
                 self.get_logger().warn(f"прогрев LLM не удался: {e}")
+        if self._announce_ready:
+            self._announce_ready_now()
+        self._warming = False
+        pending = self._pending_text
+        self._pending_text = None
         self.get_logger().info("прогрев моделей завершён")
+        if pending:
+            try:
+                os.nice(-10)
+            except Exception:  # noqa: BLE001
+                pass
+            self.get_logger().info(
+                f"прогрев моделей: обрабатываю отложенную фразу «{pending}»")
+            self._handle_text(pending)
 
     # --- приём транскрипции ------------------------------------------------
     @staticmethod
@@ -428,7 +490,15 @@ class MireaRagNode(Node):
         else:
             self.get_logger().info(f"Транскрипт: {text}")
         text = fixed
+        if self._warming:
+            # Не теряем первую фразу и не сталкиваем её с прогревочным LLM.
+            self._pending_text = text
+            self.get_logger().info(
+                f"прогрев моделей: отложил фразу «{text}» до готовности")
+            return
+        self._handle_text(text)
 
+    def _handle_text(self, text: str) -> None:
         now = time.monotonic()
         if self._busy:
             self.get_logger().info(
@@ -476,6 +546,27 @@ class MireaRagNode(Node):
         except Exception as e:  # noqa: BLE001 — узел должен пережить любую ошибку
             self._busy = False
             self.get_logger().error(f"ошибка обработки «{text}»: {e}")
+
+    def _announce_ready_now(self) -> None:
+        """Сказать/проиграть «готов» после прогрева, не занимая LLM."""
+        path = self._ready_sound
+        if path and os.path.isfile(path) and shutil.which("ros2"):
+            try:
+                self.get_logger().info(f"готовность: звук {path}")
+                proc = subprocess.Popen(
+                    ["ros2", "run", "rds_2p_audio", "music_player.py", path,
+                     "--gain", f"{self._ready_sound_gain:g}"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    env=os.environ.copy())
+                proc.wait(timeout=8.0)
+                if proc.returncode == 0:
+                    return
+                self.get_logger().warn(
+                    f"готовность: music_player вернул {proc.returncode}")
+            except Exception as e:  # noqa: BLE001
+                self.get_logger().warn(f"готовность: звук не проигран: {e}")
+        if self._ready_phrase:
+            self._speak_chunk(self._ready_phrase)
 
     def _start_filler(self, done: threading.Event) -> None:
         """Сказать короткое «Хм...» и не ждать его — LLM считается параллельно."""

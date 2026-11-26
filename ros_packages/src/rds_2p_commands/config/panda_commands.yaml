@@ -1,6 +1,6 @@
 # Компактный пресет «Команды Панды»: только реально исполняемые routine_id
 # из config/commands.yaml (dispatch в RobotRoutineHandler).
-# Классификация — system_one_ros/srv/Ask (локальная OSM, kev-0.8b), без regex.
+# Классификация — system_one_ros/srv/Ask (нативный Kev/NPU), без regex.
 # kind: start -> question(choice) -> options[].then:
 #   kind: command — routine_id для /robot/panda_command
 #   kind: wait    — пауза ms
@@ -21,12 +21,18 @@ then:
           - {kind: command, command: give_paw, label: "дай лапу"}
       - id: stand_at_attention
         name: Равняйся
-        examples: ["равняйся", "стой ровно", "замри"]
+        examples: ["равняйся", "стой ровно"]
         then:
           - {kind: command, command: stand_at_attention, label: "равняйся"}
+      # Отдельная метка «Встать»: иначе Kev путает «вставай» с «Не команда».
+      - id: stand_up
+        name: Встать
+        examples: ["вставай", "встань", "встать", "марш"]
+        then:
+          - {kind: command, command: dismiss, label: "встать"}
       - id: dismiss
         name: Отставить
-        examples: ["отставить", "вставай", "свободен", "марш"]
+        examples: ["отставить", "свободен"]
         then:
           - {kind: command, command: dismiss, label: "отставить"}
       - id: lie_down
@@ -41,7 +47,7 @@ then:
           - {kind: command, command: rotate, label: "кувырок"}
       - id: pray
         name: Служить
-        examples: ["служить", "служи", "поклон", "поклонись"]
+        examples: ["служить", "служи"]
         then:
           - {kind: command, command: pray, label: "служить"}
       - id: reconnect_joystick

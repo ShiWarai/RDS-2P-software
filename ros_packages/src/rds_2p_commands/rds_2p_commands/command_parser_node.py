@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Нода для парсинга команд из Telegram и голосовых расшифровок.
 
-Команды — share/config/commands.yaml; прерывание LLM/озвучки — **panda_dialog_interrupt**; rkllm+Paroli — **llm_commands.py**.
+Команды — share/config/commands.yaml. LLM/диалог вынесен в mirea_rag.
 """
 
 import json
-import re
 import time
 import yaml
 import rclpy
@@ -14,7 +13,6 @@ from rclpy.action import ActionClient
 from std_msgs.msg import String
 from rds_2p_audio.msg import Transcription
 from rds_2p_commands.action import PandaCommand
-from rds_2p_commands.llm_commands import LlmCommands
 from pathlib import Path
 from typing import Dict, Optional, Any, Callable
 from ament_index_python.packages import get_package_share_directory
@@ -35,7 +33,6 @@ class CommandParserNode(Node):
         self.command_debounce_sec = self.get_parameter('command_debounce_sec').get_parameter_value().double_value
 
         self.command_config = self._load_command_config()
-        self._dialog_interrupt_keywords = self._load_dialog_interrupt_keywords()
 
         self.command_handlers: Dict[str, Callable] = {}
         self._register_command_handlers()
@@ -73,30 +70,10 @@ class CommandParserNode(Node):
 
         self.panda_command_action_client = ActionClient(self, PandaCommand, '/robot/panda_command')
 
-        self.declare_parameter('panda_llm_tts_enabled', True)
-        self.declare_parameter('panda_llm_trigger_substring', 'панда')
-        self.declare_parameter('rkllm_complete_action', '/rkllm_ros/complete')
-        self.declare_parameter('rkllm_clear_kv_service', '/rkllm_ros/clear_kv_cache')
-        self.declare_parameter('tts_speak_service', '/audio/output/speak')
-        self.declare_parameter('tts_stop_speech_service', '/audio/output/stop_speech')
-        self.declare_parameter('rkllm_wait_server_sec', 5.0)
-        self.declare_parameter('tts_wait_service_sec', 3.0)
-        self.declare_parameter('rkllm_keep_history', True)
-        self.declare_parameter('rkllm_clear_kv_before_query', False)
-        self.declare_parameter('rkllm_max_new_tokens', 0)
-        self.declare_parameter('llm_stream_tts_by_punctuation', True)
-        self.declare_parameter('llm_sanitize_user_and_reply', True)
-        self.declare_parameter('llm_stream_min_chunk_chars', 2)
-        self.declare_parameter('llm_reply_log_max_chars', 280)
-        self.declare_parameter('tts_speak_log_max_chars', 0)
-
-        self._llm = LlmCommands(self)
-
         self._debounce_last: Dict[tuple, float] = {}
         self._active_goal_handles: Dict[str, list] = {}
 
         self.get_logger().info('Command Parser Node запущен')
-        self._llm.log_startup_summary()
 
     def _load_command_config(self) -> Dict[str, Any]:
         """Загрузка конфигурации команд из YAML файла."""
@@ -107,7 +84,7 @@ class CommandParserNode(Node):
 
             if not config_path.exists():
                 self.get_logger().warn(
-                    f'Конфигурационный файл не найден: {config_path} — команды и panda_dialog_interrupt пусты'
+                    f'Конфигурационный файл не найден: {config_path} — команды пусты'
                 )
                 return {}
 
@@ -120,14 +97,6 @@ class CommandParserNode(Node):
         except Exception as e:
             self.get_logger().error(f'Ошибка при загрузке конфигурации: {e}')
             return {}
-
-    def _load_dialog_interrupt_keywords(self) -> list:
-        """Ключевые фразы прерывания: только из panda_dialog_interrupt.keywords в YAML (без запасных в коде)."""
-        block = self.command_config.get('panda_dialog_interrupt') or {}
-        kws = block.get('keywords') or []
-        if isinstance(kws, str):
-            kws = [kws]
-        return [str(k).strip().lower() for k in kws if str(k).strip()]
 
     def _register_command_handlers(self):
         """Регистрация обработчиков команд."""
@@ -199,18 +168,6 @@ class CommandParserNode(Node):
             return
 
         self.get_logger().info(f'Транскрипт ({source}): {text}')
-
-        if self._match_dialog_interrupt(text):
-            self.get_logger().info(f'Прерывание диалога по фразе ({source})')
-            self._llm.handle_interrupt(source)
-            return
-
-        if self._llm.busy:
-            self.get_logger().info(
-                f'Пропуск ({source}): занят диалог LLM/озвучка TTS (ключи panda_dialog_interrupt — стоп)'
-            )
-            return
-
         self._parse_and_execute_fallback(text, source)
 
     def _parse_and_execute_fallback(self, text: str, source: str):
@@ -228,13 +185,6 @@ class CommandParserNode(Node):
                     )
                     self._execute_command(command_name, text, source)
                     return
-
-        if self._llm.should_run(text):
-            self.get_logger().info(
-                f'Рутина не распознана, триггер {self._llm.enabled_trigger!r} — только LLM+TTS'
-            )
-            self._llm.dispatch(text)
-            return
 
         self.get_logger().debug(f'Не распознано ({source}): {text[:160]}{"…" if len(text) > 160 else ""}')
 
@@ -369,47 +319,3 @@ class CommandParserNode(Node):
         send_goal_future.add_done_callback(goal_response_callback)
         self.get_logger().info(f'PandaCommand "{routine_id}" goal отправлен (source={source})')
 
-    def _match_dialog_interrupt(self, text: str) -> bool:
-        tl = (text or '').lower().strip()
-        if not tl:
-            return False
-        tokens = re.findall(r'\w+', tl, flags=re.UNICODE)
-        for kw in self._dialog_interrupt_keywords:
-            raw = (kw or '').strip().lower()
-            if not raw:
-                continue
-            if ' ' in raw:
-                if raw in tl:
-                    return True
-                continue
-            for i, tok in enumerate(tokens):
-                if tok != raw:
-                    continue
-                if raw == 'хватит' and i > 0 and tokens[i - 1] == 'не':
-                    continue
-                return True
-        return False
-
-
-def main(args=None):
-    rclpy.init(args=args)
-
-    try:
-        command_parser = CommandParserNode()
-        rclpy.spin(command_parser)
-    except KeyboardInterrupt:
-        pass
-    except Exception as e:
-        print(f'\nОшибка: {e}')
-        import traceback
-        traceback.print_exc()
-    finally:
-        try:
-            if rclpy.ok():
-                rclpy.shutdown()
-        except Exception:
-            pass
-
-
-if __name__ == '__main__':
-    main()

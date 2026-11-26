@@ -1,14 +1,22 @@
 """One Kev question as a single causal row.
 
 Questions are encoded separately. A packed row would let later questions leak
-into the Gated DeltaNet state, and the published file holds 320 tokens.
+into the Gated DeltaNet state, and the published file holds 16384 tokens.
+
+The serving limit can be lower than the file capacity: RKLLM keeps one row
+per request and its arena grows by about 1 MiB per token, so the row that
+fits depends on the node RAM, not on the .rkllm file. KEV_MAX_CONTEXT sets
+that per-deployment number; anything above the file capacity is a config
+error.
 """
 import json
+import os
 import re
 
 from .api import LimitError
 
-MAX_CONTEXT = 320
+MAX_CONTEXT = 16384
+ENV_MAX_CONTEXT = "KEV_MAX_CONTEXT"
 SPECIAL = (
     "<|fim_prefix|>",
     "<|fim_middle|>",
@@ -30,7 +38,32 @@ def user_ids(tok, text):
     return tok.encode(text, add_special_tokens=False).ids
 
 
-def encode_question(tok, state, item):
+def resolve_max_context(raw=None):
+    """Serving row limit from KEV_MAX_CONTEXT, None when unset.
+
+    The file capacity MAX_CONTEXT stays the upper bound: a bigger env value
+    is a config error, not a bigger file.
+    """
+    value = raw if raw is not None else os.environ.get(ENV_MAX_CONTEXT, "").strip()
+    if not value:
+        return None
+    try:
+        limit = int(value)
+    except ValueError:
+        raise LimitError("%s must be an integer, got %r" % (ENV_MAX_CONTEXT, value))
+    if limit < 1 or limit > MAX_CONTEXT:
+        raise LimitError("%s must be between 1 and %d, got %d" % (ENV_MAX_CONTEXT, MAX_CONTEXT, limit))
+    return limit
+
+
+def serving_limit():
+    """Effective row limit: KEV_MAX_CONTEXT when set, else the file capacity."""
+    limit = resolve_max_context()
+    return MAX_CONTEXT if limit is None else limit
+
+
+def encode_question(tok, state, item, max_context=None):
+    limit = max_context if max_context is not None else MAX_CONTEXT
     ids_of = [tok.token_to_id(token) for token in SPECIAL]
     if any(token_id is None for token_id in ids_of):
         raise LimitError("Kev tokenizer is missing the decision special tokens")
@@ -42,8 +75,13 @@ def encode_question(tok, state, item):
     branch = instr + [token for span in spans for token in span] + [decide]
     base = len(ids)
     ids = ids + branch
-    if len(ids) > MAX_CONTEXT:
-        raise LimitError("Kev row is %d tokens; this file holds %d" % (len(ids), MAX_CONTEXT))
+    if len(ids) > limit:
+        if limit < MAX_CONTEXT:
+            raise LimitError(
+                "Kev row is %d tokens; the serving limit is %d (%s), the file holds %d"
+                % (len(ids), limit, ENV_MAX_CONTEXT, MAX_CONTEXT)
+            )
+        raise LimitError("Kev row is %d tokens; this file holds %d" % (len(ids), limit))
     cursor = len(instr)
     opt_idx = []
     for span in spans:

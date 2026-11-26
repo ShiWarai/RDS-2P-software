@@ -1,12 +1,7 @@
 #!/usr/bin/env python3
-"""
-Launch файл для запуска системы обработки команд.
+"""Система команд: unified_action_server + command_parser (regex/keywords).
 
-Запускает:
-- Unified Action Server (сервер действий)
-- Command Parser Node (парсер команд из топиков)
-
-Telegram бот запускается отдельно через пакет rds_2p_telegram_bot
+LLM/диалог вынесен в mirea_rag; здесь только команды из commands.yaml.
 """
 
 from launch import LaunchDescription
@@ -17,137 +12,45 @@ from ament_index_python.packages import get_package_share_directory
 
 
 def generate_launch_description():
-    # Аргументы запуска
-    log_level_arg = DeclareLaunchArgument(
-        'log_level',
-        default_value='info',
-        description='Уровень логирования: debug, info, warn, error, fatal'
-    )
-    
-    config_file_arg = DeclareLaunchArgument(
-        'config_file',
-        default_value='commands.yaml',
-        description='Имя файла конфигурации команд в share/rds_2p_commands/config/'
-    )
-
-    transcription_topics_arg = DeclareLaunchArgument(
-        'transcription_topics',
-        default_value="['/audio/input/transcription', '/telegram/audio/transcription']",
-        description='Список топиков транскрипции для подписки (YAML массив)'
-    )
-
-    debounce_arg = DeclareLaunchArgument(
-        'command_debounce_sec',
-        default_value='3.0',
-        description='Дребезг command_parser: интервал между командами (сек)'
-    )
-
-    panda_llm_tts_arg = DeclareLaunchArgument(
-        'panda_llm_tts_enabled',
-        default_value='true',
-        description='При подстроке в тексте — rkllm + озвучка TTS параллельно PandaCommand',
-    )
-    panda_llm_trigger_arg = DeclareLaunchArgument(
-        'panda_llm_trigger_substring',
-        default_value='панда',
-        description='Подстрока (без учёта регистра) для вызова rkllm и Paroli',
-    )
-    rkllm_complete_action_arg = DeclareLaunchArgument(
-        'rkllm_complete_action',
-        default_value='/rkllm_ros/complete',
-    )
-    rkllm_clear_kv_arg = DeclareLaunchArgument(
-        'rkllm_clear_kv_service',
-        default_value='/rkllm_ros/clear_kv_cache',
-    )
-    tts_speak_arg = DeclareLaunchArgument(
-        'tts_speak_service',
-        default_value='/audio/output/speak',
-    )
-    tts_stop_speech_arg = DeclareLaunchArgument(
-        'tts_stop_speech_service',
-        default_value='/audio/output/stop_speech',
-    )
-    rkllm_wait_arg = DeclareLaunchArgument('rkllm_wait_server_sec', default_value='5.0')
-    tts_wait_arg = DeclareLaunchArgument('tts_wait_service_sec', default_value='3.0')
-    rkllm_keep_hist_arg = DeclareLaunchArgument('rkllm_keep_history', default_value='true')
-    rkllm_clear_before_arg = DeclareLaunchArgument(
-        'rkllm_clear_kv_before_query',
-        default_value='false',
-    )
-    rkllm_max_tok_arg = DeclareLaunchArgument('rkllm_max_new_tokens', default_value='0')
-
-    publish_motor_positions_arg = DeclareLaunchArgument(
-        'publish_motor_positions',
-        default_value='true',
-        description='Публиковать позы routine в /motors/commands',
-    )
-    motor_config_file_arg = DeclareLaunchArgument(
-        'motor_config_file',
-        default_value='',
-        description='YAML ftservo_ros для units→rad; пусто — config_example.yaml пакета',
-    )
-
-    # Unified Action Server
-    unified_action_server_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([
-            get_package_share_directory('rds_2p_commands'),
-            '/launch/unified_action_server.launch.py'
-        ]),
-        launch_arguments={
-            'log_level': LaunchConfiguration('log_level'),
-            'publish_motor_positions': LaunchConfiguration('publish_motor_positions'),
-            'motor_config_file': LaunchConfiguration('motor_config_file'),
-        }.items()
-    )
-    
-    # Command Parser
-    command_parser_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([
-            get_package_share_directory('rds_2p_commands'),
-            '/launch/command_parser.launch.py'
-        ]),
-        launch_arguments={
-            'log_level': LaunchConfiguration('log_level'),
-            'config_file': LaunchConfiguration('config_file'),
-            'transcription_topics': LaunchConfiguration('transcription_topics'),
-            'command_debounce_sec': LaunchConfiguration('command_debounce_sec'),
-            'panda_llm_tts_enabled': LaunchConfiguration('panda_llm_tts_enabled'),
-            'panda_llm_trigger_substring': LaunchConfiguration('panda_llm_trigger_substring'),
-            'rkllm_complete_action': LaunchConfiguration('rkllm_complete_action'),
-            'rkllm_clear_kv_service': LaunchConfiguration('rkllm_clear_kv_service'),
-            'tts_speak_service': LaunchConfiguration('tts_speak_service'),
-            'tts_stop_speech_service': LaunchConfiguration('tts_stop_speech_service'),
-            'rkllm_wait_server_sec': LaunchConfiguration('rkllm_wait_server_sec'),
-            'tts_wait_service_sec': LaunchConfiguration('tts_wait_service_sec'),
-            'rkllm_keep_history': LaunchConfiguration('rkllm_keep_history'),
-            'rkllm_clear_kv_before_query': LaunchConfiguration('rkllm_clear_kv_before_query'),
-            'rkllm_max_new_tokens': LaunchConfiguration('rkllm_max_new_tokens'),
-        }.items()
-    )
-    
-    # Собираем launch описание
-    launch_description = LaunchDescription([
-        log_level_arg,
-        config_file_arg,
-        transcription_topics_arg,
-        debounce_arg,
-        panda_llm_tts_arg,
-        panda_llm_trigger_arg,
-        rkllm_complete_action_arg,
-        rkllm_clear_kv_arg,
-        tts_speak_arg,
-        tts_stop_speech_arg,
-        rkllm_wait_arg,
-        tts_wait_arg,
-        rkllm_keep_hist_arg,
-        rkllm_clear_before_arg,
-        rkllm_max_tok_arg,
-        publish_motor_positions_arg,
-        motor_config_file_arg,
-        unified_action_server_launch,
-        command_parser_launch,
+    return LaunchDescription([
+        DeclareLaunchArgument(
+            'log_level', default_value='info',
+            description='Уровень логирования: debug, info, warn, error, fatal'),
+        DeclareLaunchArgument(
+            'config_file', default_value='commands.yaml',
+            description='Имя файла конфигурации команд'),
+        DeclareLaunchArgument(
+            'transcription_topics',
+            default_value="['/audio/input/transcription', '/telegram/audio/transcription']",
+            description='Список топиков транскрипции'),
+        DeclareLaunchArgument(
+            'command_debounce_sec', default_value='3.0',
+            description='Дребезг command_parser (сек)'),
+        DeclareLaunchArgument(
+            'publish_motor_positions', default_value='true',
+            description='Публиковать позы routine в /motors/commands'),
+        DeclareLaunchArgument(
+            'motor_config_file', default_value='',
+            description='YAML ftservo_ros для units→rad; пусто — config_example.yaml'),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([
+                get_package_share_directory('rds_2p_commands'),
+                '/launch/unified_action_server.launch.py']),
+            launch_arguments={
+                'log_level': LaunchConfiguration('log_level'),
+                'publish_motor_positions': LaunchConfiguration('publish_motor_positions'),
+                'motor_config_file': LaunchConfiguration('motor_config_file'),
+            }.items(),
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([
+                get_package_share_directory('rds_2p_commands'),
+                '/launch/command_parser.launch.py']),
+            launch_arguments={
+                'log_level': LaunchConfiguration('log_level'),
+                'config_file': LaunchConfiguration('config_file'),
+                'transcription_topics': LaunchConfiguration('transcription_topics'),
+                'command_debounce_sec': LaunchConfiguration('command_debounce_sec'),
+            }.items(),
+        ),
     ])
-    
-    return launch_description
-
