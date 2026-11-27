@@ -4,7 +4,7 @@ import { compileAction } from "./rules/to_program.js";
 import { NluEngine } from "./nlu/nlu.js";
 import { LayaBrowserBackend } from "./nlu/laya_browser.js";
 import { SpeechListener, speechSupported } from "./speech/recognizer.js";
-import { VoskStt, voskSupported, voskWarmup, voskWarmupError, voskModelReady, isSecure } from "./speech/vosk_stt.js";
+import { VoskStt, voskSupported, voskWarmup, voskWarmupError, voskModelReady, voskUseLocalModel, isSecure } from "./speech/vosk_stt.js";
 import { MANUAL_BUTTONS, programForCommand, commandLabel } from "./robot/motions.js";
 import { BALL_COLORS } from "./vision/blue-ball.js";
 import { PoseManager } from "./sim/poseManager.js";
@@ -455,6 +455,12 @@ function warmVoice() {
     }
     hideBar("bar-voice");
     const why = voskWarmupError() || "неизвестно";
+    if (why.startsWith("model-missing")) {
+      // Модели нет и сервер не докачал — не пугаем тостом, предлагаем файл вручную.
+      if (speechSupported) { preferVosk = false; setMicEnabled(true); }
+      offerVoiceModelUpload();
+      return;
+    }
     if (speechSupported) {
       preferVosk = false;
       setMicEnabled(true);
@@ -469,6 +475,28 @@ function warmVoice() {
   $("pill-voice").onclick = () => {
     if (voskSupported() && !voskModelReady()) { warmVoice(); }
   };
+}
+
+/* Модели голоса нет и сервер не докачал: тихая плашка + выбор файла вручную. */
+function offerVoiceModelUpload() {
+  setVoicePill("busy", "🎙 Нет модели голоса", "Сервер не смог докачать модель. Клик — выбрать файл vosk-ru-small.tar.gz вручную");
+  let input = $("voice-model-file");
+  if (!input) {
+    input = document.createElement("input");
+    input.type = "file";
+    input.id = "voice-model-file";
+    input.accept = ".tar.gz,.gz,application/gzip";
+    input.style.display = "none";
+    document.body.appendChild(input);
+    input.onchange = () => {
+      const f = input.files && input.files[0];
+      if (!f) { return; }
+      voskUseLocalModel(f);
+      input.value = "";
+      warmVoice();
+    };
+  }
+  $("pill-voice").onclick = () => { input.click(); };
 }
 
 function initSpeech() {

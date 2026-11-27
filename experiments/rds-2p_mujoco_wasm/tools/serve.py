@@ -21,11 +21,16 @@ import argparse
 import json
 import mimetypes
 import os
+import shutil
 import ssl
 import subprocess
 import sys
+import tarfile
+import tempfile
+import threading
 import urllib.error
 import urllib.request
+import zipfile
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -75,6 +80,86 @@ VARIANTS = {
         "summary": "передача ROS2-топиков прямо в mujoco_web — WebSocket-мост (rosbridge) + клиент-подписчик",
     },
 }
+
+
+# ── серверная догрузка моделей ─────────────────────────────
+# Если модели нет на диске, сервер сам качает её в фоне: клиент получает 202
+# {"status":"fetching"} и повторяет запрос, пока файл не появится. Если сети
+# нет (failed) — отдаём 404, и клиент предлагает загрузить файл вручную.
+MODEL_SOURCES = {
+    "/models/stt/vosk-ru-small.tar.gz": {
+        "kind": "vosk",
+        "url": "https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip",
+    },
+}
+_model_state: dict = {}
+_model_lock = threading.Lock()
+
+
+def _download(url: str, dest: Path, attempts: int = 3) -> None:
+    """Закачка с таймаутом, проверкой размера и повторами (сеть может обрывать)."""
+    last = None
+    for _ in range(attempts):
+        try:
+            with urllib.request.urlopen(url, timeout=60) as r:
+                expected = int(r.headers.get("Content-Length") or 0)
+                with open(dest, "wb") as f:
+                    shutil.copyfileobj(r, f, 256 * 1024)
+            if expected and dest.stat().st_size != expected:
+                raise IOError(f"incomplete: {dest.stat().st_size} != {expected}")
+            return
+        except Exception as err:  # noqa: BLE001
+            last = err
+            try:
+                dest.unlink()
+            except OSError:
+                pass
+    raise last
+
+
+def _fetch_vosk(spec: dict, dest: Path) -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        zip_path = Path(tmp) / "m.zip"
+        _download(spec["url"], zip_path)
+        with zipfile.ZipFile(zip_path) as z:
+            z.extractall(tmp)
+        tops = [p for p in Path(tmp).iterdir() if p.is_dir()]
+        if len(tops) != 1:
+            raise RuntimeError("ожидалась одна папка модели в zip")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        tmp_out = dest.with_suffix(".tmp")
+        with tarfile.open(tmp_out, "w:gz") as t:
+            t.add(tops[0], arcname=tops[0].name)
+        tmp_out.replace(dest)
+
+
+def _model_worker(path: str, spec: dict, dest: Path) -> None:
+    try:
+        if spec["kind"] == "vosk":
+            _fetch_vosk(spec, dest)
+        else:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            _download(spec["url"], dest)
+        with _model_lock:
+            _model_state[path] = {"status": "ready"}
+    except Exception as err:  # noqa: BLE001
+        with _model_lock:
+            _model_state[path] = {"status": "failed", "error": str(err)}
+
+
+def model_fetch_state(path: str, fs_path: str):
+    """None — модель не зарегистрирована; иначе idle/fetching/ready/failed."""
+    spec = MODEL_SOURCES.get(path)
+    if not spec:
+        return None
+    with _model_lock:
+        st = _model_state.get(path, {"status": "idle"})
+        if st["status"] == "idle":
+            st = {"status": "fetching"}
+            _model_state[path] = st
+            threading.Thread(target=_model_worker,
+                             args=(path, spec, Path(fs_path)), daemon=True).start()
+        return st["status"]
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -133,6 +218,11 @@ class Handler(SimpleHTTPRequestHandler):
                 fs_path = index
                 path = path.rstrip("/") + "/index.html"
         if not os.path.isfile(fs_path):
+            if self.command == "GET":
+                state = model_fetch_state(path, fs_path)
+                if state == "fetching":
+                    self._json(202, {"status": "fetching", "path": path})
+                    return
             self.send_error(404, f"Not found: {path}")
             return
         try:

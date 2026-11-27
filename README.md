@@ -1,6 +1,12 @@
 # RDS-2P Software
 
-Программное обеспечение для квадропеда RDS-2P: ROS 2 workspace, модели (URDF/MJCF), веб-симуляция на MuJoCo WASM, материалы по обратной кинематике.
+![Deploy](https://github.com/ShiWarai/RDS-2P-software/actions/workflows/deploy.yml/badge.svg)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![ROS 2](https://img.shields.io/badge/ROS%202-Humble-blueviolet.svg)
+![platform](https://img.shields.io/badge/platform-linux%20amd64%20%7C%20arm64-orange.svg)
+![docker](https://img.shields.io/badge/docker-GHCR-blue.svg)
+
+Программное обеспечение для квадропеда RDS-2P: ROS 2 workspace, модели (URDF/MJCF), веб-симуляция на MuJoCo WASM, самодостаточные Docker-образы и материалы по обратной кинематике.
 
 ## Структура репозитория
 
@@ -11,9 +17,23 @@
 | `urdf_src/` | Исходники/черновики URDF |
 | `mjcf_src/` | Скрипты и конфигурации для MJCF |
 | `experiments/inverse_kinematic/` | Наброски по обратной кинематике |
-| [`experiments/wasm_demo/`](experiments/wasm_demo/README.md) | Браузерная симуляция (MuJoCo + three.js) |
+| [`experiments/wasm_demo/`](experiments/wasm_demo/README.md) | Простая браузерная симуляция (MuJoCo + three.js) |
+| [`experiments/rds-2p_mujoco_wasm/`](experiments/rds-2p_mujoco_wasm/README.md) | Веб-симулятор «Панда»: MuJoCo WASM + ONNX-политика ходьбы, Laya, Vosk |
+| [`docker/`](docker/README.md) | Docker-образы desktop / robot / web на `ros:humble-ros-base` |
 
 Подробная установка и запуск ROS 2 — в [ros_packages/README.md](ros_packages/README.md).
+
+## Docker-образы (без ROS на хосте)
+
+Вместо нативной сборки можно использовать самодостаточные образы на `ros:humble-ros-base` — весь ROS 2-стек RDS-2P живёт внутри контейнера, на хостах ROS 2 не нужен:
+
+| Образ | Арх | Назначение |
+|---|---|---|
+| `rds2p/desktop:humble` | amd64 | twin-симуляция MuJoCo GUI (WSL/WSLg) |
+| `rds2p/robot:humble` | arm64 | всё железо робота (RK3588: IMU, камера, голос, NPU) |
+| `rds2p/web:latest` | amd64/arm64 | веб-мастер-класс «Панда» в браузере, без ROS |
+
+Сборка и запуск — скрипты из [`docker/`](docker/README.md). CI публикует образы в GHCR: `ghcr.io/<owner>/rds-2p-software-{desktop,robot,web}` (теги `:main` — после зелёного Deploy на `main`, `:prerelease` — с `[prerelease]` в коммите `dev`). Подробности — [docker/README.md](docker/README.md).
 
 ## Быстрый старт (ROS 2)
 

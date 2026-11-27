@@ -52,6 +52,10 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PORT=8080
 
+# CA-сертификаты нужны serve.py для серверной догрузки моделей по HTTPS.
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Модели — первыми слоями: их не задевает обновление кода приложения.
@@ -78,6 +82,8 @@ RUN python3 tools/precompress_assets.py . /app/urdf_src
 
 # Непривилегированный пользователь: serve.py только читает файлы (644/755 хватает).
 RUN useradd -m -u 10001 panda
+# models/ доступен на запись: serve.py догружает отсутствующие модели в рантайме.
+RUN chown -R panda:panda /app/experiments/rds-2p_mujoco_wasm/models
 USER panda
 
 EXPOSE 8080

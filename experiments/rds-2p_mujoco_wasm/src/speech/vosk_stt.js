@@ -19,6 +19,32 @@ let modelCb = null;
 let voskJsPromise = null;
 let warmupError = "";
 let model = null;
+let localBlob = null;
+
+/* Клиентская догрузка: пользователь сам выбрал файл модели (сервер не смог). */
+export function voskUseLocalModel(blob) {
+  localBlob = blob;
+  modelPromise = null;
+  modelReady = false;
+  model = null;
+}
+
+/* Сервер может готовить модель в фоне (202) — повторяем запрос, пока не отдаст. */
+async function fetchModel(url) {
+  const deadline = Date.now() + 180000;
+  for (;;) {
+    const resp = await fetch(url);
+    if (resp.status === 202) {
+      if (Date.now() > deadline) { throw new Error("model-missing: сервер не подготовил модель (нет сети?)"); }
+      report(0.05, "📥 сервер готовит модель");
+      await new Promise((r) => setTimeout(r, 1500));
+      continue;
+    }
+    if (resp.status === 404) { throw new Error(`model-missing: модель ${MODEL_URL}: HTTP 404`); }
+    if (!resp.ok) { throw new Error(`модель ${MODEL_URL}: HTTP ${resp.status}`); }
+    return resp;
+  }
+}
 
 export function voskSupported() {
   if (typeof WebAssembly === "undefined") { return false; }
@@ -70,15 +96,20 @@ async function storeCache(url, blob) {
 async function loadModel() {
   const Vosk = await ensureVoskGlobal();
   const url = new URL(MODEL_URL, document.baseURI).href;
-  const cached = await cacheMatch(url);
   let blob;
+  let useLocal = false;
+  if (localBlob) {
+    useLocal = true;
+    report(0.88, "📦 локальная модель");
+    blob = localBlob;
+  } else {
+  const cached = await cacheMatch(url);
   if (cached) {
     report(0.88, "📦 берём из кэша");
     blob = await cached.blob();
   } else {
     report(0.01, "📥 качаю голос");
-    const resp = await fetch(MODEL_URL);
-    if (!resp.ok) { throw new Error(`модель ${MODEL_URL}: HTTP ${resp.status}`); }
+    const resp = await fetchModel(MODEL_URL);
     const total = Number(resp.headers.get("Content-Length")) || 0;
     if (total > 0 && resp.body && resp.body.getReader) {
       const reader = resp.body.getReader();
@@ -98,9 +129,10 @@ async function loadModel() {
     }
     await storeCache(url, blob);
   }
+  }
   report(0.92, "📦 распаковываю");
-  // Stable URL reuses Vosk's filesystem cache instead of a new blob UUID.
-  const blobUrl = url;
+  // Стабильный HTTP-URL переиспользует FS-кэш Vosk; локальный blob — object URL.
+  const blobUrl = useLocal ? URL.createObjectURL(blob) : url;
   try {
     model = await withTimeout(
       Vosk.createModel(blobUrl),
@@ -109,7 +141,7 @@ async function loadModel() {
     );
     try { model.setLogLevel(-3); } catch { /* не критично */ }
   } finally {
-    // HTTP model URL is stable and must not be revoked.
+    if (useLocal) { URL.revokeObjectURL(blobUrl); }
   }
   modelReady = true;
   report(1, "готово");
